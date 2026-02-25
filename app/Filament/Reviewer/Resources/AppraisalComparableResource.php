@@ -9,13 +9,17 @@ use App\Models\AppraisalAssetComparable;
 use App\Models\AdjustmentFactor;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\Section as InfoSection;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
@@ -41,18 +45,18 @@ class AppraisalComparableResource extends Resource
                             ->relationship(
                                 name: 'asset',
                                 titleAttribute: 'address',
-                                modifyQueryUsing: fn (Builder $query) => $query
+                                modifyQueryUsing: fn(Builder $query) => $query
                                     ->with('request')
-                                    ->whereHas('request', fn (Builder $requestQuery) => $requestQuery
+                                    ->whereHas('request', fn(Builder $requestQuery) => $requestQuery
                                         ->whereIn('status', [
                                             AppraisalStatusEnum::ContractSigned->value,
                                             AppraisalStatusEnum::ValuationOnProgress->value,
                                             AppraisalStatusEnum::ValuationCompleted->value,
                                         ]))
                             )
-                            ->getOptionLabelFromRecordUsing(fn (AppraisalAsset $record): string => self::assetOptionLabel($record))
+                            ->getOptionLabelFromRecordUsing(fn(AppraisalAsset $record): string => self::assetOptionLabel($record))
                             ->searchable()
-                            ->preload()
+                            ->optionsLimit(20) // optional, biar tidak “kebanyakan”
                             ->required(),
 
                         Forms\Components\TextInput::make('external_id')
@@ -65,6 +69,16 @@ class AppraisalComparableResource extends Resource
                             ->default('pembanding_service')
                             ->maxLength(100)
                             ->required(),
+
+                        Toggle::make('is_selected')
+                            ->label('Gunakan untuk penyesuaian')
+                            ->inline(false),
+
+                        Forms\Components\TextInput::make('manual_rank')
+                            ->label('Rank Manual')
+                            ->numeric()
+                            ->minValue(1)
+                            ->helperText('Kosongkan untuk pakai priority rank dari API.'),
 
                         Forms\Components\TextInput::make('rank')
                             ->label('Peringkat')
@@ -80,6 +94,11 @@ class AppraisalComparableResource extends Resource
                             ->label('Bobot')
                             ->numeric()
                             ->step(0.0001),
+
+                        Forms\Components\TextInput::make('distance_meters')
+                            ->label('Jarak (m)')
+                            ->numeric()
+                            ->step(0.01),
                     ]),
 
                 Forms\Components\Section::make('Data Mentah Pembanding')
@@ -111,6 +130,12 @@ class AppraisalComparableResource extends Resource
 
                         Forms\Components\DatePicker::make('raw_data_date')
                             ->label('Tanggal Data Raw'),
+
+                        Forms\Components\TextInput::make('image_url')
+                            ->label('Image URL')
+                            ->maxLength(255)
+                            ->helperText('Otomatis dari API jika ada.')
+                            ->disabled(fn($record) => (bool) $record?->exists),
                     ]),
 
                 Forms\Components\Section::make('Hasil Penyesuaian')
@@ -149,7 +174,7 @@ class AppraisalComparableResource extends Resource
                             ->schema([
                                 Forms\Components\Select::make('factor_id')
                                     ->label('Factor')
-                                    ->options(fn () => AdjustmentFactor::query()
+                                    ->options(fn() => AdjustmentFactor::query()
                                         ->where('is_active', true)
                                         ->orderBy('sort_order')
                                         ->pluck('name', 'id')
@@ -189,10 +214,10 @@ class AppraisalComparableResource extends Resource
                         Forms\Components\Textarea::make('snapshot_json')
                             ->label('Snapshot JSON')
                             ->rows(6)
-                            ->formatStateUsing(fn ($state) => self::formatJson($state))
+                            ->visible(fn(string $operation) => $operation === 'edit') // hanya edit
+                            ->formatStateUsing(fn($state) => self::formatJson($state))
                             ->rules(['nullable', 'json'])
-                            ->dehydrateStateUsing(fn ($state) => blank($state) ? null : json_decode((string) $state, true))
-                            ->helperText('Opsional. Simpan payload pembanding dari API internal.')
+                            ->dehydrateStateUsing(fn($state) => blank($state) ? null : json_decode((string) $state, true))
                             ->columnSpanFull(),
                     ]),
             ]);
@@ -202,57 +227,92 @@ class AppraisalComparableResource extends Resource
     {
         return $table
             ->defaultSort('created_at', 'desc')
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['asset.request']))
+            ->modifyQueryUsing(fn(Builder $query) => $query->with(['asset.request']))
             ->columns([
+                Tables\Columns\ImageColumn::make('image_url')
+                    ->label('Foto')
+                    ->height(64)
+                    ->width(96)
+                    ->extraImgAttributes(['class' => 'object-cover rounded-md'])
+                    ->defaultImageUrl('https://ui-avatars.com/api/?name=PB'),
+
                 Tables\Columns\TextColumn::make('asset.request.request_number')
                     ->label('No. Permohonan')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('asset.address')
                     ->label('Aset')
-                    ->limit(45)
+                    ->limit(80)
+                    ->wrap()
                     ->searchable(),
+
+                Tables\Columns\TextColumn::make('appraisal_asset_id')
+                    ->label('ID Aset')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('external_id')
-                    ->label('External ID')
-                    ->searchable(),
+                    ->label('Ext ID')
+                    ->badge()
+                    ->sortable(),
 
-                Tables\Columns\TextColumn::make('rank')
+                Tables\Columns\IconColumn::make('is_selected')
+                    ->label('Pakai')
+                    ->boolean()
+                    ->action(fn(AppraisalAssetComparable $record) => $record->update(['is_selected' => ! $record->is_selected])),
+
+                Tables\Columns\TextColumn::make('score')
+                    ->label('Score')
+                    ->numeric(decimalPlaces: 3)
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('distance_meters')
+                    ->label('Jarak (m)')
+                    ->numeric(decimalPlaces: 1)
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('manual_rank')
                     ->label('Rank')
+                    ->placeholder('-')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('raw_land_area')
+                    ->label('Luas (m²)')
+                    ->numeric(decimalPlaces: 0)
                     ->placeholder('-'),
 
-                Tables\Columns\TextColumn::make('total_adjustment_percent')
-                    ->label('Adj (%)')
-                    ->numeric(decimalPlaces: 2)
-                    ->placeholder('-'),
+                Tables\Columns\TextColumn::make('raw_data_date')
+                    ->label('Tgl Data')
+                    ->date(),
 
-                Tables\Columns\TextColumn::make('adjusted_unit_value')
-                    ->label('Adjusted Unit')
-                    ->money('idr')
-                    ->placeholder('-'),
+                Tables\Columns\TextColumn::make('raw_peruntukan')
+                    ->label('Peruntukan'),
 
                 Tables\Columns\TextColumn::make('indication_value')
                     ->label('Indikasi')
                     ->money('idr')
-                    ->placeholder('-'),
-
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Dibuat')
-                    ->dateTime('d M Y H:i')
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('appraisal_asset_id')
+                SelectFilter::make('appraisal_asset_id')
                     ->label('Aset Subjek')
                     ->relationship('asset', 'address')
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->default(fn() => request()->query('asset_id')),
+                TernaryFilter::make('is_selected')
+                    ->label('Dipakai')
+                    ->boolean(),
+                SelectFilter::make('manual_rank')
+                    ->label('Rank Manual')
+                    ->options(range(1, 10))
+                    ->placeholder('Semua'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
-
                 Tables\Actions\Action::make('syncAssetRange')
                     ->label('Sync Range Aset')
                     ->icon('heroicon-o-calculator')
@@ -271,8 +331,8 @@ class AppraisalComparableResource extends Resource
                         $values = $asset->comparables()
                             ->whereNotNull('indication_value')
                             ->pluck('indication_value')
-                            ->map(fn ($value) => (int) $value)
-                            ->filter(fn (int $value) => $value > 0)
+                            ->map(fn($value) => (int) $value)
+                            ->filter(fn(int $value) => $value > 0)
                             ->values();
 
                         if ($values->isEmpty()) {
@@ -300,13 +360,35 @@ class AppraisalComparableResource extends Resource
                             ->success()
                             ->send();
                     }),
+                Tables\Actions\Action::make('toggleSelect')
+                    ->visible(false)
+                    ->action(function (AppraisalAssetComparable $record) {
+                        $record->update(['is_selected' => ! $record->is_selected]);
+                    }),
             ])
-            ->bulkActions([]);
+            ->bulkActions([
+                Tables\Actions\BulkAction::make('selectAll')
+                    ->label('Tandai Dipakai')
+                    ->action(fn($records) => $records->each->update(['is_selected' => true])),
+                Tables\Actions\BulkAction::make('deselectAll')
+                    ->label('Hapus Tanda')
+                    ->color('secondary')
+                    ->action(fn($records) => $records->each->update(['is_selected' => false])),
+            ]);
     }
 
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist->schema([
+            InfoSection::make('Media')
+                ->schema([
+                    ImageEntry::make('image_url')
+                        ->label('Foto')
+                        ->height(180)
+                        ->extraImgAttributes(['class' => 'object-cover rounded-lg'])
+                        ->default('https://ui-avatars.com/api/?name=PB'),
+                ]),
+
             InfoSection::make('Ringkasan Pembanding')
                 ->columns(3)
                 ->schema([
@@ -325,7 +407,32 @@ class AppraisalComparableResource extends Resource
                 ->schema([
                     TextEntry::make('landAdjustments_count')
                         ->label('Total Adjustment Factor')
-                        ->state(fn (AppraisalAssetComparable $record): int => $record->landAdjustments()->count()),
+                        ->state(fn(AppraisalAssetComparable $record): int => $record->landAdjustments->count()),
+                ]),
+
+            InfoSection::make('Detail API')
+                ->columns(2)
+                ->schema([
+                    TextEntry::make('snapshot_json.jenis_listing.name')->label('Jenis Listing'),
+                    TextEntry::make('snapshot_json.peruntukan.name')->label('Peruntukan'),
+                    TextEntry::make('snapshot_json.jenis_objek.name')->label('Jenis Objek'),
+                    TextEntry::make('snapshot_json.dokumen_tanah.name')->label('Dokumen Tanah'),
+                    TextEntry::make('snapshot_json.alamat_data')->label('Alamat Data')->columnSpanFull(),
+                    TextEntry::make('snapshot_json.province.name')->label('Provinsi'),
+                    TextEntry::make('snapshot_json.regency.name')->label('Kab/Kota'),
+                    TextEntry::make('snapshot_json.district.name')->label('Kecamatan'),
+                    TextEntry::make('snapshot_json.village.name')->label('Kelurahan'),
+                    TextEntry::make('snapshot_json')
+                        ->label('Koordinat')
+                        ->state(fn($state) => ($lat = data_get($state, 'latitude')) && ($lng = data_get($state, 'longitude'))
+                            ? $lat . ', ' . $lng
+                            : '-'),
+                    TextEntry::make('snapshot_json.luas_tanah')->label('Luas Tanah'),
+                    TextEntry::make('snapshot_json.luas_bangunan')->label('Luas Bangunan'),
+                    TextEntry::make('snapshot_json.tanggal_data')->label('Tanggal Data'),
+                    TextEntry::make('snapshot_json.harga')
+                        ->label('Harga')
+                        ->formatStateUsing(fn($state) => $state ? 'Rp ' . number_format((int) $state, 0, ',', '.') : '-'),
                 ]),
         ]);
     }
@@ -333,7 +440,8 @@ class AppraisalComparableResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->whereHas('asset.request', fn (Builder $query) => $query->whereIn('status', [
+            ->with(['asset.request', 'landAdjustments']) // ← add this
+            ->whereHas('asset.request', fn(Builder $query) => $query->whereIn('status', [
                 AppraisalStatusEnum::ContractSigned->value,
                 AppraisalStatusEnum::ValuationOnProgress->value,
                 AppraisalStatusEnum::ValuationCompleted->value,

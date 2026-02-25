@@ -10,10 +10,4 @@ class ViewAppraisalComparable extends ViewRecord
 {
     protected static string $resource = AppraisalComparableResource::class;
 
-    protected function getHeaderActions(): array
-    {
-        return [
-            Actions\EditAction::make(),
-        ];
-    }
 }

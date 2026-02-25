@@ -9,7 +9,7 @@ enum AssetTypeEnum: string
     use EnumTraits;
 
     case TANAH              = 'tanah';
-    case TANAH_BANGUNAN    = 'tanah_bangunan';
+    case TANAH_BANGUNAN     = 'tanah_bangunan';
     case RUMAH_TINGGAL      = 'rumah_tinggal';
     case RUKO               = 'ruko';
     case APARTEMENT         = 'apartement';
@@ -23,9 +23,9 @@ enum AssetTypeEnum: string
 
     public function label(): ?string
     {
-        return match ($this){
+        return match ($this) {
             self::TANAH                 => 'Tanah',
-self::TANAH_BANGUNAN        => 'Tanah dan Bangunan',
+            self::TANAH_BANGUNAN        => 'Tanah dan Bangunan',
             self::RUMAH_TINGGAL         => 'Rumah Tinggal',
             self::RUKO                  => 'Ruko',
             self::APARTEMENT            => 'Apartement',
@@ -38,5 +38,4 @@ self::TANAH_BANGUNAN        => 'Tanah dan Bangunan',
             self::SAWAH                 => 'Sawah',
         };
     }
-
 }
