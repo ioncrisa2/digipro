@@ -3,6 +3,7 @@
 namespace App\Filament\Reviewer\Resources;
 
 use App\Enums\AppraisalStatusEnum;
+use App\Filament\Reviewer\Pages\AdjustmentWorkbench;
 use App\Filament\Reviewer\Resources\AppraisalAssetResource\Pages;
 use App\Filament\Reviewer\Resources\AppraisalAssetResource\RelationManagers\ComparablesRelationManager;
 use App\Models\AppraisalAsset;
@@ -57,6 +58,13 @@ class AppraisalAssetResource extends Resource
                     ->sortable(),
             ])
             ->actions([
+                Tables\Actions\Action::make('adjustmentWorkbench')
+                    ->label('Adjust Harga Tanah')
+                    ->icon('heroicon-o-table-cells')
+                    ->color('warning')
+                    ->url(fn (AppraisalAsset $record): string => AdjustmentWorkbench::getUrl([
+                        'asset' => $record->id,
+                    ])),
                 Tables\Actions\ViewAction::make(), // di halaman view akan muncul tab relation pembanding
             ]);
     }

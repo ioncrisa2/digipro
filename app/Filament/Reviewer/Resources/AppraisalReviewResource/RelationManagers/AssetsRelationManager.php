@@ -3,6 +3,7 @@
 namespace App\Filament\Reviewer\Resources\AppraisalReviewResource\RelationManagers;
 
 use App\Enums\AssetTypeEnum;
+use App\Filament\Reviewer\Pages\AdjustmentWorkbench;
 use App\Models\AppraisalAsset;
 use App\Services\ComparableDataApi;
 use Filament\Forms;
@@ -80,6 +81,13 @@ class AssetsRelationManager extends RelationManager
             ])
             ->headerActions([])
             ->actions([
+                Tables\Actions\Action::make('openAdjustmentWorkbench')
+                    ->label('Adjustment Matrix')
+                    ->icon('heroicon-o-table-cells')
+                    ->color('warning')
+                    ->url(fn (AppraisalAsset $record): string => AdjustmentWorkbench::getUrl([
+                        'asset' => $record->id,
+                    ])),
                 Tables\Actions\Action::make('searchComparables')
                     ->label('Cari & Pilih Pembanding')
                     ->icon('heroicon-o-magnifying-glass')

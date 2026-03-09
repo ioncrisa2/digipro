@@ -32,6 +32,7 @@ class ReviewerPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
             ])
+            ->topNavigation()
             ->theme(asset('css/filament/admin/theme.css'))
             ->navigationGroups([
                 NavigationGroup::make('Penilaian'),
