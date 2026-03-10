@@ -34,6 +34,30 @@ defineProps({
     type: Array,
     required: true,
   },
+  usageOptions: {
+    type: Array,
+    required: true,
+  },
+  titleDocumentOptions: {
+    type: Array,
+    required: true,
+  },
+  landShapeOptions: {
+    type: Array,
+    required: true,
+  },
+  landPositionOptions: {
+    type: Array,
+    required: true,
+  },
+  landConditionOptions: {
+    type: Array,
+    required: true,
+  },
+  topographyOptions: {
+    type: Array,
+    required: true,
+  },
   provinces: {
     type: Array,
     required: true,
@@ -203,9 +227,140 @@ defineProps({
               </div>
 
               <div class="grid gap-2">
+                <Label>Tahun Bangun <span class="text-destructive">*</span></Label>
+                <Input type="number" v-model="asset.buildYear" placeholder="Cth: 2018" />
+              </div>
+
+              <div class="grid gap-2">
                 <Label>Thn. Renovasi</Label>
                 <Input type="number" v-model="asset.renovationYear" placeholder="Cth: 2020" />
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-xl border bg-muted/10 p-5 space-y-4">
+          <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Data Umum Properti
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid gap-2">
+              <Label>Peruntukan <span class="text-destructive">*</span></Label>
+              <Select v-model="asset.peruntukan">
+                <SelectTrigger class="w-full">
+                  <SelectValue placeholder="Pilih peruntukan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in usageOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="grid gap-2">
+              <Label>Dokumen Tanah <span class="text-destructive">*</span></Label>
+              <Select v-model="asset.titleDocument">
+                <SelectTrigger class="w-full">
+                  <SelectValue placeholder="Pilih dokumen tanah" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in titleDocumentOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="grid gap-2">
+              <Label>Bentuk Tanah <span class="text-destructive">*</span></Label>
+              <Select v-model="asset.landShape">
+                <SelectTrigger class="w-full">
+                  <SelectValue placeholder="Pilih bentuk tanah" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in landShapeOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="grid gap-2">
+              <Label>Posisi Tanah <span class="text-destructive">*</span></Label>
+              <Select v-model="asset.landPosition">
+                <SelectTrigger class="w-full">
+                  <SelectValue placeholder="Pilih posisi tanah" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in landPositionOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="grid gap-2">
+              <Label>Kondisi Tanah <span class="text-destructive">*</span></Label>
+              <Select v-model="asset.landCondition">
+                <SelectTrigger class="w-full">
+                  <SelectValue placeholder="Pilih kondisi tanah" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in landConditionOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="grid gap-2">
+              <Label>Topografi <span class="text-destructive">*</span></Label>
+              <Select v-model="asset.topography">
+                <SelectTrigger class="w-full">
+                  <SelectValue placeholder="Pilih topografi" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in topographyOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="grid gap-2">
+              <Label>Lebar Muka (meter) <span class="text-destructive">*</span></Label>
+              <Input type="number" v-model="asset.frontageWidth" placeholder="Cth: 12" />
+            </div>
+
+            <div class="grid gap-2">
+              <Label>Lebar Akses Jalan (meter) <span class="text-destructive">*</span></Label>
+              <Input type="number" v-model="asset.accessRoadWidth" placeholder="Cth: 6" />
             </div>
           </div>
         </section>

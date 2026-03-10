@@ -11,6 +11,13 @@ import UserDashboardTopbar from "@/components/user-dashboard/UserDashboardTopbar
 import UserDashboardFooter from "@/components/user-dashboard/UserDashboardFooter.vue";
 import LogoutConfirmDialog from "@/components/user-dashboard/LogoutConfirmDialog.vue";
 
+defineProps({
+  title: {
+    type: String,
+    default: "Dashboard",
+  },
+});
+
 const page = usePage();
 const { notify } = useNotification();
 const user = computed(() => page.props.auth?.user ?? {});
@@ -263,7 +270,7 @@ watch(
                 :on-logout="handleLogoutClick"
             >
                 <template #title>
-                    <slot name="title">Dashboard</slot>
+                    <slot name="title">{{ title }}</slot>
                 </template>
             </UserDashboardTopbar>
 

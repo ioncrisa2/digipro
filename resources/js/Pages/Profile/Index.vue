@@ -1,5 +1,6 @@
 <script setup>
 import UserDashboardLayout from "@/layouts/UserDashboardLayout.vue";
+import ReviewerLayout from "@/layouts/ReviewerLayout.vue";
 import { useForm, usePage, router } from "@inertiajs/vue3";
 import axios from "axios";
 import { computed, ref, nextTick, onBeforeUnmount, watch } from "vue";
@@ -26,6 +27,16 @@ const page = usePage();
 const { notify } = useNotification();
 
 const user = computed(() => page.props.auth?.user || {});
+const layoutContext = computed(() => page.props.layoutContext || "customer");
+const profileRoutes = computed(() => page.props.profileRoutes || {
+  edit: "/profile",
+  update: "/profile",
+  password: "/profile/password",
+  passwordVerify: "/profile/password/verify",
+  avatar: route("profile.avatar"),
+  avatarRemove: route("profile.avatar.remove"),
+});
+const layoutComponent = computed(() => (layoutContext.value === "reviewer" ? ReviewerLayout : UserDashboardLayout));
 const defaultAvatarUrl = "/images/avatar-default.svg";
 const avatarUrl = computed(() => user.value.avatar_url || defaultAvatarUrl);
 
@@ -74,7 +85,7 @@ const passwordForm = useForm({
 });
 
 const submitProfile = () => {
-  profileForm.put("/profile", {
+  profileForm.put(profileRoutes.value.update, {
     preserveScroll: true,
     onSuccess: () => {
       notify("success", "Profil berhasil diperbarui.");
@@ -87,7 +98,7 @@ const submitProfile = () => {
 };
 
 const submitPassword = () => {
-  passwordForm.put("/profile/password", {
+  passwordForm.put(profileRoutes.value.password, {
     preserveScroll: true,
     onSuccess: () => {
       notify("success", "Password berhasil diperbarui.");
@@ -292,7 +303,7 @@ const applyCrop = () => {
       const file = new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
       avatarForm.avatar = file;
 
-      avatarForm.post(route("profile.avatar"), {
+      avatarForm.post(profileRoutes.value.avatar, {
         preserveScroll: true,
         onSuccess: () => {
           notify("success", "Foto profil berhasil diperbarui.");
@@ -312,7 +323,7 @@ const applyCrop = () => {
 };
 
 const removeAvatar = () => {
-  router.delete(route("profile.avatar.remove"), {
+  router.delete(profileRoutes.value.avatarRemove, {
     preserveScroll: true,
     onSuccess: () => {
       notify("success", "Foto profil direset ke default.");
@@ -352,7 +363,7 @@ const backPasswordStep = () => {
 };
 
 const verifyCurrentPassword = () => {
-  passwordForm.post(route("profile.password.verify"), {
+  passwordForm.post(profileRoutes.value.passwordVerify, {
     preserveScroll: true,
     preserveState: true,
     onSuccess: () => {
@@ -471,8 +482,8 @@ watch(activeTab, (val) => {
 </script>
 
 <template>
-  <UserDashboardLayout>
-    <template #title>Profil Saya</template>
+  <component :is="layoutComponent" title="Profil Saya">
+    <template v-if="layoutContext !== 'reviewer'" #title>Profil Saya</template>
 
     <div class="max-w-4xl space-y-6">
       <Card class="shadow-sm">
@@ -868,5 +879,5 @@ watch(activeTab, (val) => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </UserDashboardLayout>
+  </component>
 </template>

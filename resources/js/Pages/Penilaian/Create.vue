@@ -22,6 +22,12 @@ const props = defineProps({
     districts: { type: Array, default: () => [] },
     villages: { type: Array, default: () => [] },
     assetTypeOptions: { type: Array, default: () => [] },
+    usageOptions: { type: Array, default: () => [] },
+    titleDocumentOptions: { type: Array, default: () => [] },
+    landShapeOptions: { type: Array, default: () => [] },
+    landPositionOptions: { type: Array, default: () => [] },
+    landConditionOptions: { type: Array, default: () => [] },
+    topographyOptions: { type: Array, default: () => [] },
     needsConsent: { type: Boolean, default: false },
     consentData: { type: Object, default: null },
     uploadLimits: {
@@ -79,7 +85,16 @@ function createEmptyAsset() {
         landArea: '',
         buildingArea: '',
         floors: '',
+        buildYear: '',
         renovationYear: '',
+        peruntukan: '',
+        titleDocument: '',
+        landShape: '',
+        landPosition: '',
+        landCondition: '',
+        topography: '',
+        frontageWidth: '',
+        accessRoadWidth: '',
 
         // Location
         province: null,
@@ -283,6 +298,16 @@ const isAssetComplete = (asset) => {
     isFilled(asset.regency) &&
     isFilled(asset.address)
 
+  const hasGeneralData =
+    isFilled(asset.peruntukan) &&
+    isFilled(asset.titleDocument) &&
+    isFilled(asset.landShape) &&
+    isFilled(asset.landPosition) &&
+    isFilled(asset.landCondition) &&
+    isFilled(asset.topography) &&
+    isFilled(asset.frontageWidth) &&
+    isFilled(asset.accessRoadWidth)
+
   const hasDocs =
     isFilled(asset.docPbb) &&
     (asset.docCerts?.length ?? 0) > 0 &&
@@ -295,6 +320,7 @@ const isAssetComplete = (asset) => {
 
   if (isLandOnly(asset)) {
     return isFilled(asset.landArea) &&
+      hasGeneralData &&
       hasLocation &&
       (hasCoords || hasMaps) &&
       hasDocs &&
@@ -304,6 +330,8 @@ const isAssetComplete = (asset) => {
   return isFilled(asset.landArea) &&
     isFilled(asset.buildingArea) &&
     isFilled(asset.floors) &&
+    isFilled(asset.buildYear) &&
+    hasGeneralData &&
     hasLocation &&
     (hasCoords || hasMaps) &&
     hasDocs &&
@@ -418,7 +446,16 @@ async function handleSubmit() {
           land_area: asset.landArea,
           building_area: asset.buildingArea,
           floors: asset.floors,
+          build_year: asset.buildYear,
           renovation_year: asset.renovationYear,
+          peruntukan: asset.peruntukan,
+          title_document: asset.titleDocument,
+          land_shape: asset.landShape,
+          land_position: asset.landPosition,
+          land_condition: asset.landCondition,
+          topography: asset.topography,
+          frontage_width: asset.frontageWidth,
+          access_road_width: asset.accessRoadWidth,
 
           province_id: asset.province,
           regency_id: asset.regency,
@@ -539,6 +576,12 @@ async function handleSubmit() {
                             :total="assets.length"
                             :is-open="openAssetIndex === index"
                             :asset-type-options="ASSET_TYPE_OPTIONS"
+                            :usage-options="props.usageOptions"
+                            :title-document-options="props.titleDocumentOptions"
+                            :land-shape-options="props.landShapeOptions"
+                            :land-position-options="props.landPositionOptions"
+                            :land-condition-options="props.landConditionOptions"
+                            :topography-options="props.topographyOptions"
                             :provinces="props.provinces"
                             :get-asset-type-label="getAssetTypeLabel"
                             :is-land-only="isLandOnly"

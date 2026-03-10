@@ -10,6 +10,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserNotificationController;
 use App\Http\Controllers\ArticleController;
+use App\Http\Controllers\Reviewer\ReviewerController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\EmailVerificationController;
@@ -40,50 +41,90 @@ Route::middleware('guest')->group(function () {
 
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    // user dashboard route
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
     //notification route
     Route::post('/notifications/{id}/read', [UserNotificationController::class, 'read'])->name('notifications.read');
     Route::post('/notifications/read-all', [UserNotificationController::class, 'readAll'])->name('notifications.readAll');
 
-    // appraisal route
-    Route::get('/permohonan-penilaian', [AppraisalController::class, 'index'])->name('appraisal.list');
-    Route::get('/buat-permohonan', [AppraisalController::class, 'create'])->name('appraisal.create');
-    Route::post('/buat-permohonan', [AppraisalController::class, 'store'])->name('appraisal.store');
-    Route::get('/permohonan-penilaian/{id}', [AppraisalController::class, 'show'])->name('appraisal.show');
-    Route::get('/permohonan-penilaian/{id}/penawaran', [AppraisalController::class, 'offerPage'])->name('appraisal.offer.page');
-    Route::post('/permohonan-penilaian/{id}/offer/accept', [AppraisalController::class, 'acceptOffer'])->name('appraisal.offer.accept');
-    Route::post('/permohonan-penilaian/{id}/offer/negotiate', [AppraisalController::class, 'submitOfferNegotiation'])->name('appraisal.offer.negotiate');
-    Route::post('/permohonan-penilaian/{id}/offer/select', [AppraisalController::class, 'selectOffer'])->name('appraisal.offer.select');
-    Route::post('/permohonan-penilaian/{id}/offer/cancel', [AppraisalController::class, 'cancelOffer'])->name('appraisal.offer.cancel');
-    Route::get('/permohonan-penilaian/{id}/kontrak', [AppraisalController::class, 'contractSignaturePage'])->name('appraisal.contract.page');
-    Route::get('/permohonan-penilaian/{id}/kontrak/pdf', [AppraisalController::class, 'downloadContractPdf'])->name('appraisal.contract.pdf');
-    Route::post('/permohonan-penilaian/{id}/kontrak/sign', [AppraisalController::class, 'signContract'])->name('appraisal.contract.sign');
-    Route::get('/permohonan-penilaian/{id}/pembayaran', [PaymentController::class, 'appraisalPage'])->name('appraisal.payment.page');
-    Route::get('/permohonan-penilaian/{id}/invoice', [PaymentController::class, 'invoicePage'])->name('appraisal.invoice.page');
-    Route::get('/permohonan-penilaian/{id}/invoice/pdf', [PaymentController::class, 'downloadInvoicePdf'])->name('appraisal.invoice.pdf');
-    Route::post('/permohonan-penilaian/{id}/pembayaran/proof', [PaymentController::class, 'uploadProof'])->name('appraisal.payment.upload');
-
-    Route::post('/buat-permohonan/consent', [AppraisalController::class, 'acceptConsent'])->name('appraisal.consent.accept');
-    Route::post('/buat-permohonan/consent/decline', [AppraisalController::class, 'declineConsent'])->name('appraisal.consent.decline');
-
-    // laporan penilaian (mock)
-    Route::get('/laporan-penilaian', [ReportController::class, 'index'])->name('reports.index');
-    Route::get('/laporan-penilaian/{id}', [ReportController::class, 'show'])->name('reports.show');
-
-    // pembayaran (mock)
-    Route::get('/pembayaran', [PaymentController::class, 'index'])->name('payments.index');
-    Route::get('/pembayaran/{id}', [PaymentController::class, 'show'])->name('payments.show');
-
-    //profile route
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
-    Route::post('/profile/password/verify', [ProfileController::class, 'verifyCurrentPassword'])->name('profile.password.verify');
-    Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
-    Route::delete('/profile/avatar', [ProfileController::class, 'removeAvatar'])->name('profile.avatar.remove');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    Route::middleware('not.reviewer')->group(function (): void {
+        // user dashboard route
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+        // appraisal route
+        Route::get('/permohonan-penilaian', [AppraisalController::class, 'index'])->name('appraisal.list');
+        Route::get('/buat-permohonan', [AppraisalController::class, 'create'])->name('appraisal.create');
+        Route::post('/buat-permohonan', [AppraisalController::class, 'store'])->name('appraisal.store');
+        Route::get('/permohonan-penilaian/{id}', [AppraisalController::class, 'show'])->name('appraisal.show');
+        Route::get('/permohonan-penilaian/{id}/penawaran', [AppraisalController::class, 'offerPage'])->name('appraisal.offer.page');
+        Route::post('/permohonan-penilaian/{id}/offer/accept', [AppraisalController::class, 'acceptOffer'])->name('appraisal.offer.accept');
+        Route::post('/permohonan-penilaian/{id}/offer/negotiate', [AppraisalController::class, 'submitOfferNegotiation'])->name('appraisal.offer.negotiate');
+        Route::post('/permohonan-penilaian/{id}/offer/select', [AppraisalController::class, 'selectOffer'])->name('appraisal.offer.select');
+        Route::post('/permohonan-penilaian/{id}/offer/cancel', [AppraisalController::class, 'cancelOffer'])->name('appraisal.offer.cancel');
+        Route::get('/permohonan-penilaian/{id}/kontrak', [AppraisalController::class, 'contractSignaturePage'])->name('appraisal.contract.page');
+        Route::get('/permohonan-penilaian/{id}/kontrak/pdf', [AppraisalController::class, 'downloadContractPdf'])->name('appraisal.contract.pdf');
+        Route::post('/permohonan-penilaian/{id}/kontrak/sign', [AppraisalController::class, 'signContract'])->name('appraisal.contract.sign');
+        Route::get('/permohonan-penilaian/{id}/pembayaran', [PaymentController::class, 'appraisalPage'])->name('appraisal.payment.page');
+        Route::get('/permohonan-penilaian/{id}/invoice', [PaymentController::class, 'invoicePage'])->name('appraisal.invoice.page');
+        Route::get('/permohonan-penilaian/{id}/invoice/pdf', [PaymentController::class, 'downloadInvoicePdf'])->name('appraisal.invoice.pdf');
+        Route::post('/permohonan-penilaian/{id}/pembayaran/proof', [PaymentController::class, 'uploadProof'])->name('appraisal.payment.upload');
+
+        Route::post('/buat-permohonan/consent', [AppraisalController::class, 'acceptConsent'])->name('appraisal.consent.accept');
+        Route::post('/buat-permohonan/consent/decline', [AppraisalController::class, 'declineConsent'])->name('appraisal.consent.decline');
+
+        // laporan penilaian (mock)
+        Route::get('/laporan-penilaian', [ReportController::class, 'index'])->name('reports.index');
+        Route::get('/laporan-penilaian/{id}', [ReportController::class, 'show'])->name('reports.show');
+
+        // pembayaran (mock)
+        Route::get('/pembayaran', [PaymentController::class, 'index'])->name('payments.index');
+        Route::get('/pembayaran/{id}', [PaymentController::class, 'show'])->name('payments.show');
+
+        // profile route
+        Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+        Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+        Route::post('/profile/password/verify', [ProfileController::class, 'verifyCurrentPassword'])->name('profile.password.verify');
+        Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
+        Route::delete('/profile/avatar', [ProfileController::class, 'removeAvatar'])->name('profile.avatar.remove');
+    });
+
+    Route::prefix('reviewer')
+        ->name('reviewer.')
+        ->middleware('reviewer.role')
+        ->group(function (): void {
+            Route::get('/', [ReviewerController::class, 'dashboard'])->name('dashboard');
+
+            Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+            Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+            Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+            Route::post('/profile/password/verify', [ProfileController::class, 'verifyCurrentPassword'])->name('profile.password.verify');
+            Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
+            Route::delete('/profile/avatar', [ProfileController::class, 'removeAvatar'])->name('profile.avatar.remove');
+
+            Route::get('/reviews', [ReviewerController::class, 'reviewsIndex'])->name('reviews.index');
+            Route::get('/reviews/{review}', [ReviewerController::class, 'reviewsShow'])->name('reviews.show');
+
+            Route::get('/assets', [ReviewerController::class, 'assetsIndex'])->name('assets.index');
+            Route::get('/assets/{asset}', [ReviewerController::class, 'assetsShow'])->name('assets.show');
+            Route::get('/assets/{asset}/adjustment', [ReviewerController::class, 'assetsAdjustment'])->name('assets.adjustment');
+
+            Route::get('/comparables', [ReviewerController::class, 'comparablesIndex'])->name('comparables.index');
+            Route::get('/comparables/{comparable}', [ReviewerController::class, 'comparablesShow'])->name('comparables.show');
+
+            Route::prefix('api')->name('api.')->group(function (): void {
+                Route::post('/reviews/{review}/start', [ReviewerController::class, 'startReview'])->name('reviews.start');
+                Route::post('/reviews/{review}/finish', [ReviewerController::class, 'finishReview'])->name('reviews.finish');
+
+                Route::post('/assets/{asset}/general-data', [ReviewerController::class, 'updateGeneralData'])->name('assets.general-data');
+                Route::post('/assets/{asset}/comparables/search', [ReviewerController::class, 'searchComparables'])->name('assets.comparables.search');
+                Route::post('/assets/{asset}/comparables/sync', [ReviewerController::class, 'syncComparables'])->name('assets.comparables.sync');
+                Route::post('/assets/{asset}/adjustment/preview', [ReviewerController::class, 'previewAdjustment'])->name('assets.adjustment.preview');
+                Route::post('/assets/{asset}/adjustment/save', [ReviewerController::class, 'saveAdjustment'])->name('assets.adjustment.save');
+
+                Route::post('/comparables/{comparable}', [ReviewerController::class, 'updateComparable'])->name('comparables.update');
+            });
+        });
 });
 
 //email verification

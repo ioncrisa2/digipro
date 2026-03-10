@@ -7,6 +7,7 @@ use App\Models\District;
 use App\Models\Province;
 use App\Models\Regency;
 use App\Models\Village;
+use App\Support\AppraisalAssetFieldOptions;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -42,10 +43,55 @@ class AssetsRelationManager extends RelationManager
                             ->required()
                             ->native(false),
 
-                        Forms\Components\TextInput::make('peruntukan')
+                        Forms\Components\Select::make('peruntukan')
                             ->label('Peruntukan')
-                            ->helperText('Misal: Rumah Tinggal, Ruko, Villa, Tanah Kosong')
-                            ->maxLength(100),
+                            ->options(AppraisalAssetFieldOptions::toSelectMap(AppraisalAssetFieldOptions::usageOptions()))
+                            ->native(false)
+                            ->searchable(),
+                    ]),
+
+                Forms\Components\Section::make('Data Umum Properti')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\Select::make('title_document')
+                            ->label('Dokumen Tanah')
+                            ->options(AppraisalAssetFieldOptions::toSelectMap(AppraisalAssetFieldOptions::titleDocumentOptions()))
+                            ->native(false)
+                            ->searchable(),
+
+                        Forms\Components\Select::make('land_shape')
+                            ->label('Bentuk Tanah')
+                            ->options(AppraisalAssetFieldOptions::toSelectMap(AppraisalAssetFieldOptions::landShapeOptions()))
+                            ->native(false)
+                            ->searchable(),
+
+                        Forms\Components\Select::make('land_position')
+                            ->label('Posisi Tanah')
+                            ->options(AppraisalAssetFieldOptions::toSelectMap(AppraisalAssetFieldOptions::landPositionOptions()))
+                            ->native(false)
+                            ->searchable(),
+
+                        Forms\Components\Select::make('land_condition')
+                            ->label('Kondisi Tanah')
+                            ->options(AppraisalAssetFieldOptions::toSelectMap(AppraisalAssetFieldOptions::landConditionOptions()))
+                            ->native(false)
+                            ->searchable(),
+
+                        Forms\Components\Select::make('topography')
+                            ->label('Topografi')
+                            ->options(AppraisalAssetFieldOptions::toSelectMap(AppraisalAssetFieldOptions::topographyOptions()))
+                            ->native(false)
+                            ->searchable(),
+
+                        Forms\Components\TextInput::make('frontage_width')
+                            ->label('Lebar Muka (meter)')
+                            ->numeric()
+                            ->minValue(0),
+
+                        Forms\Components\TextInput::make('access_road_width')
+                            ->label('Lebar Akses Jalan (meter)')
+                            ->numeric()
+                            ->minValue(0),
                     ]),
 
                 Forms\Components\Section::make('Lokasi')
@@ -186,6 +232,10 @@ class AssetsRelationManager extends RelationManager
                     ->label('Alamat')
                     ->limit(40)
                     ->searchable(),
+
+                Tables\Columns\TextColumn::make('peruntukan')
+                    ->label('Peruntukan')
+                    ->placeholder('-'),
 
                 Tables\Columns\TextColumn::make('land_area')
                     ->label('Luas Tanah')

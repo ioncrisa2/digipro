@@ -58,6 +58,14 @@ defineProps({
     type: Function,
     required: true,
   },
+  profileHref: {
+    type: String,
+    default: "/profile",
+  },
+  portalLabel: {
+    type: String,
+    default: "User Portal",
+  },
 });
 </script>
 
@@ -103,7 +111,7 @@ defineProps({
               {{ user.name }}
             </span>
             <span class="text-[11px] text-slate-500 leading-tight">
-              User Portal
+              {{ portalLabel }}
             </span>
           </div>
           <ChevronDown class="h-4 w-4 text-slate-500 hidden sm:block" />
@@ -122,7 +130,7 @@ defineProps({
         <DropdownMenuSeparator />
 
         <DropdownMenuItem as-child>
-          <Link href="/profile" class="w-full flex items-center justify-between">
+          <Link :href="profileHref" class="w-full flex items-center justify-between">
             <span>Profil Saya</span>
           </Link>
         </DropdownMenuItem>

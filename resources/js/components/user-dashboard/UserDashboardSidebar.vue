@@ -31,6 +31,14 @@ defineProps({
     type: Function,
     required: true,
   },
+  profileHref: {
+    type: String,
+    default: "/profile",
+  },
+  portalLabel: {
+    type: String,
+    default: "User Portal",
+  },
 });
 
 const year = new Date().getFullYear();
@@ -54,7 +62,7 @@ const year = new Date().getFullYear();
       </div>
       <div v-if="!sidebarCollapsed" class="flex flex-col leading-tight">
         <span class="font-semibold text-sm tracking-tight">DIGIPRO</span>
-        <span class="text-[11px] text-slate-400">User Portal</span>
+        <span class="text-[11px] text-slate-400">{{ portalLabel }}</span>
       </div>
       <button
         type="button"
@@ -94,7 +102,7 @@ const year = new Date().getFullYear();
 
     <div class="px-3 py-3 border-t border-slate-800">
       <Link
-        :href="route('profile.edit')"
+        :href="profileHref"
         :title="sidebarCollapsed ? 'Profil Saya' : ''"
         class="flex items-center rounded-md text-sm transition-colors"
         :class="[

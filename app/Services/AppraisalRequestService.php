@@ -7,6 +7,7 @@ use App\Enums\AssetTypeEnum;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetFile;
 use App\Models\AppraisalRequest;
+use App\Models\GuidelineSet;
 use App\Models\User;
 use App\Notifications\AppraisalRequestCreated;
 use Filament\Notifications\Actions\Action as FilamentAction;
@@ -53,11 +54,19 @@ class AppraisalRequestService
         $purpose = $validated['purpose'] ?? 'jual_beli';
         $clientNameInput = trim((string) ($validated['client_name'] ?? ''));
         $clientName = $clientNameInput !== '' ? $clientNameInput : ($submitter?->name ?? null);
+        $guidelineSetId = $this->resolveGuidelineSetId();
 
-        return DB::transaction(function () use ($request, $validated, $format, $copies, $reportType, $purpose, $clientName, $submitter, $guardName) {
+        if (! $guidelineSetId) {
+            throw ValidationException::withMessages([
+                'guideline_set_id' => 'Guideline acuan belum tersedia. Aktifkan guideline terlebih dahulu.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($request, $validated, $format, $copies, $reportType, $purpose, $clientName, $submitter, $guardName, $guidelineSetId) {
 
             $appraisalRequest = AppraisalRequest::create([
                 'user_id' => $submitter?->getKey() ?? Auth::id(),
+                'guideline_set_id' => $guidelineSetId,
                 'purpose' => $purpose,
                 'client_name' => $clientName,
                 'report_type' => $reportType,
@@ -100,12 +109,19 @@ class AppraisalRequestService
                     'appraisal_request_id' => $appraisalRequest->id,
                     'asset_type' => $assetType,
                     'peruntukan' => $a['peruntukan'] ?? null,
+                    'title_document' => $a['title_document'] ?? null,
+                    'land_shape' => $a['land_shape'] ?? null,
+                    'land_position' => $a['land_position'] ?? null,
+                    'land_condition' => $a['land_condition'] ?? null,
+                    'topography' => $a['topography'] ?? null,
 
                     'land_area' => $a['land_area'] ?? null,
                     'building_area' => $hasBuilding ? ($a['building_area'] ?? null) : null,
                     'building_floors' => $hasBuilding ? ($a['floors'] ?? $a['building_floors'] ?? null) : null,
                     'build_year' => $hasBuilding ? ($a['build_year'] ?? null) : null,
                     'renovation_year' => $hasBuilding ? ($a['renovation_year'] ?? null) : null,
+                    'frontage_width' => $a['frontage_width'] ?? null,
+                    'access_road_width' => $a['access_road_width'] ?? null,
 
                     'province_id' => $this->normalizeLocationCode($a['province_id'] ?? null, 2),
                     'regency_id' => $this->normalizeLocationCode($a['regency_id'] ?? null, 4),
@@ -233,6 +249,24 @@ class AppraisalRequestService
 
             return $appraisalRequest;
         });
+    }
+
+    private function resolveGuidelineSetId(): ?int
+    {
+        $activeId = GuidelineSet::query()
+            ->where('is_active', true)
+            ->value('id');
+
+        if ($activeId) {
+            return (int) $activeId;
+        }
+
+        $latestId = GuidelineSet::query()
+            ->orderByDesc('year')
+            ->orderByDesc('id')
+            ->value('id');
+
+        return $latestId ? (int) $latestId : null;
     }
 
     private function normalizeAssetRow(array $row): array

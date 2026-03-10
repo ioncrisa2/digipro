@@ -19,6 +19,11 @@ class AppraisalAsset extends Model
         'asset_code',
         'asset_type',
         'peruntukan',
+        'title_document',
+        'land_shape',
+        'land_position',
+        'land_condition',
+        'topography',
         'province_id',
         'regency_id',
         'district_id',
@@ -32,6 +37,8 @@ class AppraisalAsset extends Model
         'building_floors',
         'build_year',
         'renovation_year',
+        'frontage_width',
+        'access_road_width',
         'ikk_ref_id',
         'ikk_value_used',
         'land_value_final',
@@ -55,6 +62,8 @@ class AppraisalAsset extends Model
         'coordinates_lng' => 'float',
         'land_area'       => 'float',
         'building_area'   => 'float',
+        'frontage_width'  => 'float',
+        'access_road_width' => 'float',
     ];
 
     public function request(): BelongsTo

@@ -2,6 +2,7 @@ import {createApp, h} from 'vue';
 import { createInertiaApp, router } from '@inertiajs/vue3';
 import { ZiggyVue } from 'ziggy-js';
 import { createPinia } from 'pinia';
+import './bootstrap';
 import '../css/app.css';
 
 const pinia = createPinia();

@@ -87,6 +87,39 @@ class AppraisalRequest extends Model
         'report_pdf_size'               => 'integer',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $request): void {
+            if (! $request->guideline_set_id) {
+                $guidelineSetId = GuidelineSet::query()
+                    ->where('is_active', true)
+                    ->value('id');
+
+                if (! $guidelineSetId) {
+                    $guidelineSetId = GuidelineSet::query()
+                        ->orderByDesc('year')
+                        ->orderByDesc('id')
+                        ->value('id');
+                }
+
+                $request->guideline_set_id = $guidelineSetId;
+            }
+        });
+
+        static::updating(function (self $request): void {
+            $originalGuidelineSetId = $request->getOriginal('guideline_set_id');
+
+            if (
+                $originalGuidelineSetId !== null
+                && $request->isDirty('guideline_set_id')
+                && (int) $request->guideline_set_id !== (int) $originalGuidelineSetId
+            ) {
+                // Lock guideline set for historical consistency once request is created.
+                $request->guideline_set_id = (int) $originalGuidelineSetId;
+            }
+        });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

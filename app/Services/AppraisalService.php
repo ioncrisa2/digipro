@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use App\Support\EnumPresenter;
+use App\Support\AppraisalAssetFieldOptions;
 use App\Models\Regency;
 use App\Models\Village;
 use App\Models\District;
@@ -178,6 +179,12 @@ class AppraisalService
                 ])
                 ->values()
                 ->toArray(),
+            'usageOptions' => AppraisalAssetFieldOptions::usageOptions(),
+            'titleDocumentOptions' => AppraisalAssetFieldOptions::titleDocumentOptions(),
+            'landShapeOptions' => AppraisalAssetFieldOptions::landShapeOptions(),
+            'landPositionOptions' => AppraisalAssetFieldOptions::landPositionOptions(),
+            'landConditionOptions' => AppraisalAssetFieldOptions::landConditionOptions(),
+            'topographyOptions' => AppraisalAssetFieldOptions::topographyOptions(),
             'needsConsent' => $needsConsent,
             'consentData' => $consentData,
             'uploadLimits' => [
@@ -198,7 +205,7 @@ class AppraisalService
             ])
             ->with([
                 'user:id,name,email',
-                'assets:id,appraisal_request_id,asset_type,land_area,building_area,building_floors,renovation_year,address,coordinates_lat,coordinates_lng,province_id,regency_id,district_id,village_id',
+                'assets:id,appraisal_request_id,asset_type,peruntukan,title_document,land_shape,land_position,land_condition,topography,frontage_width,access_road_width,land_area,building_area,building_floors,build_year,renovation_year,address,coordinates_lat,coordinates_lng,province_id,regency_id,district_id,village_id',
                 'assets.files:id,appraisal_asset_id,type,path,original_name,mime,size,created_at',
                 'offerNegotiations:id,appraisal_request_id,user_id,action,round,offered_fee,expected_fee,selected_fee,reason,meta,created_at',
                 'offerNegotiations.user:id,name',
@@ -225,7 +232,16 @@ class AppraisalService
                 'land_area' => $a->land_area,
                 'building_area' => $a->building_area,
                 'building_floors' => $a->building_floors,
+                'build_year' => $a->build_year,
                 'renovation_year' => $a->renovation_year,
+                'peruntukan' => $a->peruntukan,
+                'title_document' => $a->title_document,
+                'land_shape' => $a->land_shape,
+                'land_position' => $a->land_position,
+                'land_condition' => $a->land_condition,
+                'topography' => $a->topography,
+                'frontage_width' => $a->frontage_width,
+                'access_road_width' => $a->access_road_width,
                 'address' => $a->address,
                 'coordinates' => [
                     'lat' => $a->coordinates_lat,

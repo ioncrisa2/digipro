@@ -62,7 +62,11 @@ class AuthController extends Controller
             return redirect()->intended(route('verification.notice'));
         }
 
-        return redirect()->intended(route('dashboard'));
+        $defaultRoute = $user->hasRole('Reviewer')
+            ? route('reviewer.dashboard')
+            : route('dashboard');
+
+        return redirect()->intended($defaultRoute);
     }
 
     public function twoFactorChallenge()

@@ -15,8 +15,19 @@ class ProfileController extends Controller
 {
     public function edit(Request $request)
     {
-        // user akan dikirim lewat shared props (auth.user)
-        return inertia('Profile/Index');
+        $isReviewer = (bool) $request->user()?->hasRole('Reviewer');
+
+        return inertia('Profile/Index', [
+            'layoutContext' => $isReviewer ? 'reviewer' : 'customer',
+            'profileRoutes' => [
+                'edit' => $isReviewer ? route('reviewer.profile.edit') : route('profile.edit'),
+                'update' => $isReviewer ? route('reviewer.profile.update') : route('profile.update'),
+                'password' => $isReviewer ? route('reviewer.profile.password') : route('profile.password'),
+                'passwordVerify' => $isReviewer ? route('reviewer.profile.password.verify') : route('profile.password.verify'),
+                'avatar' => $isReviewer ? route('reviewer.profile.avatar') : route('profile.avatar'),
+                'avatarRemove' => $isReviewer ? route('reviewer.profile.avatar.remove') : route('profile.avatar.remove'),
+            ],
+        ]);
     }
 
     public function update(ProfileUpdateRequest $request)
