@@ -135,17 +135,26 @@ it('allows reviewer to preview and save adjustment state', function (): void {
                     'adj_shape' => 5,
                 ],
             ],
+            'general_inputs' => [
+                (string) $comparable->id => [
+                    'assumed_discount' => 5,
+                ],
+            ],
             'custom_adjustment_factors' => [],
         ]);
 
     $previewResponse
         ->assertOk()
+        ->assertJsonPath('state.general_inputs.' . $comparable->id . '.assumed_discount', 5)
+        ->assertJsonPath('state.adjustment_inputs.' . $comparable->id . '.adj_size', -16.67)
+        ->assertJsonPath('state.comparables.0.likely_sale', 'Rp 95.000.000')
         ->assertJsonStructure([
             'message',
             'state' => [
                 'asset_id',
                 'comparables',
                 'adjustment_inputs',
+                'general_inputs',
                 'adjustment_computed',
                 'range_summary',
             ],
@@ -157,6 +166,11 @@ it('allows reviewer to preview and save adjustment state', function (): void {
             'adjustment_inputs' => [
                 (string) $comparable->id => [
                     'adj_shape' => 5,
+                ],
+            ],
+            'general_inputs' => [
+                (string) $comparable->id => [
+                    'assumed_discount' => 10,
                 ],
             ],
             'custom_adjustment_factors' => [],
@@ -177,6 +191,8 @@ it('allows reviewer to preview and save adjustment state', function (): void {
                 ],
             ],
         ]);
+
+    expect($comparable->fresh()->assumed_discount_percent)->toBe(10.0);
 });
 
 it('allows reviewer to update general asset data', function (): void {

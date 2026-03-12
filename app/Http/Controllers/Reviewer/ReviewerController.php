@@ -467,12 +467,17 @@ class ReviewerController extends Controller
         $data = $request->validate([
             'adjustment_inputs' => ['nullable', 'array'],
             'custom_adjustment_factors' => ['nullable', 'array'],
+            'general_inputs' => ['nullable', 'array'],
+            'general_inputs.*.assumed_discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'general_inputs.*.material_quality_adj' => ['nullable', 'numeric', 'min:0.01', 'max:10'],
+            'general_inputs.*.maintenance_adj_delta' => ['nullable', 'numeric', 'min:-100', 'max:100'],
         ]);
 
         $workbench = $this->workspace->makeAdjustmentWorkbench($asset->id);
         $workbench->syncClientState(
             $data['adjustment_inputs'] ?? [],
             $data['custom_adjustment_factors'] ?? [],
+            $data['general_inputs'] ?? [],
         );
 
         return response()->json([
@@ -486,6 +491,10 @@ class ReviewerController extends Controller
         $data = $request->validate([
             'adjustment_inputs' => ['nullable', 'array'],
             'custom_adjustment_factors' => ['nullable', 'array'],
+            'general_inputs' => ['nullable', 'array'],
+            'general_inputs.*.assumed_discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'general_inputs.*.material_quality_adj' => ['nullable', 'numeric', 'min:0.01', 'max:10'],
+            'general_inputs.*.maintenance_adj_delta' => ['nullable', 'numeric', 'min:-100', 'max:100'],
         ]);
 
         try {
@@ -493,6 +502,7 @@ class ReviewerController extends Controller
             $workbench->syncClientState(
                 $data['adjustment_inputs'] ?? [],
                 $data['custom_adjustment_factors'] ?? [],
+                $data['general_inputs'] ?? [],
             );
 
             $result = $workbench->persistAdjustmentData();

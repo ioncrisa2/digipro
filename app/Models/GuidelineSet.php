@@ -36,4 +36,9 @@ class GuidelineSet extends Model
     {
         return $this->hasMany(ConstructionCostIndex::class, 'guideline_set_id');
     }
+
+    public function mappiRcnStandards(): HasMany
+    {
+        return $this->hasMany(MappiRcnStandard::class, 'guideline_set_id');
+    }
 }

@@ -33,7 +33,10 @@ class AppraisalAssetComparable extends Model
         'raw_building_area',
         'raw_unit_price_land',
         'raw_peruntukan',
-        'raw_data_date'
+        'raw_data_date',
+        'assumed_discount_percent',
+        'material_quality_adjustment',
+        'maintenance_adjustment_delta_percent',
     ];
 
     protected $casts = [
@@ -48,6 +51,9 @@ class AppraisalAssetComparable extends Model
         'adjusted_unit_value'     => 'integer',
         'indication_value'        => 'integer',
         'is_selected'             => 'boolean',
+        'assumed_discount_percent'=> 'float',
+        'material_quality_adjustment' => 'float',
+        'maintenance_adjustment_delta_percent' => 'float',
     ];
 
     public function asset(): BelongsTo

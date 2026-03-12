@@ -89,6 +89,7 @@ const selectedIds = ref([]);
 const busyGeneral = ref(false);
 const busySearch = ref(false);
 const busySync = ref(false);
+const busyComparableUpdates = ref({});
 const feedback = ref('');
 const feedbackTone = ref('default');
 const previewFile = ref(null);
@@ -218,6 +219,49 @@ const toggleSelectedId = (id, checked) => {
     return;
   }
   selectedIds.value = selectedIds.value.filter((itemId) => itemId !== id);
+};
+
+const updateSavedComparableSelection = async (comparable, checked) => {
+  if (!comparable?.update_url) {
+    return;
+  }
+
+  const comparableId = String(comparable.id);
+  busyComparableUpdates.value = {
+    ...busyComparableUpdates.value,
+    [comparableId]: true,
+  };
+
+  setFeedback('');
+
+  try {
+    const response = await axios.post(comparable.update_url, {
+      is_selected: checked === true,
+      manual_rank: comparable.manual_rank ?? comparable.rank ?? null,
+    });
+
+    const updatedComparable = response.data?.comparable;
+
+    if (updatedComparable) {
+      assetState.value = {
+        ...assetState.value,
+        comparables: (assetState.value.comparables || []).map((item) => (
+          item.id === comparable.id
+            ? { ...item, ...updatedComparable }
+            : item
+        )),
+      };
+    }
+
+    setFeedback(response.data?.message || 'Status pembanding diperbarui.', 'success');
+  } catch (error) {
+    setFeedback(error.response?.data?.message || 'Gagal memperbarui status pembanding.', 'error');
+  } finally {
+    busyComparableUpdates.value = {
+      ...busyComparableUpdates.value,
+      [comparableId]: false,
+    };
+  }
 };
 
 const feedbackIcon = computed(() => {
@@ -954,6 +998,7 @@ onBeforeUnmount(() => {
                 <Table>
                   <TableHeader>
                     <TableRow class="bg-muted/40">
+                      <TableHead class="pl-5 font-semibold">Dipakai</TableHead>
                       <TableHead class="pl-5 font-semibold">Ext ID</TableHead>
                       <TableHead class="font-semibold">Peruntukan</TableHead>
                       <TableHead class="font-semibold">Score</TableHead>
@@ -969,6 +1014,18 @@ onBeforeUnmount(() => {
                       :key="comparable.id"
                       class="hover:bg-muted/20"
                     >
+                      <TableCell class="pl-5">
+                        <div class="flex items-center gap-3">
+                          <Checkbox
+                            :model-value="Boolean(comparable.is_selected)"
+                            :disabled="busyComparableUpdates[String(comparable.id)] === true"
+                            @update:modelValue="(checked) => updateSavedComparableSelection(comparable, checked)"
+                          />
+                          <Badge :variant="comparable.is_selected ? 'default' : 'outline'" class="text-[11px]">
+                            {{ comparable.is_selected ? 'Dipakai' : 'Tidak' }}
+                          </Badge>
+                        </div>
+                      </TableCell>
                       <TableCell class="pl-5 font-mono text-sm font-medium">{{ comparable.external_id }}</TableCell>
                       <TableCell>{{ comparable.raw_peruntukan || '-' }}</TableCell>
                       <TableCell>

@@ -23,6 +23,7 @@ const props = defineProps({
 
 const state = ref(cloneDeep(props.workbench));
 const draftInputs = ref(cloneDeep(props.workbench.adjustment_inputs) || {});
+const draftGeneralInputs = ref(cloneDeep(props.workbench.general_inputs) || {});
 const customFactors = ref(cloneDeep(props.workbench.custom_adjustment_factors) || []);
 const newCustomFactorLabel = ref('');
 const busyPreview = ref(false);
@@ -47,6 +48,7 @@ const comparableWarnings = computed(() => {
 const syncState = (payload) => {
   state.value = cloneDeep(payload);
   draftInputs.value = cloneDeep(payload.adjustment_inputs || {});
+  draftGeneralInputs.value = cloneDeep(payload.general_inputs || {});
   customFactors.value = cloneDeep(payload.custom_adjustment_factors || []);
 };
 
@@ -63,12 +65,23 @@ const totalComputed = (comparableId) => {
   return state.value?.adjustment_computed?.[comparableId] || null;
 };
 
+const comparableState = (comparableId) => {
+  return state.value?.comparables?.find((item) => String(item.id) === String(comparableId)) || null;
+};
+
+const maintenanceAllowsAdjustment = (comparableId) => {
+  const finalText = comparableState(comparableId)?.maintenance_final_text || '';
+
+  return finalText !== '' && !String(finalText).toUpperCase().startsWith('N/A');
+};
+
 const previewAdjustment = async () => {
   busyPreview.value = true;
   setFeedback('');
   try {
     const response = await axios.post(props.asset.adjustment_preview_url, {
       adjustment_inputs: draftInputs.value,
+      general_inputs: draftGeneralInputs.value,
       custom_adjustment_factors: customFactors.value,
     });
     syncState(response.data.state);
@@ -86,6 +99,7 @@ const saveAdjustment = async () => {
   try {
     const response = await axios.post(props.asset.adjustment_save_url, {
       adjustment_inputs: draftInputs.value,
+      general_inputs: draftGeneralInputs.value,
       custom_adjustment_factors: customFactors.value,
     });
     syncState(response.data.result?.state || state.value);
@@ -274,25 +288,27 @@ const feedbackClasses = computed(() => {
             v-if="hasWideComparables"
             class="border-b border-border/40 bg-muted/10 px-4 py-2 text-xs text-muted-foreground"
           >
-            Geser horizontal untuk melihat semua pembanding. Kolom <span class="font-medium text-foreground">Parameter</span> dan
-            <span class="font-medium text-foreground">Objek Penilaian</span> tetap terlihat.
+            Geser horizontal untuk melihat semua pembanding. Kolom
+            <span class="font-medium text-foreground">Parameter</span>
+            <template v-if="!isAdjustmentSection(section)">
+              dan <span class="font-medium text-foreground">Objek Penilaian</span>
+            </template>
+            tetap terlihat.
           </div>
-          <!--
-            Scrollable wrapper. "Parameter" (col 1) and "Objek Penilaian" (col 2)
-            are sticky-left. The rest of the comparable columns scroll horizontally.
-          -->
           <div class="overflow-x-auto overscroll-x-contain">
             <table class="w-full caption-bottom text-sm">
               <thead>
                 <tr class="border-b border-border/40 bg-muted/20">
 
                   <!-- Sticky: Parameter -->
-                  <th class="matrix-sticky-1 min-w-52 border-r border-border/30 bg-muted/20 px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  <th class="matrix-sticky-1 min-w-40 border-r border-border/30 bg-muted/20 px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                     Parameter
                   </th>
 
-                  <!-- Sticky: Objek Penilaian -->
-                  <th class="matrix-sticky-2 min-w-44 border-r border-border/50 bg-muted/20 px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  <th
+                    v-if="!isAdjustmentSection(section)"
+                    class="matrix-sticky-2 min-w-44 border-r border-border/50 bg-muted/20 px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+                  >
                     Objek Penilaian
                   </th>
 
@@ -319,7 +335,7 @@ const feedbackClasses = computed(() => {
                   <!-- Group divider row -->
                   <tr v-if="row.type === 'group'" class="border-b border-border/30">
                     <td
-                      :colspan="matrixColumns.length + 2"
+                      :colspan="matrixColumns.length + (isAdjustmentSection(section) ? 1 : 2)"
                       class="bg-muted/30 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
                     >
                       {{ row.label }}
@@ -335,7 +351,7 @@ const feedbackClasses = computed(() => {
 
                     <!-- Sticky col 1: Parameter label -->
                     <td
-                      class="matrix-sticky-1 border-r border-border/30 px-4 py-3 text-sm font-medium"
+                      class="matrix-sticky-1 w-40 min-w-40 max-w-40 border-r border-border/30 px-3 py-3 text-sm font-medium leading-snug"
                       :class="row.type === 'total' ? 'bg-muted/30 text-foreground' : 'bg-background text-foreground/80'"
                     >
                       {{ row.label }}
@@ -343,6 +359,7 @@ const feedbackClasses = computed(() => {
 
                     <!-- Sticky col 2: Subject value -->
                     <td
+                      v-if="!isAdjustmentSection(section)"
                       class="matrix-sticky-2 border-r border-border/50 px-4 py-3 text-sm"
                       :class="row.type === 'total'
                         ? 'bg-muted/30 font-semibold text-foreground'
@@ -361,11 +378,7 @@ const feedbackClasses = computed(() => {
 
                       <!-- Adjustment input cell -->
                       <template v-if="isAdjustmentSection(section) && row.key && row.type !== 'total'">
-                        <div class="space-y-3">
-                          <div>
-                            <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Pembanding</p>
-                            <p class="mt-1 text-sm text-foreground/80">{{ cell || '-' }}</p>
-                          </div>
+                        <div class="flex items-start gap-4">
                           <div>
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Adj. %</p>
                             <div class="mt-1 flex items-center gap-2">
@@ -381,19 +394,11 @@ const feedbackClasses = computed(() => {
                               <span class="text-xs text-muted-foreground">%</span>
                             </div>
                           </div>
-                          <div class="grid grid-cols-2 gap-x-4 gap-y-2">
-                            <div>
-                              <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Nominal</p>
-                              <p class="mt-1 text-sm tabular-nums text-foreground/70">
-                                {{ rowComputed(matrixColumns[index].id, row.key)?.amount_text || formatCurrency(0) }}
-                              </p>
-                            </div>
-                            <div>
-                              <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Terkoreksi</p>
-                              <p class="mt-1 text-sm font-medium tabular-nums">
-                                {{ rowComputed(matrixColumns[index].id, row.key)?.corrected_unit_text || '-' }}
-                              </p>
-                            </div>
+                          <div>
+                            <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Nominal</p>
+                            <p class="mt-1 text-sm tabular-nums text-foreground/70">
+                              {{ rowComputed(matrixColumns[index].id, row.key)?.amount_text || formatCurrency(0) }}
+                            </p>
                           </div>
                         </div>
                       </template>
@@ -413,6 +418,77 @@ const feedbackClasses = computed(() => {
                         <p class="font-semibold tabular-nums text-emerald-700">
                           {{ totalComputed(matrixColumns[index].id)?.estimated_unit_text || '-' }}
                         </p>
+                      </template>
+
+                      <template v-else-if="!isAdjustmentSection(section) && row.key === 'assumed_discount'">
+                        <div class="space-y-2">
+                          <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Assumed Discount</p>
+                          <div class="flex items-center gap-2">
+                            <Input
+                              v-model.number="draftGeneralInputs[matrixColumns[index].id].assumed_discount"
+                              type="number"
+                              step="1"
+                              min="0"
+                              max="100"
+                              class="h-7 w-20 text-sm tabular-nums"
+                              @blur="previewAdjustment"
+                            />
+                            <span class="text-xs text-muted-foreground">%</span>
+                          </div>
+                        </div>
+                      </template>
+
+                      <template v-else-if="!isAdjustmentSection(section) && row.key === 'material_quality_adj'">
+                        <div class="space-y-2">
+                          <div class="flex items-center gap-2">
+                            <Input
+                              v-model.number="draftGeneralInputs[matrixColumns[index].id].material_quality_adj"
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              max="10"
+                              class="h-7 w-24 text-sm tabular-nums"
+                              @blur="previewAdjustment"
+                            />
+                          </div>
+                        </div>
+                      </template>
+
+                      <template v-else-if="!isAdjustmentSection(section) && row.key === 'maintenance_ref'">
+                        <div class="space-y-3">
+                          <div v-if="maintenanceAllowsAdjustment(matrixColumns[index].id)" class="flex items-start gap-4">
+                            <div>
+                              <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                                Adj. Tambahan
+                              </p>
+                              <div class="mt-1 flex items-center gap-2">
+                                <Input
+                                  v-model.number="draftGeneralInputs[matrixColumns[index].id].maintenance_adj_delta"
+                                  type="number"
+                                  step="0.01"
+                                  min="-100"
+                                  max="100"
+                                  class="h-7 w-24 text-sm tabular-nums"
+                                  @blur="previewAdjustment"
+                                />
+                                <span class="text-xs text-muted-foreground">%</span>
+                              </div>
+                            </div>
+
+                            <div>
+                              <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                                Final
+                              </p>
+                              <p class="mt-1 text-sm tabular-nums text-foreground/80">
+                                {{ comparableState(matrixColumns[index].id)?.maintenance_final_text || '-' }}
+                              </p>
+                            </div>
+                          </div>
+
+                          <p v-else class="text-sm text-foreground/80">
+                            {{ cell || '-' }}
+                          </p>
+                        </div>
                       </template>
 
                       <!-- Plain data cell -->
@@ -439,7 +515,7 @@ const feedbackClasses = computed(() => {
   Sticky column helpers.
 
   Col 1 "Parameter"      → left: 0
-  Col 2 "Objek Penilaian" → left: 208px  (matches min-w-52 = 13rem = 208px)
+  Col 2 "Objek Penilaian" → left: 160px  (matches min-w-40 = 10rem = 160px)
 
   A subtle drop-shadow on col 2 signals that content is scrolling behind it.
 */
@@ -460,7 +536,7 @@ const feedbackClasses = computed(() => {
 
   .matrix-sticky-2 {
     position: sticky;
-    left: 208px; /* 13rem — keep in sync with min-w-52 on col 1 */
+    left: 160px; /* 10rem — keep in sync with min-w-40 on col 1 */
     z-index: 10;
     box-shadow: 2px 0 8px -2px rgba(0, 0, 0, 0.07);
   }

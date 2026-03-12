@@ -12,9 +12,11 @@ use App\Models\CostElement;
 use App\Models\FloorIndex;
 use App\Models\GuidelineSet;
 use App\Models\LandAdjustment;
+use App\Models\MappiRcnStandard;
 use App\Models\Province;
 use App\Models\RefUsageToMappiGroup;
 use App\Models\Regency;
+use App\Models\ValuationSetting;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +58,11 @@ class AdjustmentWorkbenchService
     public array $adjustmentInputs = [];
 
     /**
+     * @var array<int|string, array<string, float|int|string|null>>
+     */
+    public array $generalInputs = [];
+
+    /**
      * @var array<int|string, array<string, mixed>>
      */
     public array $adjustmentComputed = [];
@@ -75,6 +82,8 @@ class AdjustmentWorkbenchService
     private ?int $guidelineSetId = null;
     private ?int $guidelineYear = null;
     private ?float $subjectLandArea = null;
+    private ?float $subjectFrontage = null;
+    private ?float $subjectFrontingRoad = null;
 
     /**
      * @var array<string, ?RefUsageToMappiGroup>
@@ -112,6 +121,11 @@ class AdjustmentWorkbenchService
     private array $regencyNameCache = [];
 
     /**
+     * @var array<string, float|null>
+     */
+    private array $valuationSettingNumberCache = [];
+
+    /**
      * @var array<string, string>
      */
     private array $defaultAdjustmentFactors = [
@@ -128,7 +142,7 @@ class AdjustmentWorkbenchService
         'adj_size' => 'Luasan',
         'adj_topography' => 'Topografi / Elevasi',
         'adj_condition' => 'Kondisi',
-        'adj_frontage' => 'Lebar Muka',
+        'adj_frontage' => 'Lebar Depan',
         'adj_economic_character' => '5.23.8 Karakter Ekonomis Properti',
         'adj_use' => 'Peruntukan',
         'adj_kdb_klb' => '(KDB/KLB)',
@@ -180,6 +194,8 @@ class AdjustmentWorkbenchService
         }
 
         $this->subjectLandArea = $this->toFloat($asset->land_area);
+        $this->subjectFrontage = $this->toFloat($asset->frontage_width);
+        $this->subjectFrontingRoad = $this->toFloat($asset->access_road_width);
         $this->subjectAsset = $this->buildSubjectAsset($asset);
 
         $this->comparables = $asset->comparables
@@ -187,6 +203,7 @@ class AdjustmentWorkbenchService
             ->map(fn(AppraisalAssetComparable $item, int $index) => $this->normalizeComparable($item, $index + 1))
             ->all();
 
+        $this->bootstrapGeneralInputs();
         $this->hydrateCustomFactorsFromModels($asset->comparables->all());
 
         $this->matrixColumns = collect($this->comparables)
@@ -205,6 +222,7 @@ class AdjustmentWorkbenchService
             'request_number' => $asset->request?->request_number ?? '-',
             'guideline' => $asset->request?->guidelineSet?->name ?? ($activeGuideline?->name ?? '-'),
             'guideline_year' => $this->guidelineYear ? (string) $this->guidelineYear : '-',
+            'ppn_percent' => $this->formatUnsignedPercent($this->ppnPercent()),
         ];
 
         $this->bootstrapAdjustmentInputs();
@@ -216,7 +234,11 @@ class AdjustmentWorkbenchService
      * @param  array<int|string, array<string, mixed>>  $adjustmentInputs
      * @param  array<int, array{key: string, label: string}>  $customAdjustmentFactors
      */
-    public function syncClientState(array $adjustmentInputs = [], array $customAdjustmentFactors = []): void
+    public function syncClientState(
+        array $adjustmentInputs = [],
+        array $customAdjustmentFactors = [],
+        array $generalInputs = [],
+    ): void
     {
         if (! empty($customAdjustmentFactors)) {
             $this->customAdjustmentFactors = collect($customAdjustmentFactors)
@@ -264,6 +286,37 @@ class AdjustmentWorkbenchService
             }
         }
 
+        $this->bootstrapGeneralInputs();
+
+        foreach ($generalInputs as $comparableId => $rowInputs) {
+            if (! is_array($rowInputs)) {
+                continue;
+            }
+
+            $comparableId = (string) $comparableId;
+            $this->generalInputs[$comparableId] ??= [];
+
+            if (array_key_exists('assumed_discount', $rowInputs)) {
+                $this->generalInputs[$comparableId]['assumed_discount'] = $this->normalizeAssumedDiscountPercent(
+                    $rowInputs['assumed_discount']
+                );
+            }
+
+            if (array_key_exists('material_quality_adj', $rowInputs)) {
+                $this->generalInputs[$comparableId]['material_quality_adj'] = $this->normalizeMaterialQualityAdjustment(
+                    $rowInputs['material_quality_adj']
+                );
+            }
+
+            if (array_key_exists('maintenance_adj_delta', $rowInputs)) {
+                $this->generalInputs[$comparableId]['maintenance_adj_delta'] = $this->normalizeMaintenanceAdjustmentPercent(
+                    $rowInputs['maintenance_adj_delta']
+                );
+            }
+        }
+
+        $this->rebuildComparableState();
+
         $this->matrixSections = $this->buildMatrixSections();
         $this->recalculateAdjustmentOutputs();
     }
@@ -281,6 +334,7 @@ class AdjustmentWorkbenchService
             'matrix_sections' => $this->matrixSections,
             'context_meta' => $this->contextMeta,
             'adjustment_inputs' => $this->adjustmentInputs,
+            'general_inputs' => $this->generalInputs,
             'adjustment_computed' => $this->adjustmentComputed,
             'range_summary' => $this->rangeSummary,
             'custom_adjustment_factors' => $this->customAdjustmentFactors,
@@ -302,7 +356,16 @@ class AdjustmentWorkbenchService
     private function buildSubjectAsset(AppraisalAsset $asset): array
     {
         $mapping = $this->usageMapping($asset->peruntukan);
-        $buildingClass = $mapping?->buildingClass();
+        $buildingType = $this->resolveMappiBuildingType(
+            $mapping?->buildingType(),
+            $asset->peruntukan,
+            [],
+        );
+        $buildingClass = $this->resolveMappiBuildingClass(
+            $mapping?->buildingClass(),
+            $asset->peruntukan,
+            [],
+        );
         $floorCount = $this->toInt($asset->building_floors);
 
         $ikk = $asset->ikk_value_used !== null
@@ -338,13 +401,13 @@ class AdjustmentWorkbenchService
             'assumed_discount' => '-',
             'distance_to_subject' => '0 meter',
             'data_date' => $this->formatMonthYear($asset->request?->requested_at),
-            'building_type' => $this->assetTypeLabel($asset->asset_type),
+            'building_type' => $this->text($buildingType),
             'floor_count' => $this->text($floorCount),
             'floor_index' => $this->formatDecimal($this->floorIndexValue($buildingClass, $floorCount), 4),
             'province' => $this->text($this->provinceName($asset->province_id)),
             'regency' => $this->text($this->regencyName($asset->regency_id)),
             'ikk_reference' => $this->formatDecimal($ikk, 4),
-            'rcn_standard_ref' => $ikk !== null ? 'IKK ' . $this->formatDecimal($ikk, 4) : '-',
+            'rcn_standard_ref' => '-',
             'material_quality_adj' => '-',
             'rcn_x_adjustment_ref' => '-',
             'maintenance_ref' => '-',
@@ -390,11 +453,7 @@ class AdjustmentWorkbenchService
             $item->raw_peruntukan,
         ]);
 
-        $regionCode = $this->normalizeRegionCode($this->firstFilled([
-            data_get($snapshot, 'regency.id'),
-            data_get($snapshot, 'region_code'),
-            data_get($snapshot, 'regency_id'),
-        ], null));
+        $regionCode = $this->resolveRegionCodeFromSnapshot($snapshot);
 
         $floorCount = $this->firstInt([
             data_get($snapshot, 'jumlah_lantai'),
@@ -403,8 +462,17 @@ class AdjustmentWorkbenchService
         ]);
 
         $mapping = $this->usageMapping($peruntukan);
-        $buildingType = $mapping?->buildingType();
-        $buildingClass = $mapping?->buildingClass();
+        $buildingType = $this->resolveMappiBuildingType(
+            $mapping?->buildingType(),
+            is_string($peruntukan) ? $peruntukan : null,
+            $snapshot,
+        );
+        $buildingClass = $this->resolveMappiBuildingClass(
+            $mapping?->buildingClass(),
+            is_string($peruntukan) ? $peruntukan : null,
+            $snapshot,
+        );
+        $preferredStoreyPattern = $this->resolvePreferredStoreyPattern($mapping, $snapshot);
 
         $ikk = $this->ikkValue($regionCode);
 
@@ -417,6 +485,12 @@ class AdjustmentWorkbenchService
         $landArea = $this->firstNumber([
             $item->raw_land_area,
             data_get($snapshot, 'luas_tanah'),
+        ]);
+        $frontageValue = $this->firstNumber([
+            data_get($snapshot, 'lebar_depan'),
+        ]);
+        $frontingRoadValue = $this->firstNumber([
+            data_get($snapshot, 'lebar_jalan'),
         ]);
         $buildingAreaRaw = $this->toFloat($item->raw_building_area);
         $buildingAreaSnapshot = $this->firstNumber([
@@ -449,15 +523,33 @@ class AdjustmentWorkbenchService
             data_get($snapshot, 'transaction_price'),
         ]);
         $discountRaw = $this->firstNumber([
+            data_get($this->generalInputs, "{$item->id}.assumed_discount"),
+            $item->assumed_discount_percent,
             data_get($snapshot, 'assumed_discount'),
             data_get($snapshot, 'diskon'),
             data_get($snapshot, 'discount'),
         ]);
+        $discountPercent = $this->normalizeAssumedDiscountPercent($discountRaw);
 
-        $discountFraction = $this->normalizeDiscountFraction($discountRaw);
-        if ($likelySale === null && $askingPrice !== null && $discountFraction !== null) {
+        $discountFraction = $this->normalizeDiscountFraction($discountPercent);
+        if ($askingPrice !== null && $discountFraction !== null) {
             $likelySale = $askingPrice * (1 - $discountFraction);
         }
+
+        $materialQualityAdj = $this->normalizeMaterialQualityAdjustment($this->firstNumber([
+            data_get($this->generalInputs, "{$item->id}.material_quality_adj"),
+            $item->material_quality_adjustment,
+            data_get($snapshot, 'penyesuaian_kualitas_material_bangunan_rcn'),
+            data_get($snapshot, 'penyesuaian_kualitas_material'),
+            data_get($snapshot, 'material_quality_adjustment'),
+        ]));
+        $maintenanceAdjDeltaPercent = $this->normalizeMaintenanceAdjustmentPercent($this->firstNumber([
+            data_get($this->generalInputs, "{$item->id}.maintenance_adj_delta"),
+            $item->maintenance_adjustment_delta_percent,
+            data_get($snapshot, 'maintenance_adjustment_delta_percent'),
+            data_get($snapshot, 'adj_delta'),
+            data_get($snapshot, 'penyesuaian_manual'),
+        ]));
 
         $conditionLabel = $this->firstFilled([
             data_get($snapshot, 'kondisi_tanah.name'),
@@ -476,6 +568,9 @@ class AdjustmentWorkbenchService
             buildingType: $buildingType,
             buildingClass: $buildingClass,
             floorCount: $floorCount,
+            preferredStoreyPattern: $preferredStoreyPattern,
+            materialQualityAdj: $materialQualityAdj,
+            maintenanceAdjDeltaPercent: $maintenanceAdjDeltaPercent,
             ikkValue: $ikk,
             conditionLabel: is_string($conditionLabel) ? $conditionLabel : null,
             snapshot: $snapshot,
@@ -540,14 +635,8 @@ class AdjustmentWorkbenchService
                 data_get($snapshot, 'topografi.name'),
                 data_get($snapshot, 'topografi'),
             ])),
-            'frontage' => $this->formatMeter($this->firstFilled([
-                data_get($snapshot, 'lebar_muka'),
-                data_get($snapshot, 'frontage'),
-            ], null)),
-            'fronting_road' => $this->formatMeter($this->firstFilled([
-                data_get($snapshot, 'lebar_jalan'),
-                data_get($snapshot, 'fronting_road'),
-            ], null)),
+            'frontage' => $this->formatMeter($frontageValue),
+            'fronting_road' => $this->formatMeter($frontingRoadValue),
             'town_planning' => $this->text($peruntukan),
             'plot_ratio' => $this->text($this->firstFilled([
                 data_get($snapshot, 'kdb_klb'),
@@ -556,7 +645,13 @@ class AdjustmentWorkbenchService
             ])),
             'asking_price' => $this->formatCurrency($askingPrice),
             'likely_sale' => $this->formatCurrency($likelySale),
-            'assumed_discount' => $this->formatPercent($discountRaw),
+            'assumed_discount' => $this->formatUnsignedPercent($discountPercent),
+            'assumed_discount_value' => $discountPercent,
+            'material_quality_adj_value' => $materialQualityAdj,
+            'maintenance_adj_delta_value' => $maintenanceAdjDeltaPercent,
+            'maintenance_remaining_text' => $residualContext['maintenance_remaining_text'],
+            'maintenance_final_text' => $residualContext['maintenance_final_text'],
+            'maintenance_detail_text' => $residualContext['maintenance_detail_text'],
             'valuation_year' => (string) $valuationYear,
             'distance_to_subject' => $this->formatDistance($item->distance_meters),
             'data_date' => $this->formatMonthYear($this->firstFilled([
@@ -588,6 +683,11 @@ class AdjustmentWorkbenchService
             'residual_land_value_ref' => $residualContext['residual_land_value_ref'],
             'residual_land_value_sqm_ref' => $residualContext['residual_land_value_sqm_ref'],
             'residual_land_value_sqm_base' => $residualContext['residual_land_value_sqm_base'],
+            'suggested_adjustments' => [
+                'adj_size' => $this->suggestRatioAdjustment($this->subjectLandArea, $landArea),
+                'adj_frontage' => $this->suggestRatioAdjustment($this->subjectFrontage, $frontageValue),
+                'adj_road_width' => $this->suggestRatioAdjustment($this->subjectFrontingRoad, $frontingRoadValue),
+            ],
             'existing_adjustments' => $this->extractExistingAdjustments($item),
             'adj_doc_ownership' => '0.00%',
             'adj_payment_term' => '0.00%',
@@ -658,7 +758,6 @@ class AdjustmentWorkbenchService
                     $this->row('Index Lantai (ref_floor_index)', 'floor_index'),
                     $this->row('Provinsi', 'province'),
                     $this->row('Kota/Kabupaten', 'regency'),
-                    $this->row('IKK (ref_construction_cost_index)', 'ikk_reference'),
                     $this->row('RCN Standar MAPPI', 'rcn_standard_ref'),
                     $this->row('Penyesuaian Kualitas Material Bangunan RCN', 'material_quality_adj'),
                     $this->row('RCN x Penyesuaian', 'rcn_x_adjustment_ref'),
@@ -735,9 +834,12 @@ class AdjustmentWorkbenchService
             }
 
             $inputs[$comparableId] = [];
+            $suggestedAdjustments = is_array($comparable['suggested_adjustments'] ?? null)
+                ? $comparable['suggested_adjustments']
+                : [];
 
             foreach ($factorKeys as $factorKey) {
-                $inputs[$comparableId][$factorKey] = 0.0;
+                $inputs[$comparableId][$factorKey] = $this->toFloat($suggestedAdjustments[$factorKey] ?? null) ?? 0.0;
             }
 
             $existing = is_array($comparable['existing_adjustments'] ?? null)
@@ -754,6 +856,65 @@ class AdjustmentWorkbenchService
         }
 
         $this->adjustmentInputs = $inputs;
+    }
+
+    private function bootstrapGeneralInputs(): void
+    {
+        $inputs = $this->generalInputs;
+
+        foreach ($this->comparables as $comparable) {
+            $comparableId = (string) ($comparable['id'] ?? '');
+
+            if ($comparableId === '') {
+                continue;
+            }
+
+            $inputs[$comparableId] ??= [];
+            $inputs[$comparableId]['assumed_discount'] = $this->normalizeAssumedDiscountPercent(
+                $inputs[$comparableId]['assumed_discount'] ?? ($comparable['assumed_discount_value'] ?? null)
+            );
+            $inputs[$comparableId]['material_quality_adj'] = $this->normalizeMaterialQualityAdjustment(
+                $inputs[$comparableId]['material_quality_adj'] ?? ($comparable['material_quality_adj_value'] ?? null)
+            );
+            $inputs[$comparableId]['maintenance_adj_delta'] = $this->normalizeMaintenanceAdjustmentPercent(
+                $inputs[$comparableId]['maintenance_adj_delta'] ?? ($comparable['maintenance_adj_delta_value'] ?? null)
+            );
+        }
+
+        $this->generalInputs = $inputs;
+    }
+
+    private function rebuildComparableState(): void
+    {
+        if (! $this->assetId) {
+            return;
+        }
+
+        $models = AppraisalAssetComparable::query()
+            ->where('appraisal_asset_id', $this->assetId)
+            ->where('is_selected', true)
+            ->orderByRaw('COALESCE(`manual_rank`, `rank`, 9999)')
+            ->orderBy('id')
+            ->with(['landAdjustments.factor:id,code,name'])
+            ->limit(12)
+            ->get();
+
+        $this->comparables = $models
+            ->values()
+            ->map(fn (AppraisalAssetComparable $item, int $index) => $this->normalizeComparable($item, $index + 1))
+            ->all();
+
+        $this->matrixColumns = collect($this->comparables)
+            ->map(fn(array $item, int $index) => [
+                'id' => $item['id'] ?? null,
+                'title' => "Data Pembanding " . ($index + 1),
+                'external_id' => $item['external_id'] ?? '-',
+                'rank' => $item['rank'] ?? '-',
+                'score' => $item['score'] ?? null,
+                'distance_to_subject' => $item['distance_to_subject'] ?? '-',
+            ])
+            ->values()
+            ->all();
     }
 
     private function recalculateAdjustmentOutputs(): void
@@ -1070,6 +1231,15 @@ class AdjustmentWorkbenchService
                     AppraisalAssetComparable::query()
                         ->whereKey($comparableId)
                         ->update([
+                            'assumed_discount_percent' => $this->normalizeAssumedDiscountPercent(
+                                data_get($this->generalInputs, "{$comparableId}.assumed_discount")
+                            ),
+                            'material_quality_adjustment' => $this->normalizeMaterialQualityAdjustment(
+                                data_get($this->generalInputs, "{$comparableId}.material_quality_adj")
+                            ),
+                            'maintenance_adjustment_delta_percent' => $this->normalizeMaintenanceAdjustmentPercent(
+                                data_get($this->generalInputs, "{$comparableId}.maintenance_adj_delta")
+                            ),
                             'total_adjustment_percent' => round($totalPercent, 4),
                             'adjusted_unit_value' => $adjustedUnitValue,
                             'indication_value' => $indicationValue,
@@ -1200,6 +1370,62 @@ class AdjustmentWorkbenchService
         $number = $this->toFloat($value) ?? 0.0;
 
         return $this->clamp($number, -100.0, 100.0);
+    }
+
+    private function normalizeAssumedDiscountPercent(mixed $value): float
+    {
+        $number = $this->toFloat($value);
+
+        if ($number === null) {
+            $number = 5.0;
+        }
+
+        return $this->clamp($number, 0.0, 100.0);
+    }
+
+    private function normalizeMaterialQualityAdjustment(mixed $value): float
+    {
+        $number = $this->toFloat($value);
+
+        if ($number === null || $number <= 0) {
+            $number = 1.0;
+        }
+
+        return round($this->clamp($number, 0.01, 10.0), 4);
+    }
+
+    private function normalizeMaintenanceAdjustmentPercent(mixed $value): float
+    {
+        $number = $this->toFloat($value) ?? 0.0;
+
+        return round($this->clamp($number, -100.0, 100.0), 2);
+    }
+
+    private function normalizeMaintenanceAdjustmentFraction(mixed $value): float
+    {
+        $number = $this->toFloat($value) ?? 0.0;
+
+        return $this->clamp($number, -1.0, 1.0);
+    }
+
+    private function ppnPercent(): float
+    {
+        return $this->valuationSettingNumber(ValuationSetting::KEY_PPN_PERCENT, 11.0) ?? 11.0;
+    }
+
+    private function suggestRatioAdjustment(?float $subjectValue, ?float $comparableValue, float $cap = 20.0): ?float
+    {
+        if ($subjectValue === null || $comparableValue === null) {
+            return null;
+        }
+
+        if ($subjectValue <= 0 || $comparableValue <= 0) {
+            return null;
+        }
+
+        $ratio = (($comparableValue - $subjectValue) / $subjectValue) * 100;
+
+        return round($this->clamp($ratio, -$cap, $cap), 2);
     }
 
     /**
@@ -1371,6 +1597,9 @@ class AdjustmentWorkbenchService
         ?string $buildingType,
         ?string $buildingClass,
         ?int $floorCount,
+        ?string $preferredStoreyPattern,
+        float $materialQualityAdj,
+        float $maintenanceAdjDeltaPercent,
         ?float $ikkValue,
         ?string $conditionLabel,
         array $snapshot,
@@ -1383,6 +1612,9 @@ class AdjustmentWorkbenchService
                 'material_quality_adj_ref' => '-',
                 'rcn_adjusted_ref' => '-',
                 'maintenance_ref' => '-',
+                'maintenance_remaining_text' => '-',
+                'maintenance_final_text' => '-',
+                'maintenance_detail_text' => '-',
                 'building_value_sqm_ref' => '-',
                 'building_value_ref' => '-',
                 'residual_land_value_ref' => '-',
@@ -1404,6 +1636,9 @@ class AdjustmentWorkbenchService
                 'material_quality_adj_ref' => 'N/A',
                 'rcn_adjusted_ref' => 'N/A',
                 'maintenance_ref' => 'N/A',
+                'maintenance_remaining_text' => 'N/A',
+                'maintenance_final_text' => 'N/A',
+                'maintenance_detail_text' => 'N/A',
                 'building_value_sqm_ref' => 'N/A',
                 'building_value_ref' => 'N/A',
                 'residual_land_value_ref' => $this->formatCurrency($basePrice),
@@ -1413,33 +1648,28 @@ class AdjustmentWorkbenchService
             ];
         }
 
-        $baseRcnMappi = $this->firstNumber([
+        $baseRcnMappi = $this->baseRcnFromReference($buildingType, $buildingClass, $floorCount, $preferredStoreyPattern) ?? $this->firstNumber([
             data_get($snapshot, 'rcn_standar_mappi'),
             data_get($snapshot, 'rcn_standard_mappi'),
             data_get($snapshot, 'rcn_mappi'),
             data_get($snapshot, 'rcn_standard'),
             data_get($snapshot, 'rcn'),
-        ]) ?? $this->baseRcnFromReference($buildingType, $buildingClass, $floorCount);
+        ]);
 
-        $materialQualityAdj = $this->firstNumber([
-            data_get($snapshot, 'penyesuaian_kualitas_material_bangunan_rcn'),
-            data_get($snapshot, 'penyesuaian_kualitas_material'),
-            data_get($snapshot, 'material_quality_adjustment'),
-        ]) ?? 1.0;
-
-        $adjSuggested = $this->firstNumber([
+        $adjSuggested = $this->normalizeMaintenanceAdjustmentFraction($this->firstNumber([
             data_get($snapshot, 'adj_suggested'),
             data_get($snapshot, 'penyesuaian_otomatis'),
-        ]) ?? 0.0;
-
-        $adjDelta = $this->firstNumber([
-            data_get($snapshot, 'adj_delta'),
-            data_get($snapshot, 'penyesuaian_manual'),
-        ]) ?? 0.0;
+        ]));
+        $adjDelta = $maintenanceAdjDeltaPercent / 100;
 
         $ikkFactor = $ikkValue ?? 1.0;
+        $ppnPercent = $this->ppnPercent();
+        $ppnFactor = 1 + ($ppnPercent / 100);
+        $floorIndexFactor = $this->floorIndexValue($buildingClass, $floorCount) ?? 1.0;
 
-        $rcnStandard = $baseRcnMappi !== null ? ($baseRcnMappi * $ikkFactor) : null;
+        $rcnStandard = $baseRcnMappi !== null
+            ? (float) round($baseRcnMappi * $ppnFactor * $ikkFactor * $floorIndexFactor, -2)
+            : null;
         $rcnAdjusted = $rcnStandard !== null ? ($rcnStandard * $materialQualityAdj) : null;
 
         $age = $builtYear !== null ? max(0, $valuationYear - $builtYear) : null;
@@ -1469,6 +1699,9 @@ class AdjustmentWorkbenchService
                 'material_quality_adj_ref' => '-',
                 'rcn_adjusted_ref'         => '-',
                 'maintenance_ref'          => 'RCN tidak dapat dihitung (data referensi tidak tersedia)',
+                'maintenance_remaining_text' => '-',
+                'maintenance_final_text' => '-',
+                'maintenance_detail_text' => 'RCN tidak dapat dihitung (data referensi tidak tersedia)',
                 'building_value_sqm_ref'   => '-',
                 'building_value_ref'       => '-',
                 'residual_land_value_ref'      => $this->formatCurrency($basePrice),
@@ -1498,6 +1731,9 @@ class AdjustmentWorkbenchService
             'material_quality_adj_ref' => $this->formatDecimal($materialQualityAdj, 4),
             'rcn_adjusted_ref' => $this->formatCurrency($rcnAdjusted),
             'maintenance_ref' => $maintenanceText,
+            'maintenance_remaining_text' => $remainingPercent,
+            'maintenance_final_text' => $finalPercent,
+            'maintenance_detail_text' => "Age {$ageText} | Effective {$effectiveAgeText} | Life {$lifeText} | Remaining {$remainingPercent}",
             'building_value_sqm_ref' => $this->formatCurrency($buildingValuePerSqm),
             'building_value_ref' => $this->formatCurrency($buildingValue),
             'residual_land_value_ref' => $this->formatCurrency($residualLandValue),
@@ -1574,8 +1810,14 @@ class AdjustmentWorkbenchService
         return $this->economicLifeCache[$cacheKey];
     }
 
-    private function baseRcnFromReference(?string $buildingType, ?string $buildingClass, ?int $floorCount): ?float
+    private function baseRcnFromReference(?string $buildingType, ?string $buildingClass, ?int $floorCount, ?string $preferredStoreyPattern = null): ?float
     {
+        $standardValue = $this->baseRcnFromStandardReference($buildingType, $buildingClass, $floorCount, $preferredStoreyPattern);
+
+        if ($standardValue !== null) {
+            return $standardValue;
+        }
+
         if (! $this->guidelineSetId || ! $this->guidelineYear) {
             return null;
         }
@@ -1626,7 +1868,7 @@ class AdjustmentWorkbenchService
 
             $rows = $query
                 ->get(['unit_cost', 'storey_pattern'])
-                ->filter(fn(CostElement $row): bool => $this->storeyPatternMatches($row->storey_pattern, $floorCount))
+                ->filter(fn(CostElement $row): bool => $this->storeyPatternMatches($row->storey_pattern, $floorCount, $preferredStoreyPattern))
                 ->values();
 
             if ($rows->isEmpty()) {
@@ -1639,6 +1881,78 @@ class AdjustmentWorkbenchService
                 $this->baseRcnCache[$cacheKey] = $sum;
 
                 return $sum;
+            }
+        }
+
+        $this->baseRcnCache[$cacheKey] = null;
+
+        return null;
+    }
+
+    private function baseRcnFromStandardReference(?string $buildingType, ?string $buildingClass, ?int $floorCount, ?string $preferredStoreyPattern = null): ?float
+    {
+        if (! $this->guidelineSetId || ! $this->guidelineYear) {
+            return null;
+        }
+
+        $typeKey = strtolower(trim((string) $buildingType));
+        $classKey = strtolower(trim((string) $buildingClass));
+        $floorKey = $floorCount ?? 0;
+
+        $cacheKey = "std|{$this->guidelineSetId}|{$this->guidelineYear}|{$typeKey}|{$classKey}|{$floorKey}";
+
+        if (array_key_exists($cacheKey, $this->baseRcnCache)) {
+            return $this->baseRcnCache[$cacheKey];
+        }
+
+        $candidates = [];
+
+        if ($typeKey !== '' && $classKey !== '') {
+            $candidates[] = ['type' => 'exact', 'type_value' => $typeKey, 'class' => 'exact', 'class_value' => $classKey];
+            $candidates[] = ['type' => 'exact', 'type_value' => $typeKey, 'class' => 'blank', 'class_value' => null];
+        } elseif ($typeKey !== '') {
+            $candidates[] = ['type' => 'exact', 'type_value' => $typeKey, 'class' => 'blank', 'class_value' => null];
+            $candidates[] = ['type' => 'exact', 'type_value' => $typeKey, 'class' => 'any', 'class_value' => null];
+        } elseif ($classKey !== '') {
+            $candidates[] = ['type' => 'blank', 'type_value' => null, 'class' => 'exact', 'class_value' => $classKey];
+            $candidates[] = ['type' => 'any', 'type_value' => null, 'class' => 'exact', 'class_value' => $classKey];
+        }
+
+        $candidates[] = ['type' => 'blank', 'type_value' => null, 'class' => 'blank', 'class_value' => null];
+
+        foreach ($candidates as $candidate) {
+            $query = MappiRcnStandard::query()
+                ->where('guideline_set_id', $this->guidelineSetId)
+                ->where('year', $this->guidelineYear);
+
+            $this->applyCostDimensionFilter(
+                $query,
+                'building_type',
+                $candidate['type'],
+                $candidate['type_value']
+            );
+
+            $this->applyCostDimensionFilter(
+                $query,
+                'building_class',
+                $candidate['class'],
+                $candidate['class_value']
+            );
+
+            $record = $query
+                ->get(['rcn_value', 'storey_pattern'])
+                ->first(fn(MappiRcnStandard $row): bool => $this->storeyPatternMatches($row->storey_pattern, $floorCount, $preferredStoreyPattern));
+
+            if (! $record) {
+                continue;
+            }
+
+            $value = $this->toFloat($record->rcn_value);
+
+            if ($value !== null && $value > 0) {
+                $this->baseRcnCache[$cacheKey] = $value;
+
+                return $value;
             }
         }
 
@@ -1666,9 +1980,14 @@ class AdjustmentWorkbenchService
         }
     }
 
-    private function storeyPatternMatches(?string $pattern, ?int $floorCount): bool
+    private function storeyPatternMatches(?string $pattern, ?int $floorCount, ?string $preferredPattern = null): bool
     {
         $text = strtolower(trim((string) $pattern));
+        $preferred = strtolower(trim((string) $preferredPattern));
+
+        if ($preferred !== '' && $text !== '' && $text === $preferred) {
+            return true;
+        }
 
         if ($text === '' || $text === '-') {
             return true;
@@ -1765,6 +2084,64 @@ class AdjustmentWorkbenchService
         return $mapping;
     }
 
+    private function resolveMappiBuildingType(?string $mappedType, ?string $peruntukan, array $snapshot): ?string
+    {
+        $explicit = $this->firstFilled([
+            data_get($snapshot, 'mappi_building_type'),
+            data_get($snapshot, 'btb_building_type'),
+        ], null);
+
+        if (is_string($explicit) && trim($explicit) !== '') {
+            return trim($explicit);
+        }
+
+        if (is_string($mappedType) && trim($mappedType) !== '') {
+            return trim($mappedType);
+        }
+
+        return null;
+    }
+
+    private function resolveMappiBuildingClass(?string $mappedClass, ?string $peruntukan, array $snapshot): ?string
+    {
+        $explicit = $this->firstFilled([
+            data_get($snapshot, 'mappi_building_class'),
+            data_get($snapshot, 'kelas_bangunan'),
+            data_get($snapshot, 'building_class'),
+        ], null);
+
+        if (is_string($explicit) && trim($explicit) !== '') {
+            return trim($explicit);
+        }
+
+        if (is_string($mappedClass) && trim($mappedClass) !== '') {
+            return trim($mappedClass);
+        }
+
+        return null;
+    }
+
+    private function resolvePreferredStoreyPattern(?RefUsageToMappiGroup $mapping, array $snapshot): ?string
+    {
+        $explicit = $this->firstFilled([
+            data_get($snapshot, 'mappi_storey_pattern'),
+            data_get($snapshot, 'storey_pattern'),
+            data_get($snapshot, 'default_storey_group'),
+        ], null);
+
+        if (is_string($explicit) && trim($explicit) !== '') {
+            return trim($explicit);
+        }
+
+        $mapped = $mapping?->storeyGroup();
+
+        if (is_string($mapped) && trim($mapped) !== '') {
+            return trim($mapped);
+        }
+
+        return null;
+    }
+
     private function floorIndexValue(?string $buildingClass, ?int $floorCount): ?float
     {
         if (! $this->guidelineSetId || ! $this->guidelineYear || ! $floorCount) {
@@ -1825,6 +2202,59 @@ class AdjustmentWorkbenchService
         return $this->ikkCache[$cacheKey];
     }
 
+    private function resolveRegionCodeFromSnapshot(array $snapshot): ?string
+    {
+        $directCode = $this->normalizeRegionCode($this->firstFilled([
+            data_get($snapshot, 'regency.id'),
+            data_get($snapshot, 'region_code'),
+            data_get($snapshot, 'regency_id'),
+        ], null));
+
+        if ($directCode !== null) {
+            return $directCode;
+        }
+
+        $regencyName = trim((string) $this->firstFilled([
+            data_get($snapshot, 'regency.name'),
+            data_get($snapshot, 'kabupaten.name'),
+            data_get($snapshot, 'kabupaten'),
+            data_get($snapshot, 'kota_kabupaten'),
+            data_get($snapshot, 'city'),
+            data_get($snapshot, 'regency'),
+        ], ''));
+
+        if ($regencyName === '') {
+            return null;
+        }
+
+        $provinceName = trim((string) $this->firstFilled([
+            data_get($snapshot, 'province.name'),
+            data_get($snapshot, 'provinsi.name'),
+            data_get($snapshot, 'provinsi'),
+            data_get($snapshot, 'province'),
+        ], ''));
+
+        $query = Regency::query()->select(['id', 'province_id']);
+
+        if ($provinceName !== '') {
+            $query->whereHas('province', function (Builder $scope) use ($provinceName): void {
+                $scope->whereRaw('LOWER(name) = ?', [mb_strtolower($provinceName)]);
+            });
+        }
+
+        $record = (clone $query)
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($regencyName)])
+            ->first();
+
+        if (! $record) {
+            $record = (clone $query)
+                ->whereRaw('LOWER(name) LIKE ?', ['%' . mb_strtolower($regencyName) . '%'])
+                ->first();
+        }
+
+        return $this->normalizeRegionCode($record?->id);
+    }
+
     private function provinceName(?string $provinceId): ?string
     {
         $id = trim((string) $provinceId);
@@ -1857,6 +2287,29 @@ class AdjustmentWorkbenchService
         $this->regencyNameCache[$id] = Regency::query()->whereKey($id)->value('name');
 
         return $this->regencyNameCache[$id];
+    }
+
+    private function valuationSettingNumber(string $key, ?float $default = null): ?float
+    {
+        if (! $this->guidelineSetId || ! $this->guidelineYear) {
+            return $default;
+        }
+
+        $cacheKey = "{$this->guidelineSetId}|{$this->guidelineYear}|{$key}";
+
+        if (array_key_exists($cacheKey, $this->valuationSettingNumberCache)) {
+            return $this->valuationSettingNumberCache[$cacheKey] ?? $default;
+        }
+
+        $value = ValuationSetting::query()
+            ->where('guideline_set_id', $this->guidelineSetId)
+            ->where('year', $this->guidelineYear)
+            ->where('key', $key)
+            ->value('value_number');
+
+        $this->valuationSettingNumberCache[$cacheKey] = $value !== null ? (float) $value : null;
+
+        return $this->valuationSettingNumberCache[$cacheKey] ?? $default;
     }
 
     private function normalizeRegionCode(mixed $value): ?string
@@ -1924,6 +2377,17 @@ class AdjustmentWorkbenchService
         }
 
         return $discount;
+    }
+
+    private function formatUnsignedPercent(mixed $value, int $decimals = 2): string
+    {
+        $number = $this->toFloat($value);
+
+        if ($number === null) {
+            return '-';
+        }
+
+        return number_format($number, $decimals, ',', '.') . '%';
     }
 
     private function resolveEffectiveBuildingArea(
