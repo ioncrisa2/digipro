@@ -172,6 +172,7 @@
 @php
     $idr = fn ($value) => 'Rp ' . number_format((int) ($value ?? 0), 0, ',', '.');
     $bank = is_array($invoice['selected_bank_account'] ?? null) ? $invoice['selected_bank_account'] : null;
+    $gateway = is_array($invoice['gateway_details'] ?? null) ? $invoice['gateway_details'] : null;
 @endphp
 
 <div class="page">
@@ -248,13 +249,22 @@
         <table class="payment-table">
             <tr>
                 <td class="payment-label">Metode</td>
-                <td>: {{ strtoupper((string) ($invoice['method'] ?? 'manual')) }}</td>
+                <td>: {{ (string) ($invoice['method'] ?? 'Midtrans Snap') }}</td>
             </tr>
             <tr>
-                <td class="payment-label">Rekening Tujuan</td>
+                <td class="payment-label">Order ID</td>
+                <td>: {{ $invoice['external_payment_id'] ?? '-' }}</td>
+            </tr>
+            <tr>
+                <td class="payment-label">Channel</td>
                 <td>
                     :
-                    @if($bank)
+                    @if($gateway)
+                        {{ $gateway['label'] ?? '-' }}
+                        @if(!empty($gateway['reference']))
+                            | {{ $gateway['reference'] }}
+                        @endif
+                    @elseif($bank)
                         {{ $bank['bank_name'] ?? '-' }} | {{ $bank['account_number'] ?? '-' }} | a.n. {{ $bank['account_holder'] ?? '-' }}
                     @else
                         -

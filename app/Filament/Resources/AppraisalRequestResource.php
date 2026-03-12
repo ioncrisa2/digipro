@@ -390,12 +390,12 @@ class AppraisalRequestResource extends Resource
                     ->disabled(fn (AppraisalRequest $record) => ! self::canVerifyPayment($record))
                     ->tooltip(fn (AppraisalRequest $record) => self::canVerifyPayment($record)
                         ? null
-                        : 'Aksi aktif setelah pembayaran berstatus Dibayar dan bukti pembayaran tersedia.')
+                        : 'Aksi aktif setelah pembayaran berstatus Dibayar dan bukti/manual gateway valid tersedia.')
                     ->action(function (AppraisalRequest $record) {
                         if (! self::canVerifyPayment($record)) {
                             \Filament\Notifications\Notification::make()
                                 ->title('Pembayaran belum siap diverifikasi')
-                                ->body('Pastikan pembayaran sudah berstatus Dibayar dan bukti transfer sudah diunggah.')
+                                ->body('Pastikan pembayaran sudah berstatus Dibayar dan data pembayaran valid tersedia.')
                                 ->warning()
                                 ->send();
                             return;
@@ -571,13 +571,14 @@ class AppraisalRequestResource extends Resource
     {
         $latestPayment = $record->payments()
             ->latest('id')
-            ->first(['status', 'proof_file_path']);
+            ->first(['method', 'status', 'proof_file_path']);
 
         if (! $latestPayment) {
             return false;
         }
 
-        return $latestPayment->status === 'paid' && filled($latestPayment->proof_file_path);
+        return $latestPayment->status === 'paid'
+            && ($latestPayment->method === 'gateway' || filled($latestPayment->proof_file_path));
     }
 
     public static function getPages(): array

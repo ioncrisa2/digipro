@@ -291,10 +291,7 @@ class AppraisalController extends Controller
             ->findOrFail($id);
 
         $status = $record->status?->value ?? $record->status;
-        if (! in_array($status, [
-            AppraisalStatusEnum::WaitingSignature->value,
-            AppraisalStatusEnum::ContractSigned->value,
-        ], true)) {
+        if (! $this->isContractAccessibleStatus($status)) {
             return redirect()
                 ->route('appraisal.show', ['id' => $record->id])
                 ->with('error', 'Kontrak belum siap untuk ditandatangani.');
@@ -370,10 +367,7 @@ class AppraisalController extends Controller
             ->findOrFail($id);
 
         $status = $record->status?->value ?? $record->status;
-        if (! in_array($status, [
-            AppraisalStatusEnum::WaitingSignature->value,
-            AppraisalStatusEnum::ContractSigned->value,
-        ], true)) {
+        if (! $this->isContractAccessibleStatus($status)) {
             return redirect()
                 ->route('appraisal.show', ['id' => $record->id])
                 ->with('error', 'Dokumen kontrak belum tersedia pada status saat ini.');
@@ -438,6 +432,18 @@ class AppraisalController extends Controller
         return (int) $record->offerNegotiations()
             ->where('action', 'counter_request')
             ->count();
+    }
+
+    private function isContractAccessibleStatus(string $status): bool
+    {
+        return in_array($status, [
+            AppraisalStatusEnum::WaitingSignature->value,
+            AppraisalStatusEnum::ContractSigned->value,
+            AppraisalStatusEnum::ValuationOnProgress->value,
+            AppraisalStatusEnum::ValuationCompleted->value,
+            AppraisalStatusEnum::ReportReady->value,
+            AppraisalStatusEnum::Completed->value,
+        ], true);
     }
 
     /**

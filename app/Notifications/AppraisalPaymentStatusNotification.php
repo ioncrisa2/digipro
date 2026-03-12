@@ -31,7 +31,7 @@ class AppraisalPaymentStatusNotification extends Notification
             : 'Bukti pembayaran ditolak';
 
         $message = $isVerified
-            ? "Pembayaran untuk {$this->requestNumber} sudah dikonfirmasi admin. Status permohonan masuk Proses Valuasi Berjalan."
+            ? "Pembayaran untuk {$this->requestNumber} sudah dikonfirmasi sistem. Status permohonan masuk Proses Valuasi Berjalan."
             : "Bukti pembayaran untuk {$this->requestNumber} ditolak admin."
                 . ($this->reason ? " Alasan: {$this->reason}" : '');
 
@@ -45,4 +45,3 @@ class AppraisalPaymentStatusNotification extends Notification
         ];
     }
 }
-

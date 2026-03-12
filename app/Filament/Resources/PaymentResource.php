@@ -63,6 +63,7 @@ class PaymentResource extends Resource
                                 'pending' => 'Menunggu',
                                 'paid' => 'Dibayar',
                                 'failed' => 'Gagal',
+                                'expired' => 'Kedaluwarsa',
                                 'rejected' => 'Ditolak',
                                 'refunded' => 'Refund',
                             ])
@@ -157,11 +158,13 @@ class PaymentResource extends Resource
                         'warning' => 'pending',
                         'success' => 'paid',
                         'danger' => ['failed', 'rejected'],
+                        'gray' => 'expired',
                         'secondary' => 'refunded',
                     ])
                     ->formatStateUsing(fn ($state) => match ($state) {
                         'paid' => 'Dibayar',
                         'failed' => 'Gagal',
+                        'expired' => 'Kedaluwarsa',
                         'rejected' => 'Ditolak',
                         'refunded' => 'Refund',
                         default => 'Menunggu',
@@ -183,6 +186,7 @@ class PaymentResource extends Resource
                         'pending' => 'Menunggu',
                         'paid' => 'Dibayar',
                         'failed' => 'Gagal',
+                        'expired' => 'Kedaluwarsa',
                         'rejected' => 'Ditolak',
                         'refunded' => 'Refund',
                     ])

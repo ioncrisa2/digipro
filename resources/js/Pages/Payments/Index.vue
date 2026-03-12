@@ -60,6 +60,12 @@ const statusMeta = (status) => {
   if (s.includes("dibayar")) {
     return { label: status, variant: "default", icon: CheckCircle2, tone: "text-emerald-600" };
   }
+  if (s.includes("gagal")) {
+    return { label: status, variant: "destructive", icon: AlertTriangle, tone: "text-rose-600" };
+  }
+  if (s.includes("kedaluwarsa")) {
+    return { label: status, variant: "outline", icon: AlertTriangle, tone: "text-amber-700" };
+  }
   if (s.includes("menunggu verifikasi")) {
     return { label: status, variant: "secondary", icon: AlertTriangle, tone: "text-amber-600" };
   }
@@ -282,7 +288,7 @@ const downloadSelectedInvoices = () => {
       <div class="flex flex-col gap-2">
         <h1 class="text-2xl font-semibold text-slate-900">Pembayaran</h1>
         <p class="text-sm text-slate-500">
-          Pantau status pembayaran dan unduh invoice serta bukti pembayaran.
+          Pantau status pembayaran Midtrans dan unduh invoice transaksi yang sudah lunas.
         </p>
       </div>
 
@@ -526,8 +532,18 @@ const downloadSelectedInvoices = () => {
                           <div class="font-mono text-slate-900">{{ item.va }}</div>
                         </div>
                       </div>
+                      <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 text-sm">
+                        <div>
+                          <div class="text-xs text-slate-500">Order ID</div>
+                          <div class="font-medium text-slate-900 break-all">{{ item.order_id || "-" }}</div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Channel</div>
+                          <div class="font-medium text-slate-900">{{ item.gateway_details?.label || item.method }}</div>
+                        </div>
+                      </div>
                       <div class="mt-3 text-xs text-slate-500">
-                        Dokumen: Invoice Pembayaran, Bukti Pembayaran.
+                        Dokumen: Invoice Pembayaran. Bukti upload hanya tersedia untuk histori manual lama.
                       </div>
                     </TableCell>
                   </TableRow>

@@ -6,7 +6,7 @@ import UserDashboardLayout from "@/layouts/UserDashboardLayout.vue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, FileCheck2, Printer } from "lucide-vue-next";
+import { ArrowLeft, Download, Printer, ReceiptText } from "lucide-vue-next";
 
 const props = defineProps({
     request: { type: Object, default: () => ({}) },
@@ -37,22 +37,12 @@ const invoicePdfUrl = computed(() => {
     }
 });
 
-const invoiceNumber = computed(() => props.payment?.invoice_number ?? "-");
-const selectedBank = computed(() => props.payment?.selected_bank_account ?? null);
+const gatewayDetails = computed(() => props.payment?.gateway_details ?? null);
 
 const formatIDR = (value) => {
     const n = Number(value);
     if (!Number.isFinite(n)) return "-";
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(n);
-};
-
-const formatBytes = (bytes) => {
-    const n = Number(bytes);
-    if (!Number.isFinite(n) || n <= 0) return "-";
-    const units = ["B", "KB", "MB", "GB"];
-    const idx = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1);
-    const value = n / Math.pow(1024, idx);
-    return `${value.toFixed(idx === 0 ? 0 : 2)} ${units[idx]}`;
 };
 
 const formatDateTime = (value) => {
@@ -122,12 +112,12 @@ const downloadInvoicePdf = () => {
             <Card>
                 <CardHeader class="pb-3">
                     <CardTitle class="text-base">Ringkasan Invoice</CardTitle>
-                    <CardDescription>Informasi transaksi yang telah diverifikasi admin</CardDescription>
+                    <CardDescription>Informasi transaksi Midtrans yang telah dikonfirmasi</CardDescription>
                 </CardHeader>
                 <CardContent class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                     <div class="rounded-xl border p-3">
                         <div class="text-xs text-muted-foreground">Nomor Invoice</div>
-                        <div class="font-medium">{{ invoiceNumber }}</div>
+                        <div class="font-medium">{{ payment.invoice_number ?? "-" }}</div>
                     </div>
                     <div class="rounded-xl border p-3">
                         <div class="text-xs text-muted-foreground">Nomor Request</div>
@@ -147,7 +137,7 @@ const downloadInvoicePdf = () => {
             <Card>
                 <CardHeader class="pb-3">
                     <CardTitle class="text-base">Detail Pembayaran</CardTitle>
-                    <CardDescription>Nominal dan rekening tujuan transfer</CardDescription>
+                    <CardDescription>Nominal dan referensi transaksi dari Midtrans</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-3">
                     <div class="rounded-xl border p-4">
@@ -155,28 +145,30 @@ const downloadInvoicePdf = () => {
                         <div class="mt-1 text-2xl font-semibold">{{ formatIDR(payment.amount ?? request.fee_total) }}</div>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <div class="rounded-xl border p-3">
                             <div class="text-xs text-muted-foreground">Metode Pembayaran</div>
-                            <div class="font-medium">{{ payment.method ?? "Transfer Bank" }}</div>
+                            <div class="font-medium">{{ payment.method ?? "Midtrans Snap" }}</div>
                         </div>
                         <div class="rounded-xl border p-3">
                             <div class="text-xs text-muted-foreground">Status</div>
                             <div class="font-medium">{{ payment.status_label ?? "Dibayar" }}</div>
                         </div>
+                        <div class="rounded-xl border p-3">
+                            <div class="text-xs text-muted-foreground">Order ID</div>
+                            <div class="font-medium break-all">{{ payment.external_payment_id ?? "-" }}</div>
+                        </div>
                     </div>
 
                     <div class="rounded-xl border p-3">
-                        <div class="text-xs text-muted-foreground">Rekening Tujuan</div>
-                        <div class="mt-1 text-sm">
-                            <template v-if="selectedBank">
-                                <div class="font-medium">{{ selectedBank.bank_name ?? "-" }}</div>
-                                <div class="font-mono">{{ selectedBank.account_number ?? "-" }}</div>
-                                <div class="text-muted-foreground">a.n. {{ selectedBank.account_holder ?? "-" }}</div>
-                            </template>
-                            <template v-else>
-                                <div class="font-medium">-</div>
-                            </template>
+                        <div class="text-xs text-muted-foreground">Channel Pembayaran</div>
+                        <div class="mt-1 text-sm space-y-1">
+                            <div class="font-medium">{{ gatewayDetails?.label ?? payment.method ?? "-" }}</div>
+                            <div v-if="gatewayDetails?.reference" class="font-mono">{{ gatewayDetails.reference }}</div>
+                            <div v-if="gatewayDetails?.bank" class="text-muted-foreground">Bank: {{ gatewayDetails.bank }}</div>
+                            <div v-if="gatewayDetails?.transaction_id" class="text-muted-foreground break-all">
+                                Transaction ID: {{ gatewayDetails.transaction_id }}
+                            </div>
                         </div>
                     </div>
                 </CardContent>
@@ -184,33 +176,18 @@ const downloadInvoicePdf = () => {
 
             <Card>
                 <CardHeader class="pb-3">
-                    <CardTitle class="text-base">Bukti Pembayaran</CardTitle>
-                    <CardDescription>File yang Anda unggah saat proses pembayaran</CardDescription>
+                    <CardTitle class="text-base">Keterangan</CardTitle>
+                    <CardDescription>Ringkasan transaksi yang tercatat di DigiPro</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-3">
                     <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
                         <div class="flex items-center gap-2 font-medium">
-                            <FileCheck2 class="h-4 w-4" />
-                            Pembayaran terverifikasi
+                            <ReceiptText class="h-4 w-4" />
+                            Pembayaran terverifikasi otomatis
                         </div>
                         <p class="mt-1 text-xs text-emerald-800">
-                            Proses penilaian sudah berjalan. Halaman upload pembayaran tidak bisa diakses lagi.
+                            Status pembayaran telah diterima DigiPro dari Midtrans dan proses penilaian sudah berjalan.
                         </p>
-                    </div>
-
-                    <div class="rounded-xl border p-3">
-                        <div class="text-xs text-muted-foreground">Nama File</div>
-                        <div class="font-medium">{{ payment.proof_original_name ?? "-" }}</div>
-                        <div class="text-xs text-muted-foreground">{{ formatBytes(payment.proof_size) }}</div>
-                        <a
-                            v-if="payment.proof_url"
-                            :href="payment.proof_url"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="mt-2 inline-flex text-sm underline"
-                        >
-                            Lihat file bukti pembayaran
-                        </a>
                     </div>
                 </CardContent>
             </Card>

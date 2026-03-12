@@ -23,6 +23,8 @@ Route::get('/contact', [LandingController::class, 'contact'])->name('contact')->
 Route::post('/contact', [LandingController::class, 'storeContact'])->name('contact.store');
 Route::get('/artikel', [ArticleController::class, 'index'])->name('articles.index');
 Route::get('/artikel/{slug}', [ArticleController::class, 'show'])->name('articles.show');
+Route::post('/payments/midtrans/notification', [PaymentController::class, 'midtransNotification'])
+    ->name('payments.midtrans.notification');
 
 Route::middleware('guest')->group(function () {
     //auth route
@@ -67,7 +69,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/permohonan-penilaian/{id}/pembayaran', [PaymentController::class, 'appraisalPage'])->name('appraisal.payment.page');
         Route::get('/permohonan-penilaian/{id}/invoice', [PaymentController::class, 'invoicePage'])->name('appraisal.invoice.page');
         Route::get('/permohonan-penilaian/{id}/invoice/pdf', [PaymentController::class, 'downloadInvoicePdf'])->name('appraisal.invoice.pdf');
-        Route::post('/permohonan-penilaian/{id}/pembayaran/proof', [PaymentController::class, 'uploadProof'])->name('appraisal.payment.upload');
+        Route::post('/permohonan-penilaian/{id}/pembayaran/session', [PaymentController::class, 'createMidtransSession'])->name('appraisal.payment.session');
 
         Route::post('/buat-permohonan/consent', [AppraisalController::class, 'acceptConsent'])->name('appraisal.consent.accept');
         Route::post('/buat-permohonan/consent/decline', [AppraisalController::class, 'declineConsent'])->name('appraisal.consent.decline');

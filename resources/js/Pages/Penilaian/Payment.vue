@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref } from "vue";
+import axios from "axios";
+import { computed, ref, watch } from "vue";
 import { router } from "@inertiajs/vue3";
 import UserDashboardLayout from "@/layouts/UserDashboardLayout.vue";
 import { useNotification } from "@/composables/useNotification";
@@ -7,33 +8,32 @@ import { useNotification } from "@/composables/useNotification";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Upload, CreditCard, Building2, FileCheck2 } from "lucide-vue-next";
+import { ArrowLeft, CreditCard, RefreshCw, ShieldCheck, Wallet, Clock3, AlertTriangle } from "lucide-vue-next";
 
 const props = defineProps({
     request: { type: Object, default: () => ({}) },
     payment: { type: Object, default: () => ({}) },
-    bankAccounts: { type: Array, default: () => [] },
-    canUploadProof: { type: Boolean, default: false },
+    midtrans: { type: Object, default: () => ({}) },
+    canStartCheckout: { type: Boolean, default: false },
+    legacyManualMessage: { type: String, default: null },
 });
 
 const { notify } = useNotification();
+const clonePayment = (value) => JSON.parse(JSON.stringify(value ?? {}));
 
-const uploadLoading = ref(false);
-const proofFile = ref(null);
-const transferNote = ref("");
-const transferDate = ref("");
-const transferAmount = ref("");
+const paymentState = ref(clonePayment(props.payment));
+const payLoading = ref(false);
+const switchMethodLoading = ref(false);
+const refreshLoading = ref(false);
+const snapReady = ref(false);
 
-const initialSelectedBankId = computed(() => {
-    const selected = props.payment?.selected_bank_account?.id;
-    if (selected) return String(selected);
-    if (props.bankAccounts.length > 0) return String(props.bankAccounts[0].id);
-    return "";
-});
-const selectedBankAccountId = ref(initialSelectedBankId.value);
+watch(
+    () => props.payment,
+    (value) => {
+        paymentState.value = clonePayment(value);
+    },
+    { deep: true }
+);
 
 const detailUrl = computed(() => {
     try {
@@ -43,94 +43,156 @@ const detailUrl = computed(() => {
     }
 });
 
-const uploadUrl = computed(() => {
-    try {
-        return route("appraisal.payment.upload", props.request?.id);
-    } catch (_) {
-        return `/permohonan-penilaian/${props.request?.id}/pembayaran/proof`;
-    }
-});
-
 const formatIDR = (value) => {
     const n = Number(value);
     if (!Number.isFinite(n)) return "-";
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(n);
 };
 
-const formatBytes = (bytes) => {
-    const n = Number(bytes);
-    if (!Number.isFinite(n) || n <= 0) return "-";
-    const units = ["B", "KB", "MB", "GB"];
-    const index = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1);
-    const value = n / Math.pow(1024, index);
-    return `${value.toFixed(index === 0 ? 0 : 2)} ${units[index]}`;
+const formatDateTime = (value) => {
+    if (!value) return "-";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return new Intl.DateTimeFormat("id-ID", {
+        dateStyle: "medium",
+        timeStyle: "short",
+    }).format(parsed);
 };
 
 const paymentStatusVariant = computed(() => {
-    const status = String(props.payment?.status || "").toLowerCase();
+    const status = String(paymentState.value?.status || "").toLowerCase();
     if (status === "paid") return "default";
     if (["failed", "rejected"].includes(status)) return "destructive";
+    if (status === "expired") return "outline";
     return "secondary";
 });
 
-const selectedBank = computed(() => {
-    return props.bankAccounts.find((item) => String(item.id) === String(selectedBankAccountId.value)) ?? null;
-});
+const checkout = computed(() => paymentState.value?.checkout ?? {});
+const gatewayDetails = computed(() => paymentState.value?.gateway_details ?? {});
 
-const canSubmit = computed(() => {
+const canPayNow = computed(() => {
     return Boolean(
-        props.canUploadProof &&
-            selectedBankAccountId.value &&
-            proofFile.value &&
-            !uploadLoading.value
+        props.canStartCheckout &&
+            props.midtrans?.configured &&
+            !paymentState.value?.is_legacy_manual &&
+            !payLoading.value &&
+            !switchMethodLoading.value
     );
 });
 
-const firstErrorMessage = (errors) => {
-    if (!errors || typeof errors !== "object") return "";
-    const firstKey = Object.keys(errors)[0];
-    if (!firstKey) return "";
-    const value = errors[firstKey];
-    if (Array.isArray(value)) return value[0] ?? "";
-    return typeof value === "string" ? value : "";
-};
-
-const handleFileChange = (event) => {
-    const files = event?.target?.files;
-    proofFile.value = files?.length ? files[0] : null;
-};
-
-const uploadProof = () => {
-    if (!canSubmit.value) {
-        notify("warning", "Lengkapi rekening tujuan dan file bukti pembayaran.");
-        return;
-    }
-
-    uploadLoading.value = true;
-    router.post(
-        uploadUrl.value,
-        {
-            office_bank_account_id: selectedBankAccountId.value,
-            proof_file: proofFile.value,
-            transfer_note: transferNote.value?.trim() || null,
-            transfer_date: transferDate.value || null,
-            transfer_amount: transferAmount.value ? Number(String(transferAmount.value).replace(/[^\d]/g, "")) : null,
-        },
-        {
-            forceFormData: true,
-            preserveScroll: true,
-            onError: (errors) => {
-                notify("error", firstErrorMessage(errors) || "Gagal mengunggah bukti pembayaran.");
-            },
-            onFinish: () => {
-                uploadLoading.value = false;
-            },
-        }
+const canSwitchMethod = computed(() => {
+    return Boolean(
+        props.canStartCheckout &&
+            props.midtrans?.configured &&
+            paymentState.value?.status === "pending" &&
+            paymentState.value?.checkout?.snap_token &&
+            !paymentState.value?.is_legacy_manual &&
+            !payLoading.value &&
+            !switchMethodLoading.value
     );
+});
+
+const refreshPage = () => {
+    refreshLoading.value = true;
+    router.reload({
+        preserveScroll: true,
+        onFinish: () => {
+            refreshLoading.value = false;
+        },
+    });
 };
 
 const goBack = () => {
     router.visit(detailUrl.value);
+};
+
+const loadSnapScript = async () => {
+    if (typeof window === "undefined") return;
+    if (window.snap) {
+        snapReady.value = true;
+        return;
+    }
+
+    const existing = document.getElementById("midtrans-snap-js");
+    if (existing) {
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
+        snapReady.value = Boolean(window.snap);
+        return;
+    }
+
+    await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.id = "midtrans-snap-js";
+        script.src = props.midtrans?.snap_script_url;
+        script.setAttribute("data-client-key", props.midtrans?.client_key ?? "");
+        script.async = true;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.body.appendChild(script);
+    });
+
+    snapReady.value = Boolean(window.snap);
+};
+
+const handleCallback = (type, message) => {
+    notify(type, message);
+    window.setTimeout(() => {
+        refreshPage();
+    }, 1200);
+};
+
+const openSnap = (token) => {
+    if (!window.snap) {
+        notify("error", "Snap Midtrans belum siap dimuat.");
+        return;
+    }
+
+    window.snap.pay(token, {
+        onSuccess: () => handleCallback("success", "Pembayaran berhasil diproses. Menunggu sinkronisasi status."),
+        onPending: () => handleCallback("info", "Pembayaran masih menunggu penyelesaian."),
+        onError: () => handleCallback("error", "Terjadi kendala saat memproses pembayaran."),
+        onClose: () => {
+            notify("info", "Popup pembayaran ditutup.");
+            refreshPage();
+        },
+    });
+};
+
+const startCheckout = async ({ forceNewAttempt = false } = {}) => {
+    if ((forceNewAttempt && !canSwitchMethod.value) || (!forceNewAttempt && !canPayNow.value)) {
+        notify("warning", "Session pembayaran belum bisa dimulai.");
+        return;
+    }
+
+    if (forceNewAttempt) {
+        switchMethodLoading.value = true;
+    } else {
+        payLoading.value = true;
+    }
+
+    try {
+        await loadSnapScript();
+        const { data } = await axios.post(props.midtrans?.create_session_url, {
+            force_new_attempt: forceNewAttempt,
+        });
+        if (data?.payment) {
+            paymentState.value = data.payment;
+        }
+
+        const token = data?.payment?.checkout?.snap_token;
+        if (!token) {
+            notify("error", data?.message || "Snap token tidak tersedia.");
+            return;
+        }
+
+        openSnap(token);
+    } catch (error) {
+        const message = error?.response?.data?.message || "Gagal membuat session pembayaran Midtrans.";
+        notify("error", message);
+    } finally {
+        payLoading.value = false;
+        switchMethodLoading.value = false;
+    }
 };
 </script>
 
@@ -144,10 +206,10 @@ const goBack = () => {
                     <div class="flex flex-wrap items-center gap-2">
                         <h1 class="text-xl font-semibold">Pembayaran Permohonan</h1>
                         <Badge variant="outline">{{ request.request_number ?? "-" }}</Badge>
-                        <Badge :variant="paymentStatusVariant">{{ payment.status_label ?? "-" }}</Badge>
+                        <Badge :variant="paymentStatusVariant">{{ paymentState.status_label ?? "Menunggu Pembayaran" }}</Badge>
                     </div>
                     <p class="text-sm text-muted-foreground">
-                        Gunakan rekening resmi DigiPro di bawah ini lalu unggah bukti transfer Anda.
+                        Pembayaran utama DigiPro diproses melalui Midtrans Snap.
                     </p>
                 </div>
 
@@ -162,141 +224,138 @@ const goBack = () => {
                     <CardTitle class="text-base">Ringkasan Tagihan</CardTitle>
                     <CardDescription>Informasi pembayaran berdasarkan kontrak yang sudah ditandatangani</CardDescription>
                 </CardHeader>
-                <CardContent class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <CardContent class="grid grid-cols-1 gap-3 md:grid-cols-4">
                     <div class="rounded-xl border p-3">
                         <div class="text-xs text-muted-foreground">Nomor Kontrak</div>
                         <div class="font-medium">{{ request.contract_number ?? "-" }}</div>
                     </div>
                     <div class="rounded-xl border p-3">
                         <div class="text-xs text-muted-foreground">Total Tagihan</div>
-                        <div class="font-semibold">{{ formatIDR(request.fee_total) }}</div>
+                        <div class="font-semibold">{{ formatIDR(paymentState.amount ?? request.fee_total) }}</div>
                     </div>
                     <div class="rounded-xl border p-3">
                         <div class="text-xs text-muted-foreground">Status Pembayaran</div>
-                        <div class="font-medium">{{ payment.status_label ?? "-" }}</div>
+                        <div class="font-medium">{{ paymentState.status_label ?? "-" }}</div>
+                    </div>
+                    <div class="rounded-xl border p-3">
+                        <div class="text-xs text-muted-foreground">Order ID</div>
+                        <div class="font-medium break-all">{{ paymentState.external_payment_id ?? "-" }}</div>
                     </div>
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader class="pb-3">
-                    <CardTitle class="text-base">Rekening Tujuan</CardTitle>
-                    <CardDescription>Pilih salah satu rekening aktif kantor untuk transfer</CardDescription>
-                </CardHeader>
-                <CardContent class="space-y-3">
-                    <div v-if="!bankAccounts.length" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                        Rekening kantor belum tersedia. Silakan hubungi admin.
-                    </div>
-
-                    <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <label
-                            v-for="account in bankAccounts"
-                            :key="account.id"
-                            class="flex cursor-pointer items-start gap-3 rounded-xl border p-4"
-                            :class="String(selectedBankAccountId) === String(account.id)
-                                ? 'border-emerald-300 bg-emerald-50'
-                                : 'border-slate-200 bg-white'"
-                        >
-                            <input
-                                v-model="selectedBankAccountId"
-                                type="radio"
-                                :value="String(account.id)"
-                                class="mt-1"
-                            />
-                            <div class="min-w-0">
-                                <div class="flex items-center gap-2 text-sm font-medium">
-                                    <Building2 class="h-4 w-4 text-slate-500" />
-                                    {{ account.bank_name }}
-                                </div>
-                                <div class="mt-1 font-mono text-sm">{{ account.account_number }}</div>
-                                <div class="text-xs text-muted-foreground">a.n. {{ account.account_holder }}</div>
-                                <div v-if="account.branch" class="text-xs text-muted-foreground">{{ account.branch }}</div>
-                            </div>
-                        </label>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader class="pb-3">
-                    <CardTitle class="text-base">Upload Bukti Pembayaran</CardTitle>
-                    <CardDescription>Format file: PDF/JPG/JPEG/PNG, maksimal 15 MB</CardDescription>
+                    <CardTitle class="text-base">Midtrans Checkout</CardTitle>
+                    <CardDescription>VA, QRIS, dan e-wallet ditampilkan sesuai channel yang aktif</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
-                    <div v-if="payment.proof_file_path" class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 space-y-1">
-                        <div class="flex items-center gap-2 font-medium">
-                            <FileCheck2 class="h-4 w-4" />
-                            Bukti pembayaran sudah diunggah
-                        </div>
-                        <div>{{ payment.proof_original_name ?? "-" }} ({{ formatBytes(payment.proof_size) }})</div>
-                        <a
-                            v-if="payment.proof_url"
-                            :href="payment.proof_url"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex text-sm underline"
-                        >
-                            Lihat bukti pembayaran
-                        </a>
+                    <div
+                        v-if="legacyManualMessage"
+                        class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+                    >
+                        {{ legacyManualMessage }}
+                    </div>
+
+                    <div
+                        v-else-if="!midtrans?.configured"
+                        class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+                    >
+                        Konfigurasi Midtrans belum lengkap. Isi credential sandbox/production di environment aplikasi.
                     </div>
 
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <div class="space-y-1.5">
-                            <Label for="transfer-amount">Nominal transfer (opsional)</Label>
-                            <Input id="transfer-amount" v-model="transferAmount" type="number" min="0" placeholder="Contoh: 1800000" />
+                        <div class="rounded-xl border p-4 space-y-2">
+                            <div class="flex items-center gap-2 font-medium">
+                                <Wallet class="h-4 w-4 text-slate-500" />
+                                {{ paymentState.method ?? "Midtrans Snap" }}
+                            </div>
+                            <div class="text-xs text-muted-foreground">Nomor Invoice</div>
+                            <div class="font-medium">{{ paymentState.invoice_number ?? "-" }}</div>
+                            <div class="text-xs text-muted-foreground">Kedaluwarsa Session</div>
+                            <div class="font-medium">{{ formatDateTime(checkout.expires_at || gatewayDetails.expiry_time) }}</div>
                         </div>
-                        <div class="space-y-1.5">
-                            <Label for="transfer-date">Tanggal transfer (opsional)</Label>
-                            <Input id="transfer-date" v-model="transferDate" type="date" />
+
+                        <div class="rounded-xl border p-4 space-y-2">
+                            <div class="flex items-center gap-2 font-medium">
+                                <ShieldCheck class="h-4 w-4 text-slate-500" />
+                                Detail Channel
+                            </div>
+                            <div class="text-xs text-muted-foreground">Channel</div>
+                            <div class="font-medium">{{ gatewayDetails.label ?? "Midtrans Snap" }}</div>
+                            <div class="text-xs text-muted-foreground">Referensi / VA</div>
+                            <div class="font-medium break-all">{{ gatewayDetails.reference ?? "-" }}</div>
                         </div>
                     </div>
 
-                    <div class="space-y-1.5">
-                        <Label for="transfer-note">Catatan transfer (opsional)</Label>
-                        <Textarea
-                            id="transfer-note"
-                            v-model="transferNote"
-                            class="min-h-20"
-                            placeholder="Contoh: transfer via mobile banking, nama pengirim berbeda."
-                        />
-                    </div>
-
-                    <div class="space-y-1.5">
-                        <Label for="proof-file">File bukti pembayaran <span class="text-red-600">*</span></Label>
-                        <Input id="proof-file" type="file" accept=".pdf,.jpg,.jpeg,.png" @change="handleFileChange" />
-                        <p v-if="proofFile" class="text-xs text-muted-foreground">
-                            File terpilih: {{ proofFile.name }}
+                    <div class="rounded-xl border bg-slate-50 p-4 text-sm text-slate-700">
+                        <div class="flex items-center gap-2 font-medium">
+                            <Clock3 class="h-4 w-4" />
+                            Status pembayaran akan difinalkan otomatis lewat webhook Midtrans.
+                        </div>
+                        <p class="mt-1 text-xs text-muted-foreground">
+                            Setelah transaksi sukses di Midtrans, DigiPro akan menyinkronkan status pembayaran dan mengaktifkan invoice secara otomatis.
                         </p>
                     </div>
 
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="text-xs text-muted-foreground">
-                            Rekening terpilih:
-                            <span class="font-medium text-slate-700">
-                                {{ selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_number}` : "-" }}
-                            </span>
+                            Gunakan tombol bayar untuk membuka popup Snap. Jika channel aktif bermasalah, buat sesi baru untuk memilih metode bayar lain.
                         </div>
-                        <Button :disabled="!canSubmit" @click="uploadProof">
-                            <Upload class="mr-2 h-4 w-4" />
-                            {{ uploadLoading ? "Mengunggah..." : "Upload Bukti Pembayaran" }}
-                        </Button>
+                        <div class="flex flex-wrap gap-2">
+                            <Button variant="outline" :disabled="refreshLoading" @click="refreshPage">
+                                <RefreshCw class="mr-2 h-4 w-4" />
+                                {{ refreshLoading ? "Menyegarkan..." : "Refresh Status" }}
+                            </Button>
+                            <Button
+                                v-if="canSwitchMethod"
+                                variant="outline"
+                                :disabled="!canSwitchMethod"
+                                @click="startCheckout({ forceNewAttempt: true })"
+                            >
+                                <RefreshCw class="mr-2 h-4 w-4" />
+                                {{ switchMethodLoading ? "Mengganti Metode..." : "Ganti Metode Bayar" }}
+                            </Button>
+                            <Button :disabled="!canPayNow" @click="startCheckout()">
+                                <CreditCard class="mr-2 h-4 w-4" />
+                                {{ payLoading ? "Membuka Midtrans..." : (paymentState.status === "pending" ? "Lanjutkan Pembayaran" : "Bayar Sekarang") }}
+                            </Button>
+                        </div>
                     </div>
 
-                    <div v-if="!canUploadProof" class="rounded-xl border p-3 text-xs text-muted-foreground">
-                        Upload bukti pembayaran belum tersedia pada status permohonan saat ini.
+                    <div
+                        v-if="paymentState.status === 'expired' || paymentState.status === 'failed'"
+                        class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+                    >
+                        Sesi pembayaran sebelumnya tidak aktif lagi. Klik <span class="font-medium">Bayar Sekarang</span> untuk membuat sesi baru.
+                    </div>
+
+                    <div
+                        v-if="paymentState.status === 'pending' && paymentState.external_payment_id"
+                        class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900"
+                    >
+                        Pembayaran masih menunggu penyelesaian. Order ID:
+                        <span class="font-medium break-all">{{ paymentState.external_payment_id }}</span>
+                        <p class="mt-1 text-xs text-sky-800">
+                            Jika QRIS, e-wallet, atau VA yang sedang aktif bermasalah, gunakan tombol
+                            <span class="font-medium">Ganti Metode Bayar</span> untuk membuat order baru dan memilih channel lain di Snap.
+                        </p>
+                    </div>
+
+                    <div
+                        v-if="paymentState.is_legacy_manual"
+                        class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+                    >
+                        <div class="flex items-center gap-2 font-medium">
+                            <AlertTriangle class="h-4 w-4" />
+                            Record manual historis
+                        </div>
+                        <p class="mt-1 text-xs text-amber-800">
+                            Request ini masih memiliki pembayaran manual lama dan tidak dibuka ulang ke Midtrans secara otomatis.
+                        </p>
                     </div>
                 </CardContent>
             </Card>
-
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <div class="flex items-center gap-2 font-medium">
-                    <CreditCard class="h-4 w-4" />
-                    Catatan
-                </div>
-                <p class="mt-1 text-xs text-muted-foreground">
-                    Setelah bukti pembayaran diunggah, status akan menunggu verifikasi admin. Proses penilaian dimulai setelah pembayaran terverifikasi.
-                </p>
-            </div>
         </div>
     </UserDashboardLayout>
 </template>

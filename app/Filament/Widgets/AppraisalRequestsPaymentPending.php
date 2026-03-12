@@ -19,7 +19,7 @@ class AppraisalRequestsPaymentPending extends TableWidget
     protected function getTableQuery(): Builder
     {
         return AppraisalRequest::query()
-            ->where('status', AppraisalStatusEnum::OfferSent)
+            ->where('status', AppraisalStatusEnum::ContractSigned)
             ->with('user')
             ->latest('updated_at');
     }

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use App\Support\EnumPresenter;
 use App\Support\AppraisalAssetFieldOptions;
+use App\Services\Payments\MidtransSnapService;
 use App\Models\Regency;
 use App\Models\Village;
 use App\Models\District;
@@ -209,7 +210,7 @@ class AppraisalService
                 'assets.files:id,appraisal_asset_id,type,path,original_name,mime,size,created_at',
                 'offerNegotiations:id,appraisal_request_id,user_id,action,round,offered_fee,expected_fee,selected_fee,reason,meta,created_at',
                 'offerNegotiations.user:id,name',
-                'payments:id,appraisal_request_id,status,paid_at,proof_file_path,proof_original_name,metadata,updated_at,created_at',
+                'payments:id,appraisal_request_id,amount,method,gateway,external_payment_id,status,paid_at,proof_file_path,proof_original_name,metadata,updated_at,created_at',
             ])
             ->findOrFail($id);
 
@@ -330,15 +331,7 @@ class AppraisalService
         $statusTimeline = $this->buildStatusTimeline($r);
         $latestPayment = $r->payments->sortByDesc('id')->first();
         $paymentStatus = $latestPayment?->status;
-        $paymentStatusLabel = match ($paymentStatus) {
-            'paid' => 'Dibayar',
-            'failed' => 'Gagal',
-            'rejected' => 'Ditolak',
-            'refunded' => 'Refund',
-            default => $latestPayment && filled($latestPayment->proof_file_path)
-                ? 'Menunggu Verifikasi'
-                : 'Menunggu Pembayaran',
-        };
+        $paymentStatusLabel = app(MidtransSnapService::class)->paymentStatusLabel($latestPayment);
         $invoiceNumber = data_get($latestPayment?->metadata, 'invoice_number');
         if (! filled($invoiceNumber) && $latestPayment) {
             $invoiceNumber = 'INV-' . now()->format('Y') . '-' . str_pad((string) $latestPayment->id, 5, '0', STR_PAD_LEFT);
@@ -470,7 +463,7 @@ class AppraisalService
             'fee_per_asset' => $feePerAsset,
             'total_fee' => $totalFee,
             'tax_note' => 'Menyesuaikan ketentuan perpajakan yang berlaku.',
-            'payment_methods' => 'Transfer bank ke rekening resmi DigiPro.',
+            'payment_methods' => 'Pembayaran online melalui Midtrans Snap (VA, QRIS, dan e-wallet yang tersedia).',
             'included_scope' => [
                 'Telaah dokumen/foto yang diunggah pengguna',
                 'Pemilihan pembanding dari Bank Data DigiPro',
@@ -787,7 +780,7 @@ class AppraisalService
         $latestPayment = $record->payments->sortByDesc('id')->first();
         if ($latestPayment) {
             $paymentSubmittedAt = data_get($latestPayment->metadata, 'submitted_at') ?? $latestPayment->updated_at;
-            if (filled($latestPayment->proof_file_path)) {
+            if ($latestPayment->method === 'manual' && filled($latestPayment->proof_file_path)) {
                 $append(
                     'payment_submitted',
                     'Bukti Pembayaran Diunggah',
@@ -797,11 +790,23 @@ class AppraisalService
                 );
             }
 
+            if ($latestPayment->method === 'gateway' && $latestPayment->status === 'pending') {
+                $append(
+                    'payment_session_created',
+                    'Sesi Pembayaran Dibuat',
+                    'Session pembayaran Midtrans sudah dibuat dan menunggu penyelesaian pembayaran.',
+                    data_get($latestPayment->metadata, 'checkout.created_at') ?? $latestPayment->created_at,
+                    'payment'
+                );
+            }
+
             if ($latestPayment->status === 'paid') {
                 $append(
                     'payment_verified',
                     'Pembayaran Terkonfirmasi',
-                    'Pembayaran telah dikonfirmasi admin. Proses penilaian dimulai.',
+                    $latestPayment->method === 'gateway'
+                        ? 'Pembayaran berhasil dikonfirmasi Midtrans. Proses penilaian dimulai.'
+                        : 'Pembayaran telah dikonfirmasi admin. Proses penilaian dimulai.',
                     $latestPayment->paid_at ?? $latestPayment->updated_at,
                     'success'
                 );
@@ -817,6 +822,28 @@ class AppraisalService
                         : 'Admin menolak bukti pembayaran. Silakan unggah ulang bukti yang valid.',
                     data_get($latestPayment->metadata, 'admin_rejected_at') ?? $latestPayment->updated_at,
                     'danger'
+                );
+            }
+
+            if ($latestPayment->status === 'failed') {
+                $append(
+                    'payment_failed',
+                    'Pembayaran Gagal',
+                    'Transaksi pembayaran tidak berhasil diproses. Anda dapat membuat sesi pembayaran baru.',
+                    data_get($latestPayment->metadata, 'last_webhook_received_at') ?? $latestPayment->updated_at,
+                    'danger'
+                );
+            }
+
+            if ($latestPayment->status === 'expired') {
+                $append(
+                    'payment_expired',
+                    'Pembayaran Kedaluwarsa',
+                    'Sesi pembayaran telah kedaluwarsa. Anda dapat membuat sesi pembayaran baru.',
+                    data_get($latestPayment->metadata, 'last_expired_at')
+                        ?? data_get($latestPayment->metadata, 'gateway_details.expiry_time')
+                        ?? $latestPayment->updated_at,
+                    'warning'
                 );
             }
         }

@@ -19,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'reviewer.role' => EnsureReviewerRole::class,
         ]);
 
+        $middleware->validateCsrfTokens(except: [
+            'payments/midtrans/notification',
+        ]);
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
         ]);

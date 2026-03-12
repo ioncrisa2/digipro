@@ -4,15 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Enums\AppraisalStatusEnum;
 use App\Models\AppraisalRequest;
-use App\Models\OfficeBankAccount;
 use App\Models\Payment;
+use App\Models\User;
+use App\Notifications\AppraisalPaymentStatusNotification;
+use App\Services\Payments\MidtransSnapService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Notifications\Actions\Action as FilamentNotificationAction;
+use Filament\Notifications\Notification as FilamentNotification;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Spatie\Permission\Models\Role;
 
 /**
- * Handles user payment pages: upload proof and invoice/receipt.
+ * Handles Midtrans Snap payment pages, sessions, and invoice flows.
  */
 class PaymentController extends Controller
 {
@@ -29,17 +35,15 @@ class PaymentController extends Controller
             ])
             ->with([
                 'payments' => fn ($q) => $q->latest('id'),
+                'user:id,name,email',
             ])
             ->latest('requested_at')
             ->get();
 
         $payments = $records->map(function (AppraisalRequest $record) {
             $payment = $record->payments->sortByDesc('id')->first();
+            $gatewayDetails = $this->resolveGatewayDetails($payment);
             $invoiceNumber = $this->resolveInvoiceNumber($record, $payment);
-            $statusLabel = $this->paymentStatusLabel($payment);
-            $amount = (int) ($payment?->amount ?? $record->fee_total ?? 0);
-            $selectedBankName = data_get($payment?->metadata, 'selected_bank_account.bank_name', '-');
-            $selectedBankAccount = data_get($payment?->metadata, 'selected_bank_account.account_number', '-');
             $proofName = $payment?->proof_original_name;
 
             return [
@@ -47,15 +51,21 @@ class PaymentController extends Controller
                 'invoice_number' => $invoiceNumber,
                 'request_number' => $record->request_number ?? ('REQ-' . $record->id),
                 'client' => $record->client_name ?: ($record->user?->name ?? '-'),
-                'amount' => $this->formatIDR($amount),
-                'status' => $statusLabel,
+                'amount' => $this->formatIDR((int) ($payment?->amount ?? $record->fee_total ?? 0)),
+                'status' => $this->midtrans()->paymentStatusLabel($payment),
                 'is_paid' => $payment?->status === 'paid',
                 'invoice_pdf_url' => route('appraisal.invoice.pdf', ['id' => $record->id]),
-                'due_date' => optional(($payment?->created_at ?? $record->requested_at ?? now())->copy()->addDays(3))->toDateString(),
-                'method' => 'Transfer Bank',
-                'bank' => $selectedBankName ?: '-',
-                'va' => $selectedBankAccount ?: '-',
+                'due_date' => $this->resolveDueDate($payment, $record),
+                'method' => $this->resolvePaymentMethodLabel($payment),
+                'bank' => $payment?->method === 'manual'
+                    ? data_get($payment?->metadata, 'selected_bank_account.bank_name', '-')
+                    : ($gatewayDetails['bank'] ?? $gatewayDetails['label'] ?? '-'),
+                'va' => $payment?->method === 'manual'
+                    ? data_get($payment?->metadata, 'selected_bank_account.account_number', '-')
+                    : ($gatewayDetails['reference'] ?? '-'),
                 'updated_at' => optional($payment?->updated_at ?? $record->updated_at)->toDateString(),
+                'order_id' => $payment?->external_payment_id,
+                'gateway_details' => $gatewayDetails,
                 'documents' => array_values(array_filter([
                     [
                         'label' => 'Invoice Pembayaran',
@@ -64,7 +74,7 @@ class PaymentController extends Controller
                         'size' => '-',
                     ],
                     $proofName ? [
-                        'label' => 'Bukti Pembayaran',
+                        'label' => 'Bukti Pembayaran Manual',
                         'name' => $proofName,
                         'type' => 'receipt',
                         'size' => $payment?->proof_size ? $this->formatBytes((int) $payment->proof_size) : '-',
@@ -89,10 +99,7 @@ class PaymentController extends Controller
                 ->with('error', 'Pembayaran belum dapat diakses pada status saat ini.');
         }
 
-        $payment = Payment::query()
-            ->where('appraisal_request_id', $record->id)
-            ->latest('id')
-            ->first();
+        $payment = $this->latestPayment($record);
 
         if ($payment && $payment->status === 'paid') {
             return redirect()->route('appraisal.invoice.page', ['id' => $record->id]);
@@ -112,45 +119,19 @@ class PaymentController extends Controller
                 ->with('error', 'Pembayaran belum dapat diakses pada status saat ini.');
         }
 
-        $payment = $this->ensurePaymentRecord($record);
+        $payment = $this->latestPayment($record);
+        if ($payment) {
+            $this->expireStaleGatewayPayment($payment);
+            $payment = $this->syncPendingGatewayPayment($payment->fresh());
+        }
 
-        if ($payment->status === 'paid') {
+        if ($payment && $payment->status === 'paid') {
             return redirect()
                 ->route('appraisal.invoice.page', ['id' => $record->id]);
         }
 
-        $accounts = OfficeBankAccount::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get(['id', 'bank_name', 'account_number', 'account_holder', 'branch', 'currency', 'notes']);
-
-        $selectedBankAccount = null;
-        $selectedBankId = data_get($payment->metadata, 'selected_bank_account.id');
-        if ($selectedBankId) {
-            $selectedBankAccount = $accounts->firstWhere('id', (int) $selectedBankId);
-        }
-
-        $proofUrl = null;
-        if ($payment->proof_file_path && Storage::disk('public')->exists($payment->proof_file_path)) {
-            $proofUrl = Storage::disk('public')->url($payment->proof_file_path);
-        }
-
-        $paymentStatusLabel = match ($payment->status) {
-            'paid' => 'Dibayar',
-            'failed' => 'Gagal',
-            'rejected' => 'Ditolak',
-            'refunded' => 'Refund',
-            default => 'Menunggu Verifikasi',
-        };
-
-        $canUploadProof = in_array($status, [
-            AppraisalStatusEnum::ContractSigned->value,
-            AppraisalStatusEnum::ValuationOnProgress->value,
-            AppraisalStatusEnum::ValuationCompleted->value,
-            AppraisalStatusEnum::ReportReady->value,
-            AppraisalStatusEnum::Completed->value,
-        ], true) && $payment->status !== 'paid';
+        $legacyManual = $payment?->method === 'manual' && $payment->status !== 'paid';
+        $activeCheckout = $payment && $this->midtrans()->hasReusableSession($payment);
 
         return inertia('Penilaian/Payment', [
             'request' => [
@@ -162,51 +143,186 @@ class PaymentController extends Controller
                 'fee_total' => (int) ($record->fee_total ?? 0),
                 'invoice_number' => $this->resolveInvoiceNumber($record, $payment),
             ],
-            'payment' => [
-                'id' => $payment->id,
-                'status' => $payment->status,
-                'status_label' => $paymentStatusLabel,
-                'amount' => (int) ($payment->amount ?? 0),
-                'method' => $payment->method,
-                'paid_at' => optional($payment->paid_at)->toDateTimeString(),
-                'proof_file_path' => $payment->proof_file_path,
-                'proof_original_name' => $payment->proof_original_name,
-                'proof_size' => $payment->proof_size,
-                'proof_uploaded_at' => optional($payment->updated_at)->toDateTimeString(),
-                'proof_url' => $proofUrl,
-                'invoice_number' => $this->resolveInvoiceNumber($record, $payment),
-                'rejected_reason' => data_get($payment->metadata, 'admin_rejected_reason'),
-                'selected_bank_account' => $selectedBankAccount ? [
-                    'id' => $selectedBankAccount->id,
-                    'bank_name' => $selectedBankAccount->bank_name,
-                    'account_number' => $selectedBankAccount->account_number,
-                    'account_holder' => $selectedBankAccount->account_holder,
-                ] : null,
-                'metadata' => $payment->metadata,
+            'payment' => $this->buildPaymentPayload($record, $payment, $activeCheckout),
+            'midtrans' => [
+                'client_key' => $this->midtrans()->clientKey(),
+                'snap_script_url' => $this->midtrans()->snapScriptUrl(),
+                'create_session_url' => route('appraisal.payment.session', ['id' => $record->id]),
+                'configured' => filled($this->midtrans()->clientKey()) && filled($this->midtrans()->merchantId()),
             ],
-            'bankAccounts' => $accounts
-                ->map(fn (OfficeBankAccount $account) => [
-                    'id' => $account->id,
-                    'bank_name' => $account->bank_name,
-                    'account_number' => $account->account_number,
-                    'account_holder' => $account->account_holder,
-                    'branch' => $account->branch,
-                    'currency' => $account->currency,
-                    'notes' => $account->notes,
-                ])
-                ->values()
-                ->all(),
-            'canUploadProof' => $canUploadProof,
+            'canStartCheckout' => ! $legacyManual && $status === AppraisalStatusEnum::ContractSigned->value,
+            'legacyManualMessage' => $legacyManual
+                ? 'Pembayaran lama menggunakan flow manual dan dipertahankan sebagai histori. Hubungi admin untuk tindak lanjut record lama ini.'
+                : null,
+        ]);
+    }
+
+    public function createMidtransSession(Request $request, int $id): JsonResponse
+    {
+        $record = $this->resolveUserRequest($request, $id);
+        $status = $record->status?->value ?? (string) $record->status;
+        $forceNewAttempt = $request->boolean('force_new_attempt');
+
+        if ($status !== AppraisalStatusEnum::ContractSigned->value) {
+            return response()->json([
+                'message' => 'Session pembayaran hanya bisa dibuat saat kontrak sudah ditandatangani.',
+            ], 422);
+        }
+
+        $latestPayment = $this->latestPayment($record);
+
+        if ($latestPayment?->status === 'paid') {
+            return response()->json([
+                'message' => 'Pembayaran sudah terverifikasi.',
+                'redirect_url' => route('appraisal.invoice.page', ['id' => $record->id]),
+            ], 409);
+        }
+
+        if ($latestPayment?->method === 'manual' && $latestPayment->status !== 'paid') {
+            return response()->json([
+                'message' => 'Request ini masih memiliki pembayaran manual historis dan tidak dimigrasikan otomatis ke Midtrans.',
+            ], 409);
+        }
+
+        if ($latestPayment) {
+            $this->expireStaleGatewayPayment($latestPayment);
+            $latestPayment = $latestPayment->fresh();
+        }
+
+        if ($latestPayment && $this->midtrans()->hasReusableSession($latestPayment)) {
+            if ($forceNewAttempt) {
+                $replacementResult = $this->replacePendingMidtransAttempt($latestPayment);
+                if ($replacementResult['blocked']) {
+                    return response()->json([
+                        'message' => $replacementResult['message'],
+                    ], 409);
+                }
+
+                $latestPayment = null;
+            } else {
+                return response()->json([
+                    'message' => 'Session Midtrans aktif digunakan kembali.',
+                    'payment' => $this->buildPaymentPayload($record, $latestPayment, true),
+                ]);
+            }
+        }
+
+        $payment = Payment::create([
+            'appraisal_request_id' => $record->id,
+            'amount' => (int) ($record->fee_total ?? 0),
+            'method' => 'gateway',
+            'gateway' => 'midtrans',
+            'status' => 'pending',
+            'proof_type' => 'gateway_id',
+            'metadata' => [
+                'source' => 'appraisal_midtrans_session',
+                'created_at' => now()->toDateTimeString(),
+            ],
+        ]);
+
+        $payment->update([
+            'metadata' => array_merge((array) $payment->metadata, [
+                'invoice_number' => $this->buildInvoiceNumber($record, $payment),
+            ]),
+        ]);
+
+        $payment = $payment->fresh();
+
+        try {
+            $transaction = $this->midtrans()->createTransaction($record->loadMissing('user'), $payment);
+        } catch (\Throwable $e) {
+            Log::error('Midtrans session creation failed.', [
+                'appraisal_request_id' => $record->id,
+                'payment_id' => $payment->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $metadata = is_array($payment->metadata) ? $payment->metadata : [];
+            $metadata['gateway_error'] = $e->getMessage();
+            $metadata['gateway_error_at'] = now()->toDateTimeString();
+
+            $payment->update([
+                'status' => 'failed',
+                'metadata' => $metadata,
+            ]);
+
+            return response()->json([
+                'message' => 'Gagal membuat sesi pembayaran Midtrans.',
+            ], 500);
+        }
+
+        $metadata = array_merge((array) $payment->metadata, [
+            'checkout' => [
+                'snap_token' => $transaction['snap_token'],
+                'redirect_url' => $transaction['redirect_url'],
+                'expires_at' => $transaction['expires_at'],
+                'created_at' => now()->toIso8601String(),
+                'enabled_payments' => $this->midtrans()->enabledPayments(),
+            ],
+            'gateway_details' => [
+                'label' => 'Midtrans Snap',
+                'payment_type' => null,
+                'expiry_time' => $transaction['expires_at'],
+            ],
+            'gateway_request' => $transaction['payload'],
+        ]);
+
+        $payment->update([
+            'gateway' => 'midtrans',
+            'external_payment_id' => $transaction['order_id'],
+            'status' => 'pending',
+            'proof_type' => 'gateway_id',
+            'metadata' => $metadata,
+        ]);
+
+        return response()->json([
+            'message' => $forceNewAttempt
+                ? 'Metode pembayaran diganti dan sesi Midtrans baru berhasil dibuat.'
+                : 'Session pembayaran Midtrans berhasil dibuat.',
+            'payment' => $this->buildPaymentPayload($record, $payment->fresh(), true),
+        ]);
+    }
+
+    public function midtransNotification(Request $request): JsonResponse
+    {
+        $payload = $request->all();
+
+        if (! $this->midtrans()->verifyNotificationSignature($payload)) {
+            Log::warning('Midtrans notification signature invalid.', [
+                'order_id' => data_get($payload, 'order_id'),
+            ]);
+
+            return response()->json([
+                'message' => 'Signature tidak valid.',
+            ], 403);
+        }
+
+        $payment = Payment::query()
+            ->where('gateway', 'midtrans')
+            ->where('external_payment_id', (string) data_get($payload, 'order_id'))
+            ->latest('id')
+            ->first();
+
+        if (! $payment) {
+            return response()->json([
+                'message' => 'Payment tidak ditemukan.',
+            ], 404);
+        }
+
+        $this->applyMidtransStatusUpdate($payment, $payload, 'webhook');
+
+        return response()->json([
+            'message' => 'Notification diproses.',
         ]);
     }
 
     public function invoicePage(Request $request, int $id)
     {
         $record = $this->resolveUserRequest($request, $id);
-        $payment = Payment::query()
-            ->where('appraisal_request_id', $record->id)
-            ->latest('id')
-            ->first();
+        $payment = $this->latestPayment($record);
+        if ($payment) {
+            $payment = $this->syncPendingGatewayPayment($payment);
+        }
 
         if (! $payment) {
             return redirect()
@@ -220,13 +336,7 @@ class PaymentController extends Controller
                 ->with('info', 'Invoice tersedia setelah pembayaran terverifikasi.');
         }
 
-        $invoiceNumber = $this->resolveInvoiceNumber($record, $payment);
-        $proofUrl = null;
-        if ($payment->proof_file_path && Storage::disk('public')->exists($payment->proof_file_path)) {
-            $proofUrl = Storage::disk('public')->url($payment->proof_file_path);
-        }
-
-        $selectedBank = data_get($payment->metadata, 'selected_bank_account');
+        $gatewayDetails = $this->resolveGatewayDetails($payment);
 
         return inertia('Penilaian/Invoice', [
             'request' => [
@@ -240,21 +350,15 @@ class PaymentController extends Controller
             ],
             'payment' => [
                 'id' => $payment->id,
-                'invoice_number' => $invoiceNumber,
+                'invoice_number' => $this->resolveInvoiceNumber($record, $payment),
                 'status' => $payment->status,
-                'status_label' => 'Dibayar',
+                'status_label' => $this->midtrans()->paymentStatusLabel($payment),
                 'amount' => (int) ($payment->amount ?? 0),
-                'method' => $payment->method,
+                'method' => $this->resolvePaymentMethodLabel($payment),
                 'paid_at' => optional($payment->paid_at)->toDateTimeString(),
-                'proof_file_path' => $payment->proof_file_path,
-                'proof_original_name' => $payment->proof_original_name,
-                'proof_size' => $payment->proof_size,
-                'proof_url' => $proofUrl,
-                'selected_bank_account' => is_array($selectedBank) ? [
-                    'bank_name' => data_get($selectedBank, 'bank_name'),
-                    'account_number' => data_get($selectedBank, 'account_number'),
-                    'account_holder' => data_get($selectedBank, 'account_holder'),
-                ] : null,
+                'invoice_number_internal' => $this->resolveInvoiceNumber($record, $payment),
+                'external_payment_id' => $payment->external_payment_id,
+                'gateway_details' => $gatewayDetails,
                 'metadata' => $payment->metadata,
             ],
         ]);
@@ -263,10 +367,7 @@ class PaymentController extends Controller
     public function downloadInvoicePdf(Request $request, int $id)
     {
         $record = $this->resolveUserRequest($request, $id);
-        $payment = Payment::query()
-            ->where('appraisal_request_id', $record->id)
-            ->latest('id')
-            ->first();
+        $payment = $this->latestPayment($record);
 
         if (! $payment) {
             return redirect()
@@ -280,9 +381,8 @@ class PaymentController extends Controller
                 ->with('info', 'Invoice PDF tersedia setelah pembayaran terverifikasi.');
         }
 
+        $gatewayDetails = $this->resolveGatewayDetails($payment);
         $invoiceNumber = $this->resolveInvoiceNumber($record, $payment);
-        $selectedBank = data_get($payment->metadata, 'selected_bank_account');
-
         $invoice = [
             'invoice_number' => $invoiceNumber,
             'request_number' => $record->request_number ?? ('REQ-' . $record->id),
@@ -290,15 +390,13 @@ class PaymentController extends Controller
             'issued_at' => optional($payment->paid_at ?? $payment->updated_at)->toDateTimeString(),
             'client_name' => $record->client_name ?: ($request->user()->name ?? '-'),
             'amount' => (int) ($payment->amount ?? $record->fee_total ?? 0),
-            'method' => $payment->method ?: 'manual',
+            'method' => $this->resolvePaymentMethodLabel($payment),
             'status_label' => 'LUNAS',
             'payment_status' => $payment->status,
-            'selected_bank_account' => is_array($selectedBank) ? [
-                'bank_name' => data_get($selectedBank, 'bank_name'),
-                'account_number' => data_get($selectedBank, 'account_number'),
-                'account_holder' => data_get($selectedBank, 'account_holder'),
-            ] : null,
+            'selected_bank_account' => null,
+            'gateway_details' => $gatewayDetails,
             'company_name' => config('app.name', 'DigiPro'),
+            'external_payment_id' => $payment->external_payment_id,
         ];
 
         $safeInvoiceNumber = preg_replace('/[^A-Za-z0-9\-_.]/', '-', (string) $invoiceNumber);
@@ -311,116 +409,103 @@ class PaymentController extends Controller
             ->download($fileName);
     }
 
-    public function uploadProof(Request $request, int $id)
+    private function latestPayment(AppraisalRequest $record): ?Payment
     {
-        $record = $this->resolveUserRequest($request, $id);
-        $status = $record->status?->value ?? (string) $record->status;
-
-        if (! $this->isPaymentAccessibleStatus($status)) {
-            return redirect()
-                ->route('appraisal.payment.page', ['id' => $record->id])
-                ->with('error', 'Bukti pembayaran hanya dapat diunggah setelah kontrak ditandatangani.');
-        }
-
-        $data = $request->validate([
-            'office_bank_account_id' => [
-                'required',
-                'integer',
-                Rule::exists('office_bank_accounts', 'id')->where(fn ($q) => $q->where('is_active', true)),
-            ],
-            'proof_file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:15360'],
-            'transfer_note' => ['nullable', 'string', 'max:1000'],
-            'transfer_date' => ['nullable', 'date'],
-            'transfer_amount' => ['nullable', 'integer', 'min:0'],
-        ], [
-            'office_bank_account_id.required' => 'Pilih rekening tujuan transfer terlebih dahulu.',
-            'office_bank_account_id.exists' => 'Rekening tujuan tidak valid.',
-            'proof_file.required' => 'Bukti pembayaran wajib diunggah.',
-            'proof_file.mimes' => 'Format bukti pembayaran harus PDF/JPG/JPEG/PNG.',
-            'proof_file.max' => 'Ukuran bukti pembayaran maksimal 15 MB.',
-        ]);
-
-        $payment = $this->ensurePaymentRecord($record);
-
-        if ($payment->status === 'paid') {
-            return redirect()
-                ->route('appraisal.invoice.page', ['id' => $record->id])
-                ->with('info', 'Pembayaran sudah terverifikasi. Unggah ulang bukti tidak diperlukan.');
-        }
-
-        if ($payment->proof_file_path && Storage::disk('public')->exists($payment->proof_file_path)) {
-            Storage::disk('public')->delete($payment->proof_file_path);
-        }
-
-        $file = $data['proof_file'];
-        $storedPath = $file->store("payment-proofs/{$record->id}", 'public');
-
-        $selectedBank = OfficeBankAccount::query()->findOrFail((int) $data['office_bank_account_id']);
-        $metadata = array_merge((array) $payment->metadata, [
-            'selected_bank_account' => [
-                'id' => $selectedBank->id,
-                'bank_name' => $selectedBank->bank_name,
-                'account_number' => $selectedBank->account_number,
-                'account_holder' => $selectedBank->account_holder,
-            ],
-            'transfer_note' => $data['transfer_note'] ?? null,
-            'transfer_date' => $data['transfer_date'] ?? null,
-            'transfer_amount' => $data['transfer_amount'] ?? null,
-            'submitted_at' => now()->toDateTimeString(),
-            'submitted_by_user_id' => $request->user()->id,
-        ]);
-
-        $payment->update([
-            'amount' => (int) ($record->fee_total ?? $payment->amount ?? 0),
-            'method' => 'manual',
-            'status' => 'pending',
-            'proof_file_path' => $storedPath,
-            'proof_original_name' => $file->getClientOriginalName(),
-            'proof_mime' => $file->getMimeType(),
-            'proof_size' => $file->getSize(),
-            'proof_type' => 'upload',
-            'metadata' => $metadata,
-            'paid_at' => null,
-        ]);
-
-        return redirect()
-            ->route('appraisal.payment.page', ['id' => $record->id])
-            ->with('success', 'Bukti pembayaran berhasil diunggah. Menunggu verifikasi admin.');
-    }
-
-    private function ensurePaymentRecord(AppraisalRequest $record): Payment
-    {
-        $payment = Payment::query()
+        return Payment::query()
             ->where('appraisal_request_id', $record->id)
             ->latest('id')
             ->first();
+    }
 
-        if (! $payment) {
-            $payment = Payment::create([
-                'appraisal_request_id' => $record->id,
-                'amount' => (int) ($record->fee_total ?? 0),
-                'method' => 'manual',
-                'status' => 'pending',
-                'metadata' => [
-                    'source' => 'appraisal_payment_page',
-                    'created_at' => now()->toDateTimeString(),
-                ],
-            ]);
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildPaymentPayload(AppraisalRequest $record, ?Payment $payment, bool $includeCheckout = false): array
+    {
+        $gatewayDetails = $this->resolveGatewayDetails($payment);
+        $metadata = is_array($payment?->metadata) ? $payment->metadata : [];
+        $checkout = $includeCheckout ? [
+            'snap_token' => data_get($metadata, 'checkout.snap_token'),
+            'redirect_url' => data_get($metadata, 'checkout.redirect_url'),
+            'expires_at' => data_get($metadata, 'checkout.expires_at'),
+            'created_at' => data_get($metadata, 'checkout.created_at'),
+        ] : null;
+
+        return [
+            'id' => $payment?->id,
+            'status' => $payment?->status,
+            'status_label' => $this->midtrans()->paymentStatusLabel($payment),
+            'amount' => (int) ($payment?->amount ?? $record->fee_total ?? 0),
+            'method' => $this->resolvePaymentMethodLabel($payment),
+            'paid_at' => optional($payment?->paid_at)->toDateTimeString(),
+            'invoice_number' => $this->resolveInvoiceNumber($record, $payment),
+            'external_payment_id' => $payment?->external_payment_id,
+            'checkout' => $checkout,
+            'gateway_details' => $gatewayDetails,
+            'metadata' => $metadata,
+            'is_legacy_manual' => $payment?->method === 'manual' && $payment->status !== 'paid',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveGatewayDetails(?Payment $payment): ?array
+    {
+        if (! $payment || $payment->method !== 'gateway') {
+            return null;
+        }
+
+        return $this->midtrans()->gatewayDetailsFromMetadata(is_array($payment->metadata) ? $payment->metadata : []);
+    }
+
+    private function resolvePaymentMethodLabel(?Payment $payment): string
+    {
+        return $this->midtrans()->paymentMethodLabel($payment);
+    }
+
+    private function resolveDueDate(?Payment $payment, AppraisalRequest $record): ?string
+    {
+        $expiresAt = data_get($payment?->metadata, 'checkout.expires_at');
+        if (filled($expiresAt)) {
+            try {
+                return Carbon::parse((string) $expiresAt)->toDateString();
+            } catch (\Throwable) {
+                // fallback below
+            }
+        }
+
+        return optional(($payment?->created_at ?? $record->requested_at ?? now())->copy()->addDays(3))->toDateString();
+    }
+
+    private function expireStaleGatewayPayment(Payment $payment): void
+    {
+        if ($payment->method !== 'gateway' || $payment->gateway !== 'midtrans' || $payment->status !== 'pending') {
+            return;
+        }
+
+        $expiresAt = data_get($payment->metadata, 'checkout.expires_at');
+        if (! filled($expiresAt)) {
+            return;
+        }
+
+        try {
+            if (! now()->greaterThan(Carbon::parse((string) $expiresAt))) {
+                return;
+            }
+        } catch (\Throwable) {
+            return;
         }
 
         $metadata = is_array($payment->metadata) ? $payment->metadata : [];
-        if (! filled(data_get($metadata, 'invoice_number'))) {
-            $metadata['invoice_number'] = $this->buildInvoiceNumber($record, $payment);
-            $payment->update(['metadata' => $metadata]);
-        }
+        data_set($metadata, 'gateway_details.transaction_status', 'expire');
+        data_set($metadata, 'gateway_details.expiry_time', $expiresAt);
+        data_set($metadata, 'last_expired_at', now()->toDateTimeString());
 
-        if ((int) ($payment->amount ?? 0) <= 0 && (int) ($record->fee_total ?? 0) > 0) {
-            $payment->update([
-                'amount' => (int) $record->fee_total,
-            ]);
-        }
-
-        return $payment->refresh();
+        $payment->update([
+            'status' => 'expired',
+            'metadata' => $metadata,
+        ]);
     }
 
     private function isPaymentAccessibleStatus(string $status): bool
@@ -433,23 +518,6 @@ class PaymentController extends Controller
             AppraisalStatusEnum::ReportReady->value,
             AppraisalStatusEnum::Completed->value,
         ], true);
-    }
-
-    private function paymentStatusLabel(?Payment $payment): string
-    {
-        if (! $payment) {
-            return 'Menunggu Pembayaran';
-        }
-
-        return match ($payment->status) {
-            'paid' => 'Dibayar',
-            'failed' => 'Gagal',
-            'rejected' => 'Ditolak',
-            'refunded' => 'Refund',
-            default => filled($payment->proof_file_path)
-                ? 'Menunggu Verifikasi'
-                : 'Menunggu Pembayaran',
-        };
     }
 
     private function resolveInvoiceNumber(AppraisalRequest $record, ?Payment $payment): string
@@ -493,5 +561,215 @@ class PaymentController extends Controller
         return AppraisalRequest::query()
             ->where('user_id', $request->user()->id)
             ->findOrFail($id);
+    }
+
+    private function resolveIncomingStatus(string $currentStatus, string $incomingStatus): string
+    {
+        if ($currentStatus === 'refunded') {
+            return 'refunded';
+        }
+
+        if ($currentStatus === 'paid' && $incomingStatus !== 'refunded') {
+            return 'paid';
+        }
+
+        if (in_array($currentStatus, ['failed', 'expired'], true) && $incomingStatus === 'pending') {
+            return $currentStatus;
+        }
+
+        return $incomingStatus;
+    }
+
+    private function syncPendingGatewayPayment(?Payment $payment): ?Payment
+    {
+        if (! $payment || $payment->method !== 'gateway' || $payment->gateway !== 'midtrans' || $payment->status !== 'pending') {
+            return $payment;
+        }
+
+        if (! filled($payment->external_payment_id)) {
+            return $payment;
+        }
+
+        try {
+            $payload = $this->midtrans()->transactionStatus((string) $payment->external_payment_id);
+        } catch (\Throwable $e) {
+            Log::warning('Midtrans status sync failed.', [
+                'payment_id' => $payment->id,
+                'order_id' => $payment->external_payment_id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $payment;
+        }
+
+        return $this->applyMidtransStatusUpdate($payment, $payload, 'status_sync');
+    }
+
+    private function applyMidtransStatusUpdate(Payment $payment, array $payload, string $source): Payment
+    {
+        $incomingStatus = $this->midtrans()->mapTransactionStatus($payload);
+        $nextStatus = $this->resolveIncomingStatus($payment->status, $incomingStatus);
+        $becamePaid = $payment->status !== 'paid' && $nextStatus === 'paid';
+        $metadata = is_array($payment->metadata) ? $payment->metadata : [];
+        $notificationMetadata = $this->midtrans()->notificationMetadata($payload);
+
+        $metadata['notification'] = $notificationMetadata;
+        $metadata['gateway_details'] = array_filter(array_merge(
+            (array) data_get($metadata, 'gateway_details', []),
+            $notificationMetadata
+        ), static fn ($value) => $value !== null && $value !== '');
+
+        if ($source === 'webhook') {
+            $metadata['last_webhook_received_at'] = now()->toDateTimeString();
+        } else {
+            $metadata['last_status_sync_at'] = now()->toDateTimeString();
+        }
+
+        if (filled(data_get($notificationMetadata, 'expiry_time'))) {
+            data_set($metadata, 'checkout.expires_at', data_get($notificationMetadata, 'expiry_time'));
+        }
+
+        $paidAt = $payment->paid_at;
+        if ($nextStatus === 'paid' && ! $paidAt) {
+            $paidAt = data_get($notificationMetadata, 'settlement_time')
+                ?? data_get($notificationMetadata, 'transaction_time')
+                ?? now();
+        }
+
+        $payment->update([
+            'status' => $nextStatus,
+            'paid_at' => $nextStatus === 'paid' ? $paidAt : $payment->paid_at,
+            'metadata' => $metadata,
+        ]);
+
+        if ($becamePaid) {
+            $appraisal = $payment->appraisalRequest;
+            if ($appraisal && (($appraisal->status?->value ?? $appraisal->status) === AppraisalStatusEnum::ContractSigned->value)) {
+                $appraisal->update([
+                    'status' => AppraisalStatusEnum::ValuationOnProgress,
+                ]);
+            }
+
+            $requestNumber = $appraisal?->request_number ?? ('REQ-' . ($appraisal?->id ?? '-'));
+            if ($appraisal?->user) {
+                $appraisal->user->notify(new AppraisalPaymentStatusNotification(
+                    appraisalId: (int) $appraisal->id,
+                    requestNumber: (string) $requestNumber,
+                    status: 'verified',
+                ));
+            }
+
+            $this->notifyAdminsPaymentConfirmed($payment->fresh());
+        }
+
+        return $payment->fresh();
+    }
+
+    /**
+     * @return array{blocked: bool, message: string}
+     */
+    private function replacePendingMidtransAttempt(Payment $payment): array
+    {
+        if (! $this->midtrans()->hasReusableSession($payment)) {
+            return [
+                'blocked' => false,
+                'message' => 'Sesi aktif tidak ditemukan.',
+            ];
+        }
+
+        $orderId = (string) $payment->external_payment_id;
+
+        if ($orderId !== '') {
+            try {
+                $this->midtrans()->cancelTransaction($orderId);
+            } catch (\Throwable $e) {
+                Log::warning('Midtrans active payment replacement failed.', [
+                    'payment_id' => $payment->id,
+                    'order_id' => $orderId,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return [
+                    'blocked' => true,
+                    'message' => 'Sesi pembayaran aktif belum bisa diganti. Coba refresh status atau tunggu hingga sesi lama dibatalkan.',
+                ];
+            }
+        }
+
+        $metadata = is_array($payment->metadata) ? $payment->metadata : [];
+        data_set($metadata, 'replaced_at', now()->toDateTimeString());
+        data_set($metadata, 'replaced_reason', 'user_switch_payment_method');
+        data_set($metadata, 'gateway_details.transaction_status', 'cancel');
+        data_set($metadata, 'last_canceled_at', now()->toDateTimeString());
+
+        $payment->update([
+            'status' => 'failed',
+            'metadata' => $metadata,
+        ]);
+
+        return [
+            'blocked' => false,
+            'message' => 'Sesi aktif berhasil diganti.',
+        ];
+    }
+
+    private function midtrans(): MidtransSnapService
+    {
+        return app(MidtransSnapService::class);
+    }
+
+    private function notifyAdminsPaymentConfirmed(Payment $payment): void
+    {
+        $guardName = config('auth.defaults.guard', 'web');
+        $roleCandidates = array_values(array_filter([
+            config('filament-shield.super_admin.enabled', true)
+                ? config('filament-shield.super_admin.name', 'super_admin')
+                : null,
+            'admin',
+        ]));
+
+        $existingRoleNames = Role::query()
+            ->whereIn('name', $roleCandidates)
+            ->where('guard_name', $guardName)
+            ->pluck('name')
+            ->values()
+            ->all();
+
+        if (empty($existingRoleNames)) {
+            return;
+        }
+
+        $adminUsers = User::query()
+            ->role($existingRoleNames, $guardName)
+            ->get();
+
+        if ($adminUsers->isEmpty()) {
+            return;
+        }
+
+        $appraisal = $payment->appraisalRequest;
+        $requestNumber = $appraisal?->request_number ?? ('REQ-' . ($appraisal?->id ?? '-'));
+        $body = "{$requestNumber} pembayaran terkonfirmasi dan masuk Proses Valuasi Berjalan.";
+
+        $targetUrl = null;
+        if ($appraisal?->id) {
+            try {
+                $targetUrl = route('filament.admin.resources.appraisal-requests.view', ['record' => $appraisal->id]);
+            } catch (\Throwable) {
+                $targetUrl = null;
+            }
+        }
+
+        FilamentNotification::make()
+            ->title('Pembayaran terkonfirmasi')
+            ->body($body)
+            ->actions($targetUrl ? [
+                FilamentNotificationAction::make('view')
+                    ->label('Lihat Request')
+                    ->url($targetUrl)
+                    ->markAsRead(),
+            ] : [])
+            ->icon('heroicon-o-banknotes')
+            ->sendToDatabase($adminUsers, true);
     }
 }
