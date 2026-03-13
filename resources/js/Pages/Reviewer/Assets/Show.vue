@@ -495,7 +495,7 @@ onBeforeUnmount(() => {
               <Button size="sm" as-child>
                 <Link :href="assetState.adjustment_url">
                   <Scale class="mr-2 h-4 w-4" />
-                  Adjustment Matrix
+                  Adjust Harga Tanah
                 </Link>
               </Button>
             </div>
@@ -863,7 +863,7 @@ onBeforeUnmount(() => {
             <CardHeader class="pb-2">
               <CardTitle>Cari & Pilih Pembanding</CardTitle>
               <CardDescription>
-                Tentukan radius dan limit pencarian, lalu pilih data pembanding yang paling relevan. Simpan pilihan untuk digunakan di adjustment matrix.
+                Tentukan radius dan limit pencarian, lalu pilih data pembanding yang paling relevan. Simpan pilihan untuk digunakan di penyesuaian harga tanah.
               </CardDescription>
             </CardHeader>
             <CardContent class="pt-6">
@@ -980,7 +980,7 @@ onBeforeUnmount(() => {
                 <Button variant="outline" size="sm" as-child>
                   <Link :href="assetState.adjustment_url">
                     <Scale class="mr-2 h-4 w-4" />
-                    Buka Adjustment Matrix
+                    Buka Adjust Harga Tanah
                   </Link>
                 </Button>
               </div>
@@ -1043,7 +1043,7 @@ onBeforeUnmount(() => {
                           </Button>
                           <span class="text-muted-foreground/40">|</span>
                           <Button variant="link" size="sm" class="h-auto px-0 text-xs" as-child>
-                            <Link :href="comparable.adjustment_url">Adjustment</Link>
+                            <Link :href="comparable.adjustment_url">Adjust Harga Tanah</Link>
                           </Button>
                         </div>
                       </TableCell>

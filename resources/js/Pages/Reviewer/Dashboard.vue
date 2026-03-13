@@ -33,7 +33,7 @@ const statCards = [
   { key: 'ready_review', label: 'Siap Review', icon: ClipboardList, tone: 'text-amber-700 bg-amber-100' },
   { key: 'in_progress', label: 'Sedang Review', icon: TrendingUp, tone: 'text-sky-700 bg-sky-100' },
   { key: 'completed', label: 'Selesai Valuasi', icon: BarChart3, tone: 'text-emerald-700 bg-emerald-100' },
-  { key: 'assets_need_adjustment', label: 'Aset Butuh Adjustment', icon: FolderSearch, tone: 'text-rose-700 bg-rose-100' },
+  { key: 'assets_need_adjustment', label: 'Aset Butuh Adjust Harga Tanah', icon: FolderSearch, tone: 'text-rose-700 bg-rose-100' },
 ];
 </script>
 
@@ -105,10 +105,10 @@ const statCards = [
           <Card>
             <CardHeader class="pb-4">
               <div class="flex items-center justify-between gap-3">
-                <div>
-                  <CardTitle>Aset Prioritas</CardTitle>
-                  <CardDescription>Aset yang siap dibuka untuk adjustment.</CardDescription>
-                </div>
+                  <div>
+                    <CardTitle>Aset Prioritas</CardTitle>
+                    <CardDescription>Aset yang siap dibuka untuk penyesuaian harga tanah.</CardDescription>
+                  </div>
                 <Button variant="link" class="h-auto px-0" as-child>
                   <Link :href="route('reviewer.assets.index')">Lihat semua</Link>
                 </Button>
@@ -157,9 +157,9 @@ const statCards = [
                     </Button>
                     <p class="mt-1 text-xs text-muted-foreground">{{ activity.request_number }} • {{ activity.asset_address }}</p>
                   </div>
-                  <Button variant="outline" size="sm" as-child>
-                    <Link :href="activity.adjustment_url">Matrix</Link>
-                  </Button>
+                    <Button variant="outline" size="sm" as-child>
+                      <Link :href="activity.adjustment_url">Adjust Harga Tanah</Link>
+                    </Button>
                 </div>
                 <div class="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
                   <Badge variant="outline">Adj: {{ formatPercent(activity.total_adjustment_percent ?? 0) }}</Badge>

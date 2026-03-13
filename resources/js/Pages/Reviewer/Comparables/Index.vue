@@ -211,7 +211,7 @@ const submit = () => {
                                 <Link :href="item.detail_url">Detail</Link>
                               </Button>
                               <Button variant="link" class="h-auto px-0" as-child>
-                                <Link :href="item.adjustment_url">Adjustment</Link>
+                                <Link :href="item.adjustment_url">Adjust Harga Tanah</Link>
                               </Button>
                             </div>
                           </TableCell>

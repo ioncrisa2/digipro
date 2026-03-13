@@ -96,7 +96,7 @@ const submit = () => {
           <div class="flex items-center justify-between gap-3">
             <div>
               <CardTitle>Daftar Aset</CardTitle>
-              <CardDescription>Aset reviewer aktif dan jalur cepat ke detail atau adjustment matrix.</CardDescription>
+              <CardDescription>Aset reviewer aktif dan jalur cepat ke detail atau penyesuaian harga tanah.</CardDescription>
             </div>
             <SlidersHorizontal class="h-4 w-4 text-muted-foreground" />
           </div>
@@ -132,7 +132,7 @@ const submit = () => {
                         <Link :href="asset.detail_url">Detail</Link>
                       </Button>
                       <Button variant="link" class="h-auto px-0" as-child>
-                        <Link :href="asset.adjustment_url">Adjustment</Link>
+                        <Link :href="asset.adjustment_url">Adjust Harga Tanah</Link>
                       </Button>
                     </div>
                   </TableCell>

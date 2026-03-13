@@ -101,7 +101,7 @@ const saveComparable = async () => {
               <p class="mt-2 font-medium">{{ formatCurrency(comparableState.raw_price) }}</p>
             </div>
             <div class="rounded-xl border bg-muted/30 p-4">
-              <p class="text-xs uppercase tracking-wide text-muted-foreground">Adjustment</p>
+              <p class="text-xs uppercase tracking-wide text-muted-foreground">Adjust Harga Tanah</p>
               <p class="mt-2 font-medium">{{ formatPercent(comparableState.total_adjustment_percent ?? 0) }}</p>
             </div>
             <div class="rounded-xl border bg-muted/30 p-4">
@@ -135,7 +135,7 @@ const saveComparable = async () => {
               Simpan
             </Button>
             <Button variant="outline" as-child>
-              <Link :href="comparableState.adjustment_url">Buka Adjustment</Link>
+              <Link :href="comparableState.adjustment_url">Buka Adjust Harga Tanah</Link>
             </Button>
             <Button v-if="comparableState.asset" variant="ghost" as-child>
               <Link :href="comparableState.asset.detail_url">

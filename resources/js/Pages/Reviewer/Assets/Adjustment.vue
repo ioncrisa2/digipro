@@ -162,7 +162,7 @@ const feedbackClasses = computed(() => {
             <div class="space-y-1.5">
               <div class="flex items-center gap-2">
                 <SlidersHorizontal class="h-3.5 w-3.5 text-muted-foreground" />
-                <CardDescription class="text-[10px] font-semibold uppercase tracking-widest">Adjustment Matrix</CardDescription>
+                <CardDescription class="text-[10px] font-semibold uppercase tracking-widest">Adjust Harga Tanah</CardDescription>
               </div>
               <CardTitle class="text-2xl font-semibold leading-snug tracking-tight">
                 {{ asset.address }}

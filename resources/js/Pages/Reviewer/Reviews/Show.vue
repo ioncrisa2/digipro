@@ -157,10 +157,10 @@ const feedbackClasses = () => {
       <Card>
         <CardHeader class="pb-4">
           <div class="flex items-center justify-between gap-3">
-            <div>
-              <CardTitle>Daftar Aset</CardTitle>
-              <CardDescription>Masuk ke detail aset atau adjustment matrix langsung dari sini.</CardDescription>
-            </div>
+              <div>
+                <CardTitle>Daftar Aset</CardTitle>
+              <CardDescription>Masuk ke detail aset atau penyesuaian harga tanah langsung dari sini.</CardDescription>
+              </div>
             <Badge variant="outline">{{ reviewState.assets?.length || 0 }} aset</Badge>
           </div>
         </CardHeader>
@@ -184,10 +184,10 @@ const feedbackClasses = () => {
                     <div class="flex flex-wrap gap-2">
                       <Button variant="link" class="h-auto px-0" as-child>
                         <Link :href="asset.detail_url">Detail aset</Link>
-                      </Button>
-                      <Button variant="link" class="h-auto px-0" as-child>
-                        <Link :href="asset.adjustment_url">Adjustment</Link>
-                      </Button>
+                        </Button>
+                        <Button variant="link" class="h-auto px-0" as-child>
+                          <Link :href="asset.adjustment_url">Adjust Harga Tanah</Link>
+                        </Button>
                     </div>
                   </TableCell>
                 </TableRow>
