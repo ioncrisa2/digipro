@@ -7,20 +7,28 @@ use App\Enums\AssetTypeEnum;
 use App\Enums\ContractStatusEnum;
 use App\Enums\ReportTypeEnum;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreOfficeBankAccountRequest;
+use App\Http\Requests\Admin\StoreAppraisalAssetFileRequest;
 use App\Http\Requests\Admin\StoreAppraisalRequestFileRequest;
 use App\Http\Requests\Admin\StoreAppraisalOfferRequest;
 use App\Http\Requests\Admin\UpsertAppraisalAssetRequest;
+use App\Http\Requests\Admin\UpdatePaymentRequest;
 use App\Http\Requests\Admin\UpdateAppraisalRequestBasicRequest;
 use App\Models\AppraisalAsset;
+use App\Models\AppraisalAssetFile;
 use App\Models\AppraisalRequestFile;
 use App\Models\AppraisalRequest;
 use App\Models\District;
+use App\Models\OfficeBankAccount;
+use App\Models\Payment;
 use App\Models\Province;
 use App\Models\Regency;
 use App\Models\Village;
 use App\Services\Admin\AppraisalContractNumberService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
+use App\Services\Payments\MidtransSnapService;
 use App\Support\AppraisalAssetFieldOptions;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
@@ -258,6 +266,8 @@ class AdminController extends Controller
                 ->map(fn ($asset, $index) => $this->transformAsset($asset, $index + 1, $locationMaps))
                 ->values(),
             'assetCreateUrl' => route('admin.appraisal-requests.assets.create', $appraisalRequest),
+            'assetDocumentTypeOptions' => $this->assetDocumentTypeOptions(),
+            'assetPhotoTypeOptions' => $this->assetPhotoTypeOptions(),
             'payments' => $appraisalRequest->payments->map(fn ($payment) => [
                 'id' => $payment->id,
                 'amount' => (int) $payment->amount,
@@ -269,7 +279,9 @@ class AdminController extends Controller
             ])->values(),
             'negotiations' => $appraisalRequest->offerNegotiations->map(fn ($negotiation) => [
                 'id' => $negotiation->id,
+                'action_value' => (string) $negotiation->action,
                 'action_label' => $this->formatNegotiationAction($negotiation->action),
+                'action_tone' => $this->negotiationActionTone($negotiation->action),
                 'actor_name' => $negotiation->user?->name ?? 'System',
                 'round' => $negotiation->round,
                 'offered_fee' => $negotiation->offered_fee,
@@ -278,6 +290,8 @@ class AdminController extends Controller
                 'reason' => $negotiation->reason,
                 'created_at' => $negotiation->created_at?->toIso8601String(),
             ])->values(),
+            'negotiationActionOptions' => $this->negotiationActionOptions($appraisalRequest),
+            'negotiationSummary' => $this->negotiationSummary($appraisalRequest),
             'requestFileTypeOptions' => $this->requestFileTypeOptions(),
             'legacyPanelUrl' => url('/legacy-admin'),
         ]);
@@ -419,6 +433,49 @@ class AdminController extends Controller
         $asset->delete();
 
         return back()->with('success', 'Aset berhasil dihapus.');
+    }
+
+    public function storeAppraisalAssetFile(
+        StoreAppraisalAssetFileRequest $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalAsset $asset
+    )
+    {
+        $this->ensureAssetBelongsToRequest($appraisalRequest, $asset);
+
+        $validated = $request->validated();
+        $file = $request->file('file');
+        $directory = $this->assetFileDirectory($validated['type']);
+        $storedPath = $file->storeAs(
+            "appraisal-requests/{$appraisalRequest->id}/assets/{$asset->id}/{$directory}",
+            now()->format('YmdHis') . '-' . uniqid() . '.' . $file->getClientOriginalExtension(),
+            'public'
+        );
+
+        $asset->files()->create([
+            'type' => $validated['type'],
+            'path' => $storedPath,
+            'original_name' => $file->getClientOriginalName(),
+            'mime' => $file->getMimeType(),
+            'size' => $file->getSize(),
+        ]);
+
+        return back()->with('success', 'File aset berhasil diunggah.');
+    }
+
+    public function destroyAppraisalAssetFile(
+        AppraisalRequest $appraisalRequest,
+        AppraisalAsset $asset,
+        AppraisalAssetFile $file
+    )
+    {
+        $this->ensureAssetBelongsToRequest($appraisalRequest, $asset);
+        abort_unless((int) $file->appraisal_asset_id === (int) $asset->id, 404);
+
+        Storage::disk('public')->delete($file->path);
+        $file->delete();
+
+        return back()->with('success', 'File aset berhasil dihapus.');
     }
 
     public function sendOffer(
@@ -571,6 +628,288 @@ class AdminController extends Controller
         ]);
     }
 
+    public function paymentsIndex(Request $request, MidtransSnapService $midtrans): Response
+    {
+        $filters = [
+            'q' => trim((string) $request->query('q', '')),
+            'status' => (string) $request->query('status', 'all'),
+            'method' => (string) $request->query('method', 'all'),
+        ];
+
+        $records = Payment::query()
+            ->with(['appraisalRequest.user'])
+            ->when($filters['q'] !== '', function ($query) use ($filters): void {
+                $query->where(function ($innerQuery) use ($filters): void {
+                    $innerQuery
+                        ->where('external_payment_id', 'like', '%' . $filters['q'] . '%')
+                        ->orWhereHas('appraisalRequest', function ($requestQuery) use ($filters): void {
+                            $requestQuery
+                                ->where('request_number', 'like', '%' . $filters['q'] . '%')
+                                ->orWhere('client_name', 'like', '%' . $filters['q'] . '%')
+                                ->orWhereHas('user', fn ($userQuery) => $userQuery->where('name', 'like', '%' . $filters['q'] . '%'));
+                        });
+                });
+            })
+            ->when($filters['status'] !== 'all', fn ($query) => $query->where('status', $filters['status']))
+            ->when($filters['method'] !== 'all', fn ($query) => $query->where('method', $filters['method']))
+            ->latest('created_at')
+            ->paginate(15)
+            ->withQueryString();
+
+        $records->through(fn (Payment $payment) => $this->transformPaymentRow($payment, $midtrans));
+
+        return inertia('Admin/Payments/Index', [
+            'filters' => $filters,
+            'statusOptions' => [
+                ['value' => 'all', 'label' => 'Semua Status'],
+                ['value' => 'pending', 'label' => 'Menunggu'],
+                ['value' => 'paid', 'label' => 'Dibayar'],
+                ['value' => 'failed', 'label' => 'Gagal'],
+                ['value' => 'expired', 'label' => 'Kedaluwarsa'],
+                ['value' => 'rejected', 'label' => 'Ditolak'],
+                ['value' => 'refunded', 'label' => 'Refund'],
+            ],
+            'methodOptions' => [
+                ['value' => 'all', 'label' => 'Semua Metode'],
+                ['value' => 'gateway', 'label' => 'Gateway / Midtrans'],
+                ['value' => 'manual', 'label' => 'Legacy Manual'],
+            ],
+            'summary' => [
+                'total' => Payment::query()->count(),
+                'pending' => Payment::query()->where('status', 'pending')->count(),
+                'paid' => Payment::query()->where('status', 'paid')->count(),
+                'active_bank_accounts' => OfficeBankAccount::query()->where('is_active', true)->count(),
+            ],
+            'records' => [
+                'data' => $records->items(),
+                'meta' => [
+                    'from' => $records->firstItem(),
+                    'to' => $records->lastItem(),
+                    'total' => $records->total(),
+                    'links' => $records->linkCollection()->toArray(),
+                ],
+            ],
+            'officeBankAccountsUrl' => route('admin.finance.office-bank-accounts.index'),
+            'legacyPanelUrl' => url('/legacy-admin'),
+        ]);
+    }
+
+    public function paymentsShow(Payment $payment, MidtransSnapService $midtrans): Response
+    {
+        $payment->loadMissing(['appraisalRequest.user']);
+
+        $gatewayDetails = $midtrans->gatewayDetailsFromMetadata(is_array($payment->metadata) ? $payment->metadata : []);
+        $proofFileUrl = filled($payment->proof_file_path) && Storage::disk('public')->exists($payment->proof_file_path)
+            ? Storage::disk('public')->url($payment->proof_file_path)
+            : null;
+
+        return inertia('Admin/Payments/Show', [
+            'record' => [
+                'id' => $payment->id,
+                'invoice_number' => $this->paymentInvoiceNumber($payment),
+                'amount' => (int) $payment->amount,
+                'method' => $payment->method,
+                'method_label' => $midtrans->paymentMethodLabel($payment),
+                'status' => $payment->status,
+                'status_label' => $midtrans->paymentStatusLabel($payment),
+                'gateway' => $payment->gateway,
+                'external_payment_id' => $payment->external_payment_id,
+                'paid_at' => $payment->paid_at?->toIso8601String(),
+                'proof_original_name' => $payment->proof_original_name,
+                'proof_mime' => $payment->proof_mime,
+                'proof_size' => (int) ($payment->proof_size ?? 0),
+                'proof_size_label' => $this->formatBytes($payment->proof_size),
+                'proof_type' => $payment->proof_type,
+                'proof_url' => $proofFileUrl,
+                'metadata_lines' => $this->paymentMetadataLines($payment->metadata),
+                'request_number' => $payment->appraisalRequest?->request_number ?? ('REQ-' . $payment->appraisal_request_id),
+                'requester_name' => $payment->appraisalRequest?->user?->name ?? '-',
+                'client_name' => $payment->appraisalRequest?->client_name ?: ($payment->appraisalRequest?->user?->name ?? '-'),
+                'request_show_url' => $payment->appraisalRequest
+                    ? route('admin.appraisal-requests.show', $payment->appraisalRequest)
+                    : null,
+                'created_at' => $payment->created_at?->toIso8601String(),
+                'updated_at' => $payment->updated_at?->toIso8601String(),
+                'legacy_url' => $this->legacyPaymentUrl($payment),
+            ],
+            'gatewayDetails' => $gatewayDetails,
+            'officeBankAccountsUrl' => route('admin.finance.office-bank-accounts.index'),
+            'indexUrl' => route('admin.finance.payments.index'),
+            'legacyPanelUrl' => url('/legacy-admin'),
+        ]);
+    }
+
+    public function paymentsEdit(Payment $payment): Response
+    {
+        $payment->loadMissing(['appraisalRequest.user']);
+
+        return inertia('Admin/Payments/Edit', [
+            'record' => [
+                'id' => $payment->id,
+                'invoice_number' => $this->paymentInvoiceNumber($payment),
+                'method' => $payment->method,
+                'method_label' => $payment->method === 'gateway' ? 'Midtrans Gateway' : 'Legacy Manual',
+                'amount' => (int) $payment->amount,
+                'status' => $payment->status,
+                'gateway' => $payment->gateway,
+                'external_payment_id' => $payment->external_payment_id,
+                'paid_at' => $payment->paid_at?->format('Y-m-d\TH:i'),
+                'metadata_json' => $this->formatPaymentMetadataJson($payment->metadata),
+                'request_number' => $payment->appraisalRequest?->request_number ?? ('REQ-' . $payment->appraisal_request_id),
+                'requester_name' => $payment->appraisalRequest?->user?->name ?? '-',
+                'client_name' => $payment->appraisalRequest?->client_name ?: ($payment->appraisalRequest?->user?->name ?? '-'),
+                'show_url' => route('admin.finance.payments.show', $payment),
+                'request_show_url' => $payment->appraisalRequest
+                    ? route('admin.appraisal-requests.show', $payment->appraisalRequest)
+                    : null,
+                'legacy_url' => $this->legacyPaymentUrl($payment),
+            ],
+            'statusOptions' => [
+                ['value' => 'pending', 'label' => 'Menunggu'],
+                ['value' => 'paid', 'label' => 'Dibayar'],
+                ['value' => 'failed', 'label' => 'Gagal'],
+                ['value' => 'expired', 'label' => 'Kedaluwarsa'],
+                ['value' => 'rejected', 'label' => 'Ditolak'],
+                ['value' => 'refunded', 'label' => 'Refund'],
+            ],
+            'indexUrl' => route('admin.finance.payments.index'),
+            'legacyPanelUrl' => url('/legacy-admin'),
+        ]);
+    }
+
+    public function paymentsUpdate(UpdatePaymentRequest $request, Payment $payment): RedirectResponse
+    {
+        $validated = $request->validated();
+
+        $payment->forceFill([
+            'amount' => (int) $validated['amount'],
+            'status' => $validated['status'],
+            'gateway' => $validated['gateway'] ?: 'midtrans',
+            'external_payment_id' => $validated['external_payment_id'] ?: null,
+            'paid_at' => $validated['paid_at'] ?? null,
+            'metadata' => $this->decodePaymentMetadata($validated['metadata_json'] ?? null),
+        ])->save();
+
+        return redirect()
+            ->route('admin.finance.payments.show', $payment)
+            ->with('success', 'Pembayaran berhasil diperbarui.');
+    }
+
+    public function officeBankAccountsIndex(Request $request): Response
+    {
+        $filters = [
+            'q' => trim((string) $request->query('q', '')),
+            'status' => (string) $request->query('status', 'all'),
+        ];
+
+        $records = OfficeBankAccount::query()
+            ->when($filters['q'] !== '', function ($query) use ($filters): void {
+                $query->where(function ($innerQuery) use ($filters): void {
+                    $innerQuery
+                        ->where('bank_name', 'like', '%' . $filters['q'] . '%')
+                        ->orWhere('account_number', 'like', '%' . $filters['q'] . '%')
+                        ->orWhere('account_holder', 'like', '%' . $filters['q'] . '%');
+                });
+            })
+            ->when($filters['status'] === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($filters['status'] === 'inactive', fn ($query) => $query->where('is_active', false))
+            ->orderBy('sort_order')
+            ->orderBy('bank_name')
+            ->get()
+            ->map(fn (OfficeBankAccount $account) => $this->transformOfficeBankAccountRow($account))
+            ->values();
+
+        return inertia('Admin/OfficeBankAccounts/Index', [
+            'filters' => $filters,
+            'statusOptions' => [
+                ['value' => 'all', 'label' => 'Semua Status'],
+                ['value' => 'active', 'label' => 'Aktif'],
+                ['value' => 'inactive', 'label' => 'Nonaktif'],
+            ],
+            'summary' => [
+                'total' => OfficeBankAccount::query()->count(),
+                'active' => OfficeBankAccount::query()->where('is_active', true)->count(),
+                'inactive' => OfficeBankAccount::query()->where('is_active', false)->count(),
+            ],
+            'records' => $records,
+            'createUrl' => route('admin.finance.office-bank-accounts.create'),
+            'paymentsUrl' => route('admin.finance.payments.index'),
+            'legacyPanelUrl' => url('/legacy-admin'),
+        ]);
+    }
+
+    public function officeBankAccountsCreate(): Response
+    {
+        return inertia('Admin/OfficeBankAccounts/Form', [
+            'mode' => 'create',
+            'record' => [
+                'bank_name' => '',
+                'account_number' => '',
+                'account_holder' => '',
+                'branch' => '',
+                'currency' => 'IDR',
+                'notes' => '',
+                'is_active' => true,
+                'sort_order' => 0,
+                'legacy_url' => null,
+            ],
+            'indexUrl' => route('admin.finance.office-bank-accounts.index'),
+            'submitUrl' => route('admin.finance.office-bank-accounts.store'),
+            'legacyPanelUrl' => url('/legacy-admin'),
+        ]);
+    }
+
+    public function officeBankAccountsStore(StoreOfficeBankAccountRequest $request): RedirectResponse
+    {
+        OfficeBankAccount::query()->create($request->validated());
+
+        return redirect()
+            ->route('admin.finance.office-bank-accounts.index')
+            ->with('success', 'Rekening kantor berhasil ditambahkan.');
+    }
+
+    public function officeBankAccountsEdit(OfficeBankAccount $officeBankAccount): Response
+    {
+        return inertia('Admin/OfficeBankAccounts/Form', [
+            'mode' => 'edit',
+            'record' => [
+                'id' => $officeBankAccount->id,
+                'bank_name' => $officeBankAccount->bank_name,
+                'account_number' => $officeBankAccount->account_number,
+                'account_holder' => $officeBankAccount->account_holder,
+                'branch' => $officeBankAccount->branch,
+                'currency' => $officeBankAccount->currency,
+                'notes' => $officeBankAccount->notes,
+                'is_active' => (bool) $officeBankAccount->is_active,
+                'sort_order' => (int) $officeBankAccount->sort_order,
+                'legacy_url' => $this->legacyOfficeBankAccountUrl($officeBankAccount),
+            ],
+            'indexUrl' => route('admin.finance.office-bank-accounts.index'),
+            'submitUrl' => route('admin.finance.office-bank-accounts.update', $officeBankAccount),
+            'legacyPanelUrl' => url('/legacy-admin'),
+        ]);
+    }
+
+    public function officeBankAccountsUpdate(
+        StoreOfficeBankAccountRequest $request,
+        OfficeBankAccount $officeBankAccount
+    ): RedirectResponse {
+        $officeBankAccount->update($request->validated());
+
+        return redirect()
+            ->route('admin.finance.office-bank-accounts.index')
+            ->with('success', 'Rekening kantor berhasil diperbarui.');
+    }
+
+    public function officeBankAccountsDestroy(OfficeBankAccount $officeBankAccount): RedirectResponse
+    {
+        $officeBankAccount->delete();
+
+        return redirect()
+            ->route('admin.finance.office-bank-accounts.index')
+            ->with('success', 'Rekening kantor berhasil dihapus.');
+    }
+
     private function transformRequestListItem(AppraisalRequest $record): array
     {
         return [
@@ -607,10 +946,76 @@ class AdminController extends Controller
         ];
     }
 
+    private function transformPaymentRow(Payment $payment, MidtransSnapService $midtrans): array
+    {
+        $payment->loadMissing(['appraisalRequest.user']);
+        $requestRecord = $payment->appraisalRequest;
+        $gatewayDetails = $midtrans->gatewayDetailsFromMetadata(is_array($payment->metadata) ? $payment->metadata : []);
+
+        return [
+            'id' => $payment->id,
+            'invoice_number' => $this->paymentInvoiceNumber($payment),
+            'request_number' => $requestRecord?->request_number ?? ('REQ-' . $payment->appraisal_request_id),
+            'client_name' => $requestRecord?->client_name ?: ($requestRecord?->user?->name ?? '-'),
+            'requester_name' => $requestRecord?->user?->name ?? '-',
+            'amount' => (int) $payment->amount,
+            'method' => $payment->method,
+            'method_label' => $midtrans->paymentMethodLabel($payment),
+            'status' => $payment->status,
+            'status_label' => $midtrans->paymentStatusLabel($payment),
+            'gateway' => $payment->gateway,
+            'bank_label' => $gatewayDetails['bank'] ?? $gatewayDetails['label'] ?? '-',
+            'reference' => $gatewayDetails['reference'] ?? null,
+            'external_payment_id' => $payment->external_payment_id,
+            'paid_at' => $payment->paid_at?->toIso8601String(),
+            'updated_at' => $payment->updated_at?->toIso8601String(),
+            'show_url' => route('admin.finance.payments.show', $payment),
+            'edit_url' => route('admin.finance.payments.edit', $payment),
+            'request_show_url' => $requestRecord ? route('admin.appraisal-requests.show', $requestRecord) : null,
+        ];
+    }
+
+    private function transformOfficeBankAccountRow(OfficeBankAccount $account): array
+    {
+        return [
+            'id' => $account->id,
+            'bank_name' => $account->bank_name,
+            'account_number' => $account->account_number,
+            'account_holder' => $account->account_holder,
+            'branch' => $account->branch,
+            'currency' => $account->currency,
+            'is_active' => (bool) $account->is_active,
+            'sort_order' => (int) $account->sort_order,
+            'notes' => $account->notes,
+            'updated_at' => $account->updated_at?->toIso8601String(),
+            'edit_url' => route('admin.finance.office-bank-accounts.edit', $account),
+            'destroy_url' => route('admin.finance.office-bank-accounts.destroy', $account),
+            'legacy_url' => $this->legacyOfficeBankAccountUrl($account),
+        ];
+    }
+
     private function legacyAppraisalRequestUrl(AppraisalRequest $record): ?string
     {
         try {
             return route('filament.admin.resources.appraisal-requests.view', ['record' => $record]);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function legacyPaymentUrl(Payment $payment): ?string
+    {
+        try {
+            return route('filament.admin.resources.payments.view', ['record' => $payment]);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function legacyOfficeBankAccountUrl(OfficeBankAccount $account): ?string
+    {
+        try {
+            return route('filament.admin.resources.office-bank-accounts.view', ['record' => $account]);
         } catch (\Throwable) {
             return null;
         }
@@ -629,6 +1034,17 @@ class AdminController extends Controller
             'cancel_request' => 'Permohonan dibatalkan',
             'cancelled' => 'Negosiasi dibatalkan',
             default => Arr::headline((string) $action),
+        };
+    }
+
+    private function negotiationActionTone(?string $action): string
+    {
+        return match ((string) $action) {
+            'counter_request' => 'warning',
+            'accept_offer', 'accepted', 'contract_sign_mock' => 'success',
+            'cancel_request', 'cancelled' => 'danger',
+            'offer_sent', 'offer_revised' => 'info',
+            default => 'default',
         };
     }
 
@@ -704,26 +1120,28 @@ class AdminController extends Controller
             'destroy_url' => route('admin.appraisal-requests.assets.destroy', [$asset->appraisal_request_id, $asset]),
             'documents' => $files
                 ->whereIn('type', ['doc_pbb', 'doc_imb', 'doc_certs'])
-                ->map(fn ($file) => $this->transformAssetFile($file))
+                ->map(fn ($file) => $this->transformAssetFile($asset, $file))
                 ->values(),
             'photos' => $files
                 ->whereIn('type', ['photo_access_road', 'photo_front', 'photo_interior'])
-                ->map(fn ($file) => $this->transformAssetFile($file))
+                ->map(fn ($file) => $this->transformAssetFile($asset, $file))
                 ->values(),
         ];
     }
 
-    private function transformAssetFile(object $file): array
+    private function transformAssetFile(AppraisalAsset $asset, object $file): array
     {
         return [
             'id' => $file->id,
             'type' => (string) $file->type,
             'type_label' => $this->assetFileTypeLabel($file->type),
+            'can_delete' => true,
             'original_name' => $file->original_name ?: basename((string) $file->path),
             'mime' => $file->mime,
             'size' => (int) ($file->size ?? 0),
             'size_label' => $this->formatBytes($file->size),
             'url' => Storage::disk('public')->url($file->path),
+            'destroy_url' => route('admin.appraisal-requests.assets.files.destroy', [$asset->appraisal_request_id, $asset, $file]),
             'created_at' => $file->created_at?->toIso8601String(),
         ];
     }
@@ -1042,6 +1460,130 @@ class AdminController extends Controller
         ];
     }
 
+    private function paymentInvoiceNumber(Payment $payment): string
+    {
+        $invoice = data_get($payment->metadata, 'invoice_number');
+
+        if (filled($invoice)) {
+            return (string) $invoice;
+        }
+
+        return 'INV-' . now()->format('Y') . '-' . str_pad((string) $payment->id, 5, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function paymentMetadataLines(mixed $metadata): array
+    {
+        if (! is_array($metadata) || empty($metadata)) {
+            return ['-'];
+        }
+
+        $lines = [];
+        $flatten = function (array $data, string $prefix = '') use (&$flatten, &$lines): void {
+            foreach ($data as $key => $value) {
+                $path = $prefix === '' ? (string) $key : "{$prefix}.{$key}";
+
+                if (is_array($value)) {
+                    $flatten($value, $path);
+                    continue;
+                }
+
+                $label = ucwords(str_replace(['.', '_'], [' > ', ' '], $path));
+                $text = match (true) {
+                    $value === null => '-',
+                    is_bool($value) => $value ? 'Ya' : 'Tidak',
+                    default => (string) $value,
+                };
+
+                $lines[] = "{$label}: {$text}";
+            }
+        };
+
+        $flatten($metadata);
+
+        return empty($lines) ? ['-'] : $lines;
+    }
+
+    private function formatPaymentMetadataJson(mixed $metadata): string
+    {
+        if (! is_array($metadata) || empty($metadata)) {
+            return '';
+        }
+
+        return (string) json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    }
+
+    private function decodePaymentMetadata(?string $metadata): ?array
+    {
+        if (blank($metadata)) {
+            return null;
+        }
+
+        $decoded = json_decode((string) $metadata, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function negotiationActionOptions(AppraisalRequest $appraisalRequest): array
+    {
+        return $appraisalRequest->offerNegotiations
+            ->pluck('action')
+            ->filter()
+            ->unique()
+            ->values()
+            ->map(fn (string $action) => [
+                'value' => $action,
+                'label' => $this->formatNegotiationAction($action),
+            ])
+            ->all();
+    }
+
+    private function negotiationSummary(AppraisalRequest $appraisalRequest): array
+    {
+        $entries = $appraisalRequest->offerNegotiations;
+
+        return [
+            'total' => $entries->count(),
+            'counter_requests' => $entries->where('action', 'counter_request')->count(),
+            'offers_sent' => $entries->whereIn('action', ['offer_sent', 'offer_revised'])->count(),
+            'accepted' => $entries->whereIn('action', ['accept_offer', 'accepted'])->count(),
+            'cancelled' => $entries->whereIn('action', ['cancel_request', 'cancelled'])->count(),
+        ];
+    }
+
+    private function assetDocumentTypeOptions(): array
+    {
+        return [
+            ['value' => 'doc_pbb', 'label' => 'PBB'],
+            ['value' => 'doc_imb', 'label' => 'IMB / PBG'],
+            ['value' => 'doc_certs', 'label' => 'Sertifikat'],
+        ];
+    }
+
+    private function assetPhotoTypeOptions(): array
+    {
+        return [
+            ['value' => 'photo_access_road', 'label' => 'Foto Akses Jalan'],
+            ['value' => 'photo_front', 'label' => 'Foto Depan'],
+            ['value' => 'photo_interior', 'label' => 'Foto Dalam'],
+        ];
+    }
+
+    private function assetFileDirectory(string $type): string
+    {
+        return match ($type) {
+            'doc_pbb' => 'documents/pbb',
+            'doc_imb' => 'documents/imb',
+            'doc_certs' => 'documents/certificate',
+            'photo_access_road' => 'photos/access_road',
+            'photo_front' => 'photos/front',
+            'photo_interior' => 'photos/interior',
+            default => 'uploads',
+        };
+    }
+
     private function moduleStatusLabel(string $status): string
     {
         return match ($status) {
@@ -1058,14 +1600,14 @@ class AdminController extends Controller
             'payments' => [
                 'title' => 'Keuangan',
                 'description' => 'Menggantikan PaymentResource dan OfficeBankAccountResource berikut alur verifikasi pembayaran.',
-                'status' => 'bridge',
+                'status' => 'in_progress',
                 'legacy_resources' => [
                     'PaymentResource',
                     'OfficeBankAccountResource',
                 ],
                 'dependencies' => [
+                    'List/detail pembayaran, edit pembayaran, dan CRUD rekening kantor sudah tersedia di admin Vue.',
                     'PaymentController masih mengirim database notification dengan builder Filament.',
-                    'Verifikasi pembayaran di legacy admin masih menjadi sumber kebenaran untuk beberapa aksi.',
                 ],
             ],
             'content' => [

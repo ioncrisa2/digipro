@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import {
   ClipboardList,
+  CreditCard,
   LayoutDashboard,
 } from 'lucide-vue-next';
 import { useNotification } from '@/composables/useNotification';
@@ -51,6 +52,14 @@ const navItems = [
     routeName: 'admin.appraisal-requests.index',
     activePatterns: ['admin.appraisal-requests.*'],
     pathPrefixes: ['/admin/permohonan-penilaian'],
+  },
+  {
+    key: 'admin.finance',
+    label: 'Keuangan',
+    icon: CreditCard,
+    routeName: 'admin.finance.payments.index',
+    activePatterns: ['admin.finance.*'],
+    pathPrefixes: ['/admin/keuangan'],
   },
 ];
 

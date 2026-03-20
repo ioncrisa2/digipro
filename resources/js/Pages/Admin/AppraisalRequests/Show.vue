@@ -1,5 +1,5 @@
 <script setup>
-import { computed, toRefs } from 'vue';
+import { computed, reactive, toRefs, watch } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import BaseFileUpload from '@/components/base/BaseFileUpload.vue';
@@ -53,6 +53,14 @@ const props = defineProps({
     type: String,
     default: null,
   },
+  assetDocumentTypeOptions: {
+    type: Array,
+    default: () => [],
+  },
+  assetPhotoTypeOptions: {
+    type: Array,
+    default: () => [],
+  },
   payments: {
     type: Array,
     default: () => [],
@@ -60,6 +68,20 @@ const props = defineProps({
   negotiations: {
     type: Array,
     default: () => [],
+  },
+  negotiationActionOptions: {
+    type: Array,
+    default: () => [],
+  },
+  negotiationSummary: {
+    type: Object,
+    default: () => ({
+      total: 0,
+      counter_requests: 0,
+      offers_sent: 0,
+      accepted: 0,
+      cancelled: 0,
+    }),
   },
   legacyPanelUrl: {
     type: String,
@@ -87,8 +109,12 @@ const {
   requestFileTypeOptions,
   assets,
   assetCreateUrl,
+  assetDocumentTypeOptions,
+  assetPhotoTypeOptions,
   payments,
   negotiations,
+  negotiationActionOptions,
+  negotiationSummary,
   legacyPanelUrl,
   offerAction,
   approveLatestNegotiationAction,
@@ -108,6 +134,48 @@ const requestFileForm = useForm({
   file: null,
 });
 
+const negotiationFilters = reactive({
+  action: 'all',
+  q: '',
+});
+
+const assetDocumentForms = reactive({});
+const assetPhotoForms = reactive({});
+
+const ensureAssetUploadForms = (assetList = []) => {
+  assetList.forEach((asset) => {
+    if (!assetDocumentForms[asset.id]) {
+      assetDocumentForms[asset.id] = useForm({
+        type: 'doc_pbb',
+        file: null,
+      });
+    }
+
+    if (!assetPhotoForms[asset.id]) {
+      assetPhotoForms[asset.id] = useForm({
+        type: 'photo_front',
+        file: null,
+      });
+    }
+  });
+
+  Object.keys(assetDocumentForms).forEach((assetId) => {
+    if (!assetList.some((asset) => String(asset.id) === String(assetId))) {
+      delete assetDocumentForms[assetId];
+    }
+  });
+
+  Object.keys(assetPhotoForms).forEach((assetId) => {
+    if (!assetList.some((asset) => String(asset.id) === String(assetId))) {
+      delete assetPhotoForms[assetId];
+    }
+  });
+};
+
+watch(assets, (value) => {
+  ensureAssetUploadForms(value ?? []);
+}, { immediate: true, deep: true });
+
 const statusTone = (value) => {
   switch (value) {
     case 'submitted':
@@ -123,6 +191,21 @@ const statusTone = (value) => {
       return 'bg-amber-100 text-amber-900 border-amber-200';
     case 'offer_sent':
       return 'bg-indigo-100 text-indigo-900 border-indigo-200';
+    default:
+      return 'bg-slate-100 text-slate-800 border-slate-200';
+  }
+};
+
+const negotiationToneClass = (tone) => {
+  switch (tone) {
+    case 'warning':
+      return 'bg-amber-100 text-amber-900 border-amber-200';
+    case 'success':
+      return 'bg-emerald-100 text-emerald-900 border-emerald-200';
+    case 'danger':
+      return 'bg-rose-100 text-rose-900 border-rose-200';
+    case 'info':
+      return 'bg-sky-100 text-sky-900 border-sky-200';
     default:
       return 'bg-slate-100 text-slate-800 border-slate-200';
   }
@@ -252,6 +335,90 @@ const deleteAsset = (asset) => {
     preserveScroll: true,
   });
 };
+
+const setAssetFile = (form, file) => {
+  if (!form) {
+    return;
+  }
+
+  form.file = Array.isArray(file) ? (file[0] ?? null) : file;
+};
+
+const assetDocumentFormFor = (assetId) => assetDocumentForms[assetId] ?? null;
+const assetPhotoFormFor = (assetId) => assetPhotoForms[assetId] ?? null;
+
+const submitAssetDocument = (asset) => {
+  const form = assetDocumentFormFor(asset.id);
+
+  if (!form?.file) {
+    return;
+  }
+
+  form.post(route('admin.appraisal-requests.assets.files.store', [record.value.id, asset.id]), {
+    preserveScroll: true,
+    forceFormData: true,
+    onSuccess: () => {
+      form.reset('file');
+      form.type = 'doc_pbb';
+    },
+  });
+};
+
+const submitAssetPhoto = (asset) => {
+  const form = assetPhotoFormFor(asset.id);
+
+  if (!form?.file) {
+    return;
+  }
+
+  form.post(route('admin.appraisal-requests.assets.files.store', [record.value.id, asset.id]), {
+    preserveScroll: true,
+    forceFormData: true,
+    onSuccess: () => {
+      form.reset('file');
+      form.type = 'photo_front';
+    },
+  });
+};
+
+const deleteAssetFile = (asset, file) => {
+  if (!file?.destroy_url) {
+    return;
+  }
+
+  if (!window.confirm(`Hapus file "${file.original_name}" dari aset #${asset.order}?`)) {
+    return;
+  }
+
+  router.delete(file.destroy_url, {
+    preserveScroll: true,
+  });
+};
+
+const filteredNegotiations = computed(() => {
+  const query = String(negotiationFilters.q || '').trim().toLowerCase();
+
+  return (negotiations.value ?? []).filter((entry) => {
+    if (negotiationFilters.action !== 'all' && entry.action_value !== negotiationFilters.action) {
+      return false;
+    }
+
+    if (!query) {
+      return true;
+    }
+
+    const haystacks = [
+      entry.action_label,
+      entry.actor_name,
+      entry.reason,
+      entry.round ? `putaran ${entry.round}` : '',
+    ]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase());
+
+    return haystacks.some((value) => value.includes(query));
+  });
+});
 </script>
 
 <template>
@@ -535,12 +702,67 @@ const deleteAsset = (asset) => {
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dokumen Aset</p>
                     <div class="mt-3 space-y-3">
+                      <div class="rounded-2xl border bg-slate-50 p-4">
+                        <div class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+                          <div class="space-y-2">
+                            <Label :for="`asset_document_type_${asset.id}`">Tipe Dokumen</Label>
+                            <Select
+                              :model-value="assetDocumentFormFor(asset.id)?.type"
+                              @update:model-value="assetDocumentFormFor(asset.id).type = $event"
+                            >
+                              <SelectTrigger :id="`asset_document_type_${asset.id}`">
+                                <SelectValue placeholder="Pilih tipe dokumen" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem
+                                  v-for="option in assetDocumentTypeOptions"
+                                  :key="option.value"
+                                  :value="option.value"
+                                >
+                                  {{ option.label }}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p v-if="assetDocumentFormFor(asset.id)?.errors?.type" class="text-xs text-red-500">
+                              {{ assetDocumentFormFor(asset.id).errors.type }}
+                            </p>
+                          </div>
+
+                          <div class="space-y-2">
+                            <Label>Upload Dokumen</Label>
+                            <BaseFileUpload
+                              label=""
+                              :multiple="false"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              :model-value="assetDocumentFormFor(asset.id)?.file"
+                              @update:modelValue="setAssetFile(assetDocumentFormFor(asset.id), $event)"
+                            />
+                            <p v-if="assetDocumentFormFor(asset.id)?.errors?.file" class="text-xs text-red-500">
+                              {{ assetDocumentFormFor(asset.id).errors.file }}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div class="mt-4 flex justify-end">
+                          <Button
+                            type="button"
+                            :disabled="assetDocumentFormFor(asset.id)?.processing || !assetDocumentFormFor(asset.id)?.file"
+                            @click="submitAssetDocument(asset)"
+                          >
+                            Upload Dokumen Aset
+                          </Button>
+                        </div>
+                      </div>
+
                       <div v-for="file in asset.documents" :key="file.id" class="rounded-2xl border bg-slate-50 p-4">
                         <p class="font-medium text-slate-950">{{ file.original_name }}</p>
                         <p class="mt-1 text-xs text-slate-500">{{ file.type_label }} - {{ file.size_label }}</p>
-                        <div class="mt-3">
+                        <div class="mt-3 flex flex-wrap gap-2">
                           <Button variant="outline" size="sm" as-child>
                             <a :href="file.url" target="_blank" rel="noreferrer">Buka Dokumen</a>
+                          </Button>
+                          <Button v-if="file.can_delete" type="button" variant="outline" size="sm" @click="deleteAssetFile(asset, file)">
+                            Hapus
                           </Button>
                         </div>
                       </div>
@@ -553,6 +775,58 @@ const deleteAsset = (asset) => {
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Foto Aset</p>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div class="rounded-2xl border bg-slate-50 p-4 sm:col-span-2">
+                        <div class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+                          <div class="space-y-2">
+                            <Label :for="`asset_photo_type_${asset.id}`">Tipe Foto</Label>
+                            <Select
+                              :model-value="assetPhotoFormFor(asset.id)?.type"
+                              @update:model-value="assetPhotoFormFor(asset.id).type = $event"
+                            >
+                              <SelectTrigger :id="`asset_photo_type_${asset.id}`">
+                                <SelectValue placeholder="Pilih tipe foto" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem
+                                  v-for="option in assetPhotoTypeOptions"
+                                  :key="option.value"
+                                  :value="option.value"
+                                >
+                                  {{ option.label }}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p v-if="assetPhotoFormFor(asset.id)?.errors?.type" class="text-xs text-red-500">
+                              {{ assetPhotoFormFor(asset.id).errors.type }}
+                            </p>
+                          </div>
+
+                          <div class="space-y-2">
+                            <Label>Upload Foto</Label>
+                            <BaseFileUpload
+                              label=""
+                              :multiple="false"
+                              accept=".jpg,.jpeg,.png"
+                              :model-value="assetPhotoFormFor(asset.id)?.file"
+                              @update:modelValue="setAssetFile(assetPhotoFormFor(asset.id), $event)"
+                            />
+                            <p v-if="assetPhotoFormFor(asset.id)?.errors?.file" class="text-xs text-red-500">
+                              {{ assetPhotoFormFor(asset.id).errors.file }}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div class="mt-4 flex justify-end">
+                          <Button
+                            type="button"
+                            :disabled="assetPhotoFormFor(asset.id)?.processing || !assetPhotoFormFor(asset.id)?.file"
+                            @click="submitAssetPhoto(asset)"
+                          >
+                            Upload Foto Aset
+                          </Button>
+                        </div>
+                      </div>
+
                       <a
                         v-for="photo in asset.photos"
                         :key="photo.id"
@@ -565,6 +839,11 @@ const deleteAsset = (asset) => {
                         <div class="p-3">
                           <p class="text-sm font-medium text-slate-950">{{ photo.type_label }}</p>
                           <p class="mt-1 text-xs text-slate-500">{{ photo.original_name }}</p>
+                          <div class="mt-3">
+                            <Button v-if="photo.can_delete" type="button" variant="outline" size="sm" @click.prevent="deleteAssetFile(asset, photo)">
+                              Hapus
+                            </Button>
+                          </div>
                         </div>
                       </a>
                       <div v-if="!asset.photos.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500 sm:col-span-2">
@@ -723,11 +1002,70 @@ const deleteAsset = (asset) => {
             <CardHeader>
               <CardTitle>Riwayat Negosiasi</CardTitle>
             </CardHeader>
-            <CardContent class="space-y-3">
-              <div v-for="entry in negotiations" :key="entry.id" class="rounded-2xl border p-4">
+            <CardContent class="space-y-4">
+              <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Event</p>
+                  <p class="mt-2 text-2xl font-semibold text-slate-950">{{ negotiationSummary.total }}</p>
+                </div>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Counter Request</p>
+                  <p class="mt-2 text-2xl font-semibold text-slate-950">{{ negotiationSummary.counter_requests }}</p>
+                </div>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Offer Admin</p>
+                  <p class="mt-2 text-2xl font-semibold text-slate-950">{{ negotiationSummary.offers_sent }}</p>
+                </div>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Disetujui</p>
+                  <p class="mt-2 text-2xl font-semibold text-slate-950">{{ negotiationSummary.accepted }}</p>
+                </div>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dibatalkan</p>
+                  <p class="mt-2 text-2xl font-semibold text-slate-950">{{ negotiationSummary.cancelled }}</p>
+                </div>
+              </div>
+
+              <div class="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+                <div class="space-y-2">
+                  <Label for="negotiation_action_filter">Filter Aksi</Label>
+                  <Select v-model="negotiationFilters.action">
+                    <SelectTrigger id="negotiation_action_filter">
+                      <SelectValue placeholder="Semua aksi" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua aksi</SelectItem>
+                      <SelectItem
+                        v-for="option in negotiationActionOptions"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div class="space-y-2">
+                  <Label for="negotiation_search">Cari Riwayat</Label>
+                  <Input
+                    id="negotiation_search"
+                    v-model="negotiationFilters.q"
+                    type="text"
+                    placeholder="Cari nama aktor, alasan, atau putaran"
+                  />
+                </div>
+              </div>
+
+              <div v-for="entry in filteredNegotiations" :key="entry.id" class="rounded-2xl border p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div>
-                    <p class="font-medium text-slate-950">{{ entry.action_label }}</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <p class="font-medium text-slate-950">{{ entry.action_label }}</p>
+                      <Badge variant="outline" :class="negotiationToneClass(entry.action_tone)">
+                        {{ entry.action_label }}
+                      </Badge>
+                    </div>
                     <p class="mt-1 text-xs text-slate-500">
                       {{ entry.actor_name }}
                       <span v-if="entry.round">- Putaran {{ entry.round }}</span>
@@ -742,8 +1080,12 @@ const deleteAsset = (asset) => {
                   <p v-if="entry.reason">Catatan: {{ entry.reason }}</p>
                 </div>
               </div>
-              <div v-if="!negotiations.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
-                Belum ada histori negosiasi.
+              <div v-if="!filteredNegotiations.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
+                {{
+                  negotiations.length
+                    ? 'Tidak ada histori negosiasi yang cocok dengan filter saat ini.'
+                    : 'Belum ada histori negosiasi.'
+                }}
               </div>
             </CardContent>
           </Card>

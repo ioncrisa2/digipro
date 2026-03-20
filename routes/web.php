@@ -67,6 +67,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/{appraisalRequest}/assets/{asset}/edit', [AdminController::class, 'appraisalRequestAssetEdit'])->name('assets.edit');
                     Route::put('/{appraisalRequest}/assets/{asset}', [AdminController::class, 'updateAppraisalRequestAsset'])->name('assets.update');
                     Route::delete('/{appraisalRequest}/assets/{asset}', [AdminController::class, 'destroyAppraisalRequestAsset'])->name('assets.destroy');
+                    Route::post('/{appraisalRequest}/assets/{asset}/files', [AdminController::class, 'storeAppraisalAssetFile'])->name('assets.files.store');
+                    Route::delete('/{appraisalRequest}/assets/{asset}/files/{file}', [AdminController::class, 'destroyAppraisalAssetFile'])->name('assets.files.destroy');
                     Route::post('/{appraisalRequest}/verify-docs', [AdminController::class, 'verifyDocs'])->name('actions.verify-docs');
                     Route::post('/{appraisalRequest}/docs-incomplete', [AdminController::class, 'markDocsIncomplete'])->name('actions.docs-incomplete');
                     Route::post('/{appraisalRequest}/contract-signed', [AdminController::class, 'markContractSigned'])->name('actions.contract-signed');
@@ -75,6 +77,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/{appraisalRequest}/approve-latest-negotiation', [AdminController::class, 'approveLatestNegotiation'])->name('actions.approve-latest-negotiation');
                     Route::post('/{appraisalRequest}/files', [AdminController::class, 'storeRequestFile'])->name('files.store');
                     Route::delete('/{appraisalRequest}/files/{file}', [AdminController::class, 'destroyRequestFile'])->name('files.destroy');
+                });
+            Route::prefix('keuangan')
+                ->name('finance.')
+                ->group(function (): void {
+                    Route::get('/pembayaran', [AdminController::class, 'paymentsIndex'])->name('payments.index');
+                    Route::get('/pembayaran/{payment}', [AdminController::class, 'paymentsShow'])->name('payments.show');
+                    Route::get('/pembayaran/{payment}/edit', [AdminController::class, 'paymentsEdit'])->name('payments.edit');
+                    Route::put('/pembayaran/{payment}', [AdminController::class, 'paymentsUpdate'])->name('payments.update');
+                    Route::get('/rekening-kantor', [AdminController::class, 'officeBankAccountsIndex'])->name('office-bank-accounts.index');
+                    Route::get('/rekening-kantor/buat', [AdminController::class, 'officeBankAccountsCreate'])->name('office-bank-accounts.create');
+                    Route::post('/rekening-kantor', [AdminController::class, 'officeBankAccountsStore'])->name('office-bank-accounts.store');
+                    Route::get('/rekening-kantor/{officeBankAccount}/edit', [AdminController::class, 'officeBankAccountsEdit'])->name('office-bank-accounts.edit');
+                    Route::put('/rekening-kantor/{officeBankAccount}', [AdminController::class, 'officeBankAccountsUpdate'])->name('office-bank-accounts.update');
+                    Route::delete('/rekening-kantor/{officeBankAccount}', [AdminController::class, 'officeBankAccountsDestroy'])->name('office-bank-accounts.destroy');
                 });
             Route::get('/modul/{module}', [AdminController::class, 'moduleShow'])->name('modules.show');
         });
