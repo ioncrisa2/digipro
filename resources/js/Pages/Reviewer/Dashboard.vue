@@ -129,6 +129,14 @@ const statCards = [
                   <Badge variant="outline">Pembanding dipilih: {{ asset.selected_comparables_count }}</Badge>
                   <Badge variant="outline">Range bawah: {{ formatCurrency(asset.estimated_value_low) }}</Badge>
                 </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" as-child>
+                    <Link :href="asset.land_adjustment_url || asset.adjustment_url">Adjust Harga Tanah</Link>
+                  </Button>
+                  <Button v-if="asset.has_btb && asset.btb_url" variant="outline" size="sm" as-child>
+                    <Link :href="asset.btb_url">BTB Bangunan</Link>
+                  </Button>
+                </div>
               </div>
               <div v-if="!assetPreview?.length" class="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
                 Belum ada aset prioritas.

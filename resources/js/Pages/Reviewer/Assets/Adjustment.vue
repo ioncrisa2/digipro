@@ -45,7 +45,7 @@ const comparableWarnings = computed(() => {
     .filter((column) => column.warnings.length > 0);
 });
 
-const syncState = (payload) => {
+const syncWorkbenchState = (payload) => {
   state.value = cloneDeep(payload);
   draftInputs.value = cloneDeep(payload.adjustment_inputs || {});
   draftGeneralInputs.value = cloneDeep(payload.general_inputs || {});
@@ -84,7 +84,7 @@ const previewAdjustment = async () => {
       general_inputs: draftGeneralInputs.value,
       custom_adjustment_factors: customFactors.value,
     });
-    syncState(response.data.state);
+    syncWorkbenchState(response.data.state);
     setFeedback(response.data.message, 'success');
   } catch (error) {
     setFeedback(error.response?.data?.message || 'Preview gagal diperbarui.', 'error');
@@ -102,7 +102,7 @@ const saveAdjustment = async () => {
       general_inputs: draftGeneralInputs.value,
       custom_adjustment_factors: customFactors.value,
     });
-    syncState(response.data.result?.state || state.value);
+    syncWorkbenchState(response.data.result?.state || state.value);
     setFeedback(response.data.result?.notification_body || response.data.message, 'success');
   } catch (error) {
     setFeedback(error.response?.data?.message || 'Simpan adjustment gagal.', 'error');

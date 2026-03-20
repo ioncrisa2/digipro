@@ -8,6 +8,7 @@ use App\Services\Reviewer\AdjustmentWorkbenchService;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetComparable;
 use App\Models\AppraisalRequest;
+use App\Support\ReviewerBtbCatalog;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -60,6 +61,7 @@ class ReviewerWorkspaceService
     public function serializeAssetListItem(AppraisalAsset $asset): array
     {
         $assetType = $this->enumValue($asset->asset_type);
+        $hasBtb = $this->assetHasBtb($asset);
 
         return [
             'id' => $asset->id,
@@ -79,12 +81,16 @@ class ReviewerWorkspaceService
             'market_value_final' => $asset->market_value_final,
             'detail_url' => route('reviewer.assets.show', $asset),
             'adjustment_url' => route('reviewer.assets.adjustment', $asset),
+            'land_adjustment_url' => route('reviewer.assets.adjustment', $asset),
+            'has_btb' => $hasBtb,
+            'btb_url' => $hasBtb ? route('reviewer.assets.btb', $asset) : null,
         ];
     }
 
     public function serializeAssetDetail(AppraisalAsset $asset, bool $includeComparables = false, bool $includeFiles = false): array
     {
         $assetType = $this->enumValue($asset->asset_type);
+        $hasBtb = $this->assetHasBtb($asset);
 
         $payload = [
             'id' => $asset->id,
@@ -126,6 +132,9 @@ class ReviewerWorkspaceService
             ],
             'detail_url' => route('reviewer.assets.show', $asset),
             'adjustment_url' => route('reviewer.assets.adjustment', $asset),
+            'land_adjustment_url' => route('reviewer.assets.adjustment', $asset),
+            'has_btb' => $hasBtb,
+            'btb_url' => $hasBtb ? route('reviewer.assets.btb', $asset) : null,
             'general_data_update_url' => route('reviewer.api.assets.general-data', $asset),
             'comparables_search_url' => route('reviewer.api.assets.comparables.search', $asset),
             'comparables_sync_url' => route('reviewer.api.assets.comparables.sync', $asset),
@@ -234,6 +243,11 @@ class ReviewerWorkspaceService
         $workbench->mount($assetId);
 
         return $workbench;
+    }
+
+    public function assetHasBtb(AppraisalAsset $asset): bool
+    {
+        return (float) ($asset->building_area ?? 0) > 0;
     }
 
     private function enumValue(mixed $value): ?string

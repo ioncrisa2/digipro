@@ -182,11 +182,14 @@ const feedbackClasses = () => {
                   <TableCell>{{ asset.land_area || '-' }} / {{ asset.building_area || '-' }}</TableCell>
                   <TableCell>
                     <div class="flex flex-wrap gap-2">
-                      <Button variant="link" class="h-auto px-0" as-child>
-                        <Link :href="asset.detail_url">Detail aset</Link>
+                        <Button variant="link" class="h-auto px-0" as-child>
+                          <Link :href="asset.detail_url">Detail aset</Link>
                         </Button>
                         <Button variant="link" class="h-auto px-0" as-child>
-                          <Link :href="asset.adjustment_url">Adjust Harga Tanah</Link>
+                          <Link :href="asset.land_adjustment_url || asset.adjustment_url">Adjust Harga Tanah</Link>
+                        </Button>
+                        <Button v-if="asset.has_btb && asset.btb_url" variant="link" class="h-auto px-0" as-child>
+                          <Link :href="asset.btb_url">BTB Bangunan</Link>
                         </Button>
                     </div>
                   </TableCell>

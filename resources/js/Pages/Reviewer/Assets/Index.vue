@@ -132,7 +132,10 @@ const submit = () => {
                         <Link :href="asset.detail_url">Detail</Link>
                       </Button>
                       <Button variant="link" class="h-auto px-0" as-child>
-                        <Link :href="asset.adjustment_url">Adjust Harga Tanah</Link>
+                        <Link :href="asset.land_adjustment_url || asset.adjustment_url">Adjust Harga Tanah</Link>
+                      </Button>
+                      <Button v-if="asset.has_btb && asset.btb_url" variant="link" class="h-auto px-0" as-child>
+                        <Link :href="asset.btb_url">BTB Bangunan</Link>
                       </Button>
                     </div>
                   </TableCell>

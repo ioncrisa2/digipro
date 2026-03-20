@@ -1269,11 +1269,12 @@ class AdjustmentWorkbenchService
                     $unitMid = ! empty($unitSummaryValues)
                         ? (int) round(array_sum($unitSummaryValues) / count($unitSummaryValues))
                         : null;
+                    $buildingValue = (int) ($asset->building_value_final ?? 0);
 
                     $asset->update([
-                        'estimated_value_low' => $low,
-                        'estimated_value_high' => $high,
-                        'market_value_final' => $mid,
+                        'estimated_value_low' => $low + $buildingValue,
+                        'estimated_value_high' => $high + $buildingValue,
+                        'market_value_final' => $mid + $buildingValue,
                         'land_value_final' => $unitMid,
                     ]);
                 } else {

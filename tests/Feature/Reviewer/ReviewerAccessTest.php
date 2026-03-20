@@ -195,6 +195,60 @@ it('allows reviewer to preview and save adjustment state', function (): void {
     expect($comparable->fresh()->assumed_discount_percent)->toBe(10.0);
 });
 
+it('adds saved building value to land range totals when saving land adjustment', function (): void {
+    [$reviewer, $request, $asset] = createReviewerAssetFixture();
+
+    $asset->update([
+        'building_value_final' => 250000000,
+    ]);
+
+    $comparable = AppraisalAssetComparable::query()->create([
+        'appraisal_asset_id' => $asset->id,
+        'external_id' => 1002,
+        'external_source' => 'test',
+        'is_selected' => true,
+        'manual_rank' => 1,
+        'rank' => 1,
+        'raw_price' => 100000000,
+        'raw_land_area' => 100,
+        'raw_peruntukan' => 'tanah_kosong',
+        'snapshot_json' => [
+            'harga' => 100000000,
+            'luas_tanah' => 100,
+            'peruntukan' => [
+                'slug' => 'tanah_kosong',
+                'name' => 'Tanah Kosong',
+            ],
+            'jenis_objek' => [
+                'name' => 'Tanah',
+            ],
+        ],
+    ]);
+
+    $this
+        ->actingAs($reviewer)
+        ->postJson(route('reviewer.api.assets.adjustment.save', $asset), [
+            'adjustment_inputs' => [
+                (string) $comparable->id => [
+                    'adj_shape' => 5,
+                ],
+            ],
+            'general_inputs' => [
+                (string) $comparable->id => [
+                    'assumed_discount' => 10,
+                ],
+            ],
+            'custom_adjustment_factors' => [],
+        ])
+        ->assertOk();
+
+    $asset->refresh();
+
+    expect($asset->estimated_value_low)->toBeGreaterThan($asset->building_value_final);
+    expect($asset->estimated_value_high)->toBeGreaterThan($asset->building_value_final);
+    expect($asset->market_value_final)->toBeGreaterThan($asset->building_value_final);
+});
+
 it('allows reviewer to update general asset data', function (): void {
     [$reviewer, $request, $asset] = createReviewerAssetFixture();
 

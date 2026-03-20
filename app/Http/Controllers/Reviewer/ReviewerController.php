@@ -8,12 +8,16 @@ use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetComparable;
 use App\Models\AppraisalRequest;
 use App\Services\ComparableDataApi;
+use App\Services\Reviewer\BtbWorksheetEngine;
+use App\Services\Reviewer\BtbValuationPersistenceService;
 use App\Services\Reviewer\ReviewerWorkspaceService;
 use App\Support\AppraisalAssetFieldOptions;
+use App\Support\ReviewerBtbCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,6 +27,8 @@ class ReviewerController extends Controller
 {
     public function __construct(
         private readonly ReviewerWorkspaceService $workspace,
+        private readonly BtbWorksheetEngine $btbEngine,
+        private readonly BtbValuationPersistenceService $btbPersistence,
     ) {}
 
     public function dashboard(): Response
@@ -250,15 +256,49 @@ class ReviewerController extends Controller
 
     public function assetsAdjustment(AppraisalAsset $asset): Response
     {
+        $asset->loadMissing(['request.guidelineSet', 'ikkRef']);
+
         return Inertia::render('Reviewer/Assets/Adjustment', [
             'asset' => [
                 'id' => $asset->id,
                 'address' => $asset->address,
                 'request_number' => $asset->request?->request_number,
+                'peruntukan' => $asset->peruntukan,
+                'land_area' => $asset->land_area,
+                'building_area' => $asset->building_area,
+                'building_floors' => $asset->building_floors,
+                'build_year' => $asset->build_year,
+                'market_value_final' => $asset->market_value_final,
                 'adjustment_save_url' => route('reviewer.api.assets.adjustment.save', $asset),
                 'adjustment_preview_url' => route('reviewer.api.assets.adjustment.preview', $asset),
+                'detail_url' => route('reviewer.assets.show', $asset),
             ],
             'workbench' => $this->workspace->makeAdjustmentWorkbench($asset->id)->exportReviewerPayload(),
+        ]);
+    }
+
+    public function assetsBtb(AppraisalAsset $asset): Response
+    {
+        $this->ensureBtbAsset($asset);
+        $asset->loadMissing(['request.guidelineSet', 'ikkRef']);
+
+        return Inertia::render('Reviewer/Assets/Btb', [
+            'asset' => [
+                'id' => $asset->id,
+                'address' => $asset->address,
+                'request_number' => $asset->request?->request_number,
+                'peruntukan' => $asset->peruntukan,
+                'land_area' => $asset->land_area,
+                'building_area' => $asset->building_area,
+                'building_floors' => $asset->building_floors,
+                'build_year' => $asset->build_year,
+                'market_value_final' => $asset->market_value_final,
+                'btb_save_url' => route('reviewer.api.assets.btb.save', $asset),
+                'btb_preview_url' => route('reviewer.api.assets.btb.preview', $asset),
+                'detail_url' => route('reviewer.assets.show', $asset),
+                'land_adjustment_url' => route('reviewer.assets.adjustment', $asset),
+            ],
+            'btb' => $this->buildBtbPayload($asset),
         ]);
     }
 
@@ -516,6 +556,170 @@ class ReviewerController extends Controller
             'message' => 'Adjustment berhasil disimpan.',
             'result' => $result,
         ]);
+    }
+
+    public function previewBtb(Request $request, AppraisalAsset $asset): JsonResponse
+    {
+        $this->ensureBtbAsset($asset);
+        $data = $this->validateBtbInput($request);
+
+        return response()->json([
+            'message' => 'Preview BTB diperbarui.',
+            'btb' => $this->buildBtbPayload($asset, $data['btb_input'] ?? []),
+        ]);
+    }
+
+    public function saveBtb(Request $request, AppraisalAsset $asset): JsonResponse
+    {
+        $this->ensureBtbAsset($asset);
+        $data = $this->validateBtbInput($request);
+        $payload = $this->buildBtbPayload($asset, $data['btb_input'] ?? []);
+
+        if (! data_get($payload, 'state')) {
+            return response()->json([
+                'message' => 'Worksheet BTB belum memiliki hasil perhitungan yang bisa disimpan.',
+            ], 422);
+        }
+
+        $result = $this->btbPersistence->persist($asset, (array) $payload['state']);
+
+        return response()->json([
+            'message' => 'Worksheet BTB berhasil disimpan.',
+            'result' => [
+                'btb' => $this->buildBtbPayload($asset->fresh(['request.guidelineSet', 'ikkRef', 'buildingValuation']), $data['btb_input'] ?? []),
+                'asset_values' => [
+                    'building_value_final' => $result['asset']->building_value_final,
+                    'estimated_value_low' => $result['asset']->estimated_value_low,
+                    'estimated_value_high' => $result['asset']->estimated_value_high,
+                    'market_value_final' => $result['asset']->market_value_final,
+                ],
+            ],
+        ]);
+    }
+
+    private function buildBtbPayload(AppraisalAsset $asset, array $input = []): array
+    {
+        $asset->loadMissing(['request.guidelineSet', 'ikkRef']);
+
+        $usage = $asset->peruntukan;
+        $hasBuilding = (float) ($asset->building_area ?? 0) > 0;
+
+        if (! $hasBuilding) {
+            return [
+                'enabled' => false,
+                'reason' => 'Aset ini belum memiliki data bangunan untuk worksheet BTB.',
+                'templates' => [],
+                'input' => [],
+                'state' => null,
+            ];
+        }
+
+        $guidelineSetId = (int) ($asset->request?->guideline_set_id ?: 0);
+        $guidelineYear = (int) ($asset->request?->guidelineSet?->year ?: now()->year);
+        $defaultTemplateKey = ReviewerBtbCatalog::defaultTemplateForUsage($usage);
+        $templateKey = $this->nonEmptyString(Arr::get($input, 'template_key')) ?? $defaultTemplateKey;
+        $template = $templateKey ? ReviewerBtbCatalog::template($templateKey) : null;
+        $buildingClass = $this->nonEmptyString(Arr::get($input, 'building_class'))
+            ?? ($template['mappi_building_class'] ?? null);
+        $floorCount = $this->nullableInt(Arr::get($input, 'floor_count'))
+            ?? $asset->building_floors
+            ?? ($template['default_floor_count'] ?? null);
+        $buildingArea = $this->nullableFloat(Arr::get($input, 'building_area')) ?? $asset->building_area;
+        $landArea = $this->nullableFloat(Arr::get($input, 'land_area')) ?? $asset->land_area;
+        $effectiveAge = $this->nullableFloat(Arr::get($input, 'effective_age'));
+        if ($effectiveAge === null && $asset->build_year) {
+            $effectiveAge = max(0, $guidelineYear - (int) $asset->build_year);
+        }
+
+        $engineInput = [
+            'guideline_set_id' => $guidelineSetId,
+            'year' => $guidelineYear,
+            'usage' => $usage,
+            'template_key' => $templateKey,
+            'building_class' => $buildingClass,
+            'floor_count' => $floorCount,
+            'building_area' => $buildingArea,
+            'land_area' => $landArea,
+            'effective_age' => $effectiveAge,
+            'material_quality_adjustment' => $this->nullableFloat(Arr::get($input, 'material_quality_adjustment')) ?? 1.0,
+            'maintenance_adjustment_factor' => $this->nullableFloat(Arr::get($input, 'maintenance_adjustment_factor')) ?? 0.0,
+            'market_value' => $this->nullableFloat(Arr::get($input, 'market_value')) ?? $asset->market_value_final,
+            'region_code' => $asset->regency_id,
+            'ikk_value' => $asset->ikk_value_used,
+            'subject_overrides' => (array) Arr::get($input, 'subject_overrides', []),
+        ];
+
+        try {
+            $state = $guidelineSetId > 0 ? $this->btbEngine->build($engineInput) : null;
+        } catch (Throwable $e) {
+            $state = null;
+        }
+
+        return [
+            'enabled' => true,
+            'reason' => null,
+            'mode' => 'preview',
+            'note' => 'Worksheet BTB sudah bisa dipreview dari reviewer. Penyimpanan permanen ke valuation record akan disambungkan pada fase berikutnya.',
+            'templates' => collect(ReviewerBtbCatalog::candidateTemplatesForUsage($usage))
+                ->map(fn (string $key): array => [
+                    'value' => $key,
+                    'label' => ReviewerBtbCatalog::template($key)['label'] ?? $key,
+                ])
+                ->values()
+                ->all(),
+            'input' => [
+                'template_key' => $templateKey,
+                'building_class' => $buildingClass,
+                'floor_count' => $floorCount,
+                'building_area' => $buildingArea,
+                'land_area' => $landArea,
+                'effective_age' => $effectiveAge,
+                'material_quality_adjustment' => $engineInput['material_quality_adjustment'],
+                'maintenance_adjustment_factor' => $engineInput['maintenance_adjustment_factor'],
+                'market_value' => $engineInput['market_value'],
+                'subject_overrides' => $engineInput['subject_overrides'],
+            ],
+            'state' => $state,
+        ];
+    }
+
+    private function validateBtbInput(Request $request): array
+    {
+        return $request->validate([
+            'btb_input' => ['nullable', 'array'],
+            'btb_input.template_key' => ['nullable', 'string'],
+            'btb_input.building_class' => ['nullable', 'string'],
+            'btb_input.floor_count' => ['nullable', 'integer', 'min:1', 'max:200'],
+            'btb_input.building_area' => ['nullable', 'numeric', 'min:0'],
+            'btb_input.land_area' => ['nullable', 'numeric', 'min:0'],
+            'btb_input.effective_age' => ['nullable', 'numeric', 'min:0'],
+            'btb_input.material_quality_adjustment' => ['nullable', 'numeric', 'min:0.01', 'max:10'],
+            'btb_input.maintenance_adjustment_factor' => ['nullable', 'numeric', 'min:-1', 'max:1'],
+            'btb_input.market_value' => ['nullable', 'numeric', 'min:0'],
+            'btb_input.subject_overrides' => ['nullable', 'array'],
+        ]);
+    }
+
+    private function ensureBtbAsset(AppraisalAsset $asset): void
+    {
+        abort_unless($this->workspace->assetHasBtb($asset), 404);
+    }
+
+    private function nonEmptyString(mixed $value): ?string
+    {
+        $text = trim((string) $value);
+
+        return $text === '' ? null : $text;
+    }
+
+    private function nullableFloat(mixed $value): ?float
+    {
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    private function nullableInt(mixed $value): ?int
+    {
+        return is_numeric($value) ? (int) $value : null;
     }
 
 }

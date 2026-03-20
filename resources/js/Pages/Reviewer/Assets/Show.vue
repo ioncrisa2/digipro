@@ -493,9 +493,15 @@ onBeforeUnmount(() => {
                 </a>
               </Button>
               <Button size="sm" as-child>
-                <Link :href="assetState.adjustment_url">
+                <Link :href="assetState.land_adjustment_url || assetState.adjustment_url">
                   <Scale class="mr-2 h-4 w-4" />
                   Adjust Harga Tanah
+                </Link>
+              </Button>
+              <Button v-if="assetState.has_btb && assetState.btb_url" variant="outline" size="sm" as-child>
+                <Link :href="assetState.btb_url">
+                  <BarChart3 class="mr-2 h-4 w-4" />
+                  BTB Bangunan
                 </Link>
               </Button>
             </div>
@@ -978,9 +984,15 @@ onBeforeUnmount(() => {
                   <CardDescription>Data pembanding yang telah dipilih dan digunakan untuk aset ini.</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" as-child>
-                  <Link :href="assetState.adjustment_url">
+                  <Link :href="assetState.land_adjustment_url || assetState.adjustment_url">
                     <Scale class="mr-2 h-4 w-4" />
                     Buka Adjust Harga Tanah
+                  </Link>
+                </Button>
+                <Button v-if="assetState.has_btb && assetState.btb_url" variant="outline" size="sm" as-child>
+                  <Link :href="assetState.btb_url">
+                    <BarChart3 class="mr-2 h-4 w-4" />
+                    Buka BTB Bangunan
                   </Link>
                 </Button>
               </div>

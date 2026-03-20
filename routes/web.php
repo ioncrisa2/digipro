@@ -110,6 +110,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/assets', [ReviewerController::class, 'assetsIndex'])->name('assets.index');
             Route::get('/assets/{asset}', [ReviewerController::class, 'assetsShow'])->name('assets.show');
             Route::get('/assets/{asset}/adjustment', [ReviewerController::class, 'assetsAdjustment'])->name('assets.adjustment');
+            Route::get('/assets/{asset}/btb', [ReviewerController::class, 'assetsBtb'])->name('assets.btb');
 
             Route::get('/comparables', [ReviewerController::class, 'comparablesIndex'])->name('comparables.index');
             Route::get('/comparables/{comparable}', [ReviewerController::class, 'comparablesShow'])->name('comparables.show');
@@ -123,6 +124,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::post('/assets/{asset}/comparables/sync', [ReviewerController::class, 'syncComparables'])->name('assets.comparables.sync');
                 Route::post('/assets/{asset}/adjustment/preview', [ReviewerController::class, 'previewAdjustment'])->name('assets.adjustment.preview');
                 Route::post('/assets/{asset}/adjustment/save', [ReviewerController::class, 'saveAdjustment'])->name('assets.adjustment.save');
+                Route::post('/assets/{asset}/btb/preview', [ReviewerController::class, 'previewBtb'])->name('assets.btb.preview');
+                Route::post('/assets/{asset}/btb/save', [ReviewerController::class, 'saveBtb'])->name('assets.btb.save');
 
                 Route::post('/comparables/{comparable}', [ReviewerController::class, 'updateComparable'])->name('comparables.update');
             });
