@@ -1,8 +1,20 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { computed, toRefs } from 'vue';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
+import BaseFileUpload from '@/components/base/BaseFileUpload.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Card,
   CardContent,
@@ -12,7 +24,7 @@ import {
 } from '@/components/ui/card';
 import { formatArea, formatCurrency, formatDateTime, formatNumber } from '@/utils/reviewer';
 
-defineProps({
+const props = defineProps({
   record: {
     type: Object,
     required: true,
@@ -21,13 +33,25 @@ defineProps({
     type: Object,
     required: true,
   },
+  availableActions: {
+    type: Array,
+    default: () => [],
+  },
   requestFiles: {
+    type: Array,
+    default: () => [],
+  },
+  requestFileTypeOptions: {
     type: Array,
     default: () => [],
   },
   assets: {
     type: Array,
     default: () => [],
+  },
+  assetCreateUrl: {
+    type: String,
+    default: null,
   },
   payments: {
     type: Array,
@@ -41,6 +65,47 @@ defineProps({
     type: String,
     default: '/legacy-admin',
   },
+  offerAction: {
+    type: Object,
+    default: null,
+  },
+  approveLatestNegotiationAction: {
+    type: Object,
+    default: null,
+  },
+  paymentVerification: {
+    type: Object,
+    default: null,
+  },
+});
+
+const {
+  record,
+  requester,
+  availableActions,
+  requestFiles,
+  requestFileTypeOptions,
+  assets,
+  assetCreateUrl,
+  payments,
+  negotiations,
+  legacyPanelUrl,
+  offerAction,
+  approveLatestNegotiationAction,
+  paymentVerification,
+} = toRefs(props);
+
+const offerForm = useForm({
+  fee_total: offerAction.value?.defaults?.fee_total ?? '',
+  fee_has_dp: Boolean(offerAction.value?.defaults?.fee_has_dp ?? false),
+  fee_dp_percent: offerAction.value?.defaults?.fee_dp_percent ?? '',
+  contract_sequence: offerAction.value?.defaults?.contract_sequence ?? '',
+  offer_validity_days: offerAction.value?.defaults?.offer_validity_days ?? '',
+});
+
+const requestFileForm = useForm({
+  type: 'other_request_document',
+  file: null,
 });
 
 const statusTone = (value) => {
@@ -81,6 +146,112 @@ const paymentStatusLabel = (status) => {
       return status || '-';
   }
 };
+
+const runAction = (action) => {
+  if (!window.confirm(action.message)) {
+    return;
+  }
+
+  router.post(action.url, {}, {
+    preserveScroll: true,
+  });
+};
+
+const offerContractNumberPreview = computed(() => {
+  const raw = String(offerForm.contract_sequence ?? '').replace(/\D+/g, '');
+  if (!raw) return '-';
+
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = String(now.getFullYear());
+
+  return `${raw.padStart(5, '0')}/AGR/DP/${month}/${year}`;
+});
+
+const submitOffer = () => {
+  if (!offerAction.value?.url) {
+    return;
+  }
+
+  offerForm.post(offerAction.value.url, {
+    preserveScroll: true,
+  });
+};
+
+const approveLatestNegotiation = () => {
+  if (!approveLatestNegotiationAction.value?.url) {
+    return;
+  }
+
+  if (!window.confirm(approveLatestNegotiationAction.value.message)) {
+    return;
+  }
+
+  router.post(approveLatestNegotiationAction.value.url, {}, {
+    preserveScroll: true,
+  });
+};
+
+const verifyPayment = () => {
+  if (!paymentVerification.value?.action_url) {
+    return;
+  }
+
+  if (!window.confirm('Pembayaran sudah valid. Lanjutkan request ini ke proses valuasi?')) {
+    return;
+  }
+
+  router.post(paymentVerification.value.action_url, {}, {
+    preserveScroll: true,
+  });
+};
+
+const setRequestFile = (file) => {
+  requestFileForm.file = Array.isArray(file) ? (file[0] ?? null) : file;
+};
+
+const submitRequestFile = () => {
+  if (!requestFileForm.file) {
+    return;
+  }
+
+  requestFileForm.post(route('admin.appraisal-requests.files.store', record.value.id), {
+    preserveScroll: true,
+    forceFormData: true,
+    onSuccess: () => {
+      requestFileForm.reset('file');
+      requestFileForm.type = 'other_request_document';
+    },
+  });
+};
+
+const deleteRequestFile = (file) => {
+  if (!file?.can_delete) {
+    return;
+  }
+
+  if (!window.confirm(`Hapus file "${file.original_name}" dari request ini?`)) {
+    return;
+  }
+
+  router.delete(route('admin.appraisal-requests.files.destroy', [record.value.id, file.id]), {
+    preserveScroll: true,
+  });
+};
+
+const deleteAsset = (asset) => {
+  if (!asset?.destroy_url) {
+    return;
+  }
+
+  if (!window.confirm(`Hapus aset #${asset.order} dari request ini?`)) {
+    return;
+  }
+
+  router.delete(asset.destroy_url, {
+    preserveScroll: true,
+  });
+};
 </script>
 
 <template>
@@ -98,6 +269,17 @@ const paymentStatusLabel = (status) => {
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
+          <Button
+            v-for="action in availableActions"
+            :key="action.key"
+            :variant="action.variant"
+            @click="runAction(action)"
+          >
+            {{ action.label }}
+          </Button>
+          <Button variant="outline" as-child>
+            <Link :href="route('admin.appraisal-requests.edit', record.id)">Edit Dasar</Link>
+          </Button>
           <Button variant="outline" as-child>
             <Link :href="route('admin.appraisal-requests.index')">Kembali ke daftar</Link>
           </Button>
@@ -185,6 +367,47 @@ const paymentStatusLabel = (status) => {
               <CardDescription>File level request seperti kontrak bertanda tangan dan lampiran global.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-3">
+              <div class="rounded-2xl border bg-slate-50 p-4">
+                <div class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+                  <div class="space-y-2">
+                    <Label for="request_file_type">Tipe File</Label>
+                    <Select v-model="requestFileForm.type">
+                      <SelectTrigger id="request_file_type">
+                        <SelectValue placeholder="Pilih tipe file" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem
+                          v-for="option in requestFileTypeOptions"
+                          :key="option.value"
+                          :value="option.value"
+                        >
+                          {{ option.label }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p v-if="requestFileForm.errors.type" class="text-xs text-red-500">{{ requestFileForm.errors.type }}</p>
+                  </div>
+
+                  <div class="space-y-2">
+                    <Label>Upload File</Label>
+                    <BaseFileUpload
+                      label=""
+                      :multiple="false"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      :model-value="requestFileForm.file"
+                      @update:modelValue="setRequestFile"
+                    />
+                    <p v-if="requestFileForm.errors.file" class="text-xs text-red-500">{{ requestFileForm.errors.file }}</p>
+                  </div>
+                </div>
+
+                <div class="mt-4 flex justify-end">
+                  <Button type="button" :disabled="requestFileForm.processing || !requestFileForm.file" @click="submitRequestFile">
+                    Upload File Request
+                  </Button>
+                </div>
+              </div>
+
               <div v-for="file in requestFiles" :key="file.id" class="rounded-2xl border p-4">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -192,9 +415,14 @@ const paymentStatusLabel = (status) => {
                     <p class="mt-1 text-xs text-slate-500">{{ file.type_label }} - {{ file.size_label }}</p>
                     <p class="mt-1 text-xs text-slate-500">{{ file.mime || '-' }} - {{ formatDateTime(file.created_at) }}</p>
                   </div>
-                  <Button variant="outline" size="sm" as-child>
-                    <a :href="file.url" target="_blank" rel="noreferrer">Buka File</a>
-                  </Button>
+                  <div class="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" as-child>
+                      <a :href="file.url" target="_blank" rel="noreferrer">Buka File</a>
+                    </Button>
+                    <Button v-if="file.can_delete" type="button" variant="outline" size="sm" @click="deleteRequestFile(file)">
+                      Hapus
+                    </Button>
+                  </div>
                 </div>
               </div>
               <div v-if="!requestFiles.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
@@ -205,8 +433,15 @@ const paymentStatusLabel = (status) => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Aset Terkait</CardTitle>
-              <CardDescription>Ringkasan aset, metadata properti, dokumen, dan foto yang sebelumnya tersebar di relation manager Filament.</CardDescription>
+              <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <CardTitle>Aset Terkait</CardTitle>
+                  <CardDescription>Ringkasan aset, metadata properti, dokumen, dan foto yang sebelumnya tersebar di relation manager Filament.</CardDescription>
+                </div>
+                <Button v-if="assetCreateUrl" variant="outline" as-child>
+                  <Link :href="assetCreateUrl">Tambah Aset</Link>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent class="space-y-4">
               <div v-for="asset in assets" :key="asset.id" class="rounded-3xl border p-5">
@@ -220,9 +455,25 @@ const paymentStatusLabel = (status) => {
                       <span v-if="asset.asset_code">- Kode: {{ asset.asset_code }}</span>
                     </p>
                   </div>
-                  <div class="grid gap-2 text-right text-sm text-slate-600">
-                    <p>Range nilai: {{ formatCurrency(asset.estimated_value_low) }} - {{ formatCurrency(asset.estimated_value_high) }}</p>
-                    <p>Market value: {{ formatCurrency(asset.market_value_final) }}</p>
+                  <div class="space-y-3">
+                    <div class="grid gap-2 text-right text-sm text-slate-600">
+                      <p>Range nilai: {{ formatCurrency(asset.estimated_value_low) }} - {{ formatCurrency(asset.estimated_value_high) }}</p>
+                      <p>Market value: {{ formatCurrency(asset.market_value_final) }}</p>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <Button v-if="asset.edit_url" variant="outline" size="sm" as-child>
+                        <Link :href="asset.edit_url">Edit Aset</Link>
+                      </Button>
+                      <Button
+                        v-if="asset.destroy_url"
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        @click="deleteAsset(asset)"
+                      >
+                        Hapus
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -348,11 +599,104 @@ const paymentStatusLabel = (status) => {
             </CardContent>
           </Card>
 
+          <Card v-if="offerAction">
+            <CardHeader>
+              <CardTitle>{{ offerAction.label }}</CardTitle>
+              <CardDescription>{{ offerAction.description }}</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-5">
+              <div v-if="approveLatestNegotiationAction" class="rounded-2xl border bg-slate-50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Negosiasi User Terbaru</p>
+                <div class="mt-3 space-y-2 text-sm text-slate-700">
+                  <p>Harapan fee: {{ formatCurrency(approveLatestNegotiationAction.expected_fee) }}</p>
+                  <p>Putaran: {{ approveLatestNegotiationAction.round || '-' }}</p>
+                  <p>Catatan: {{ approveLatestNegotiationAction.reason || '-' }}</p>
+                </div>
+                <div class="mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    @click="approveLatestNegotiation"
+                  >
+                    {{ approveLatestNegotiationAction.label }}
+                  </Button>
+                </div>
+              </div>
+
+              <form class="space-y-5" @submit.prevent="submitOffer">
+                <div class="space-y-2">
+                  <Label for="offer_fee_total">Total Fee (Rp)</Label>
+                  <Input id="offer_fee_total" v-model="offerForm.fee_total" type="number" min="1" placeholder="15000000" />
+                  <p v-if="offerForm.errors.fee_total" class="text-xs text-red-500">{{ offerForm.errors.fee_total }}</p>
+                </div>
+
+                <div class="space-y-3">
+                  <Label>Skema DP</Label>
+                  <label class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm text-slate-700">
+                    <Checkbox v-model="offerForm.fee_has_dp" />
+                    <span>Gunakan DP</span>
+                  </label>
+                </div>
+
+                <div class="space-y-2" v-if="offerForm.fee_has_dp">
+                  <Label for="offer_fee_dp_percent">Persentase DP (%)</Label>
+                  <Input id="offer_fee_dp_percent" v-model="offerForm.fee_dp_percent" type="number" min="0" max="100" step="0.01" placeholder="50" />
+                  <p v-if="offerForm.errors.fee_dp_percent" class="text-xs text-red-500">{{ offerForm.errors.fee_dp_percent }}</p>
+                </div>
+
+                <div class="space-y-2">
+                  <Label for="offer_contract_sequence">No. Penawaran</Label>
+                  <Input id="offer_contract_sequence" v-model="offerForm.contract_sequence" type="number" min="1" placeholder="1" />
+                  <p v-if="offerForm.errors.contract_sequence" class="text-xs text-red-500">{{ offerForm.errors.contract_sequence }}</p>
+                </div>
+
+                <div class="space-y-2">
+                  <Label>Preview Nomor Penawaran</Label>
+                  <div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900">
+                    {{ offerContractNumberPreview }}
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <Label for="offer_validity_days">Masa Berlaku Penawaran</Label>
+                  <Input id="offer_validity_days" v-model="offerForm.offer_validity_days" type="number" min="1" placeholder="14" />
+                  <p v-if="offerForm.errors.offer_validity_days" class="text-xs text-red-500">{{ offerForm.errors.offer_validity_days }}</p>
+                </div>
+
+                <div class="flex justify-end">
+                  <Button type="submit" :disabled="offerForm.processing">
+                    {{ offerAction.label }}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Pembayaran</CardTitle>
             </CardHeader>
             <CardContent class="space-y-3">
+              <div
+                v-if="paymentVerification"
+                :class="[
+                  'rounded-2xl border p-4 text-sm',
+                  paymentVerification.ready
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                    : 'border-amber-200 bg-amber-50 text-amber-900',
+                ]"
+              >
+                <p class="font-medium">
+                  {{ paymentVerification.ready ? 'Siap Diverifikasi' : 'Belum Siap Diverifikasi' }}
+                </p>
+                <p class="mt-1">{{ paymentVerification.message || '-' }}</p>
+                <div class="mt-3" v-if="paymentVerification.action_url">
+                  <Button type="button" size="sm" @click="verifyPayment">
+                    Verifikasi Pembayaran
+                  </Button>
+                </div>
+              </div>
+
               <div v-for="payment in payments" :key="payment.id" class="rounded-2xl border p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div>

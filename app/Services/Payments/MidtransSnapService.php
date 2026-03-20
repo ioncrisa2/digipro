@@ -200,9 +200,7 @@ class MidtransSnapService
             'expired' => 'Kedaluwarsa',
             'rejected' => 'Ditolak',
             'refunded' => 'Refund',
-            default => $payment->method === 'manual' && filled($payment->proof_file_path)
-                ? 'Menunggu Verifikasi'
-                : 'Menunggu Pembayaran',
+            default => 'Menunggu Pembayaran',
         };
     }
 
@@ -213,7 +211,7 @@ class MidtransSnapService
         }
 
         if ($payment->method === 'manual') {
-            return 'Transfer Bank';
+            return 'Pembayaran Legacy';
         }
 
         $details = $this->gatewayDetailsFromMetadata(is_array($payment->metadata) ? $payment->metadata : []);

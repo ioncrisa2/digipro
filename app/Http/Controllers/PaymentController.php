@@ -44,7 +44,6 @@ class PaymentController extends Controller
             $payment = $record->payments->sortByDesc('id')->first();
             $gatewayDetails = $this->resolveGatewayDetails($payment);
             $invoiceNumber = $this->resolveInvoiceNumber($record, $payment);
-            $proofName = $payment?->proof_original_name;
 
             return [
                 'id' => $record->id,
@@ -57,29 +56,17 @@ class PaymentController extends Controller
                 'invoice_pdf_url' => route('appraisal.invoice.pdf', ['id' => $record->id]),
                 'due_date' => $this->resolveDueDate($payment, $record),
                 'method' => $this->resolvePaymentMethodLabel($payment),
-                'bank' => $payment?->method === 'manual'
-                    ? data_get($payment?->metadata, 'selected_bank_account.bank_name', '-')
-                    : ($gatewayDetails['bank'] ?? $gatewayDetails['label'] ?? '-'),
-                'va' => $payment?->method === 'manual'
-                    ? data_get($payment?->metadata, 'selected_bank_account.account_number', '-')
-                    : ($gatewayDetails['reference'] ?? '-'),
+                'bank' => $gatewayDetails['bank'] ?? $gatewayDetails['label'] ?? '-',
+                'va' => $gatewayDetails['reference'] ?? '-',
                 'updated_at' => optional($payment?->updated_at ?? $record->updated_at)->toDateString(),
                 'order_id' => $payment?->external_payment_id,
                 'gateway_details' => $gatewayDetails,
-                'documents' => array_values(array_filter([
-                    [
-                        'label' => 'Invoice Pembayaran',
-                        'name' => "{$invoiceNumber}.pdf",
-                        'type' => 'invoice',
-                        'size' => '-',
-                    ],
-                    $proofName ? [
-                        'label' => 'Bukti Pembayaran Manual',
-                        'name' => $proofName,
-                        'type' => 'receipt',
-                        'size' => $payment?->proof_size ? $this->formatBytes((int) $payment->proof_size) : '-',
-                    ] : null,
-                ])),
+                'documents' => [[
+                    'label' => 'Invoice Pembayaran',
+                    'name' => "{$invoiceNumber}.pdf",
+                    'type' => 'invoice',
+                    'size' => '-',
+                ]],
             ];
         })->values()->all();
 
@@ -130,7 +117,6 @@ class PaymentController extends Controller
                 ->route('appraisal.invoice.page', ['id' => $record->id]);
         }
 
-        $legacyManual = $payment?->method === 'manual' && $payment->status !== 'paid';
         $activeCheckout = $payment && $this->midtrans()->hasReusableSession($payment);
 
         return inertia('Penilaian/Payment', [
@@ -150,10 +136,7 @@ class PaymentController extends Controller
                 'create_session_url' => route('appraisal.payment.session', ['id' => $record->id]),
                 'configured' => filled($this->midtrans()->clientKey()) && filled($this->midtrans()->merchantId()),
             ],
-            'canStartCheckout' => ! $legacyManual && $status === AppraisalStatusEnum::ContractSigned->value,
-            'legacyManualMessage' => $legacyManual
-                ? 'Pembayaran lama menggunakan flow manual dan dipertahankan sebagai histori. Hubungi admin untuk tindak lanjut record lama ini.'
-                : null,
+            'canStartCheckout' => $status === AppraisalStatusEnum::ContractSigned->value,
         ]);
     }
 
@@ -175,12 +158,6 @@ class PaymentController extends Controller
             return response()->json([
                 'message' => 'Pembayaran sudah terverifikasi.',
                 'redirect_url' => route('appraisal.invoice.page', ['id' => $record->id]),
-            ], 409);
-        }
-
-        if ($latestPayment?->method === 'manual' && $latestPayment->status !== 'paid') {
-            return response()->json([
-                'message' => 'Request ini masih memiliki pembayaran manual historis dan tidak dimigrasikan otomatis ke Midtrans.',
             ], 409);
         }
 
@@ -443,7 +420,6 @@ class PaymentController extends Controller
             'checkout' => $checkout,
             'gateway_details' => $gatewayDetails,
             'metadata' => $metadata,
-            'is_legacy_manual' => $payment?->method === 'manual' && $payment->status !== 'paid',
         ];
     }
 

@@ -208,6 +208,9 @@ const summaryCards = [
                       <Button variant="outline" size="sm" as-child>
                         <Link :href="record.show_url">Detail</Link>
                       </Button>
+                      <Button variant="ghost" size="sm" as-child>
+                        <Link :href="route('admin.appraisal-requests.edit', record.id)">Edit</Link>
+                      </Button>
                       <Button v-if="record.legacy_url" variant="ghost" size="sm" as-child>
                         <a :href="record.legacy_url">Legacy Admin</a>
                       </Button>

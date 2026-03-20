@@ -210,7 +210,7 @@ class AppraisalService
                 'assets.files:id,appraisal_asset_id,type,path,original_name,mime,size,created_at',
                 'offerNegotiations:id,appraisal_request_id,user_id,action,round,offered_fee,expected_fee,selected_fee,reason,meta,created_at',
                 'offerNegotiations.user:id,name',
-                'payments:id,appraisal_request_id,amount,method,gateway,external_payment_id,status,paid_at,proof_file_path,proof_original_name,metadata,updated_at,created_at',
+                'payments:id,appraisal_request_id,amount,method,gateway,external_payment_id,status,paid_at,metadata,updated_at,created_at',
             ])
             ->findOrFail($id);
 
@@ -779,17 +779,6 @@ class AppraisalService
 
         $latestPayment = $record->payments->sortByDesc('id')->first();
         if ($latestPayment) {
-            $paymentSubmittedAt = data_get($latestPayment->metadata, 'submitted_at') ?? $latestPayment->updated_at;
-            if ($latestPayment->method === 'manual' && filled($latestPayment->proof_file_path)) {
-                $append(
-                    'payment_submitted',
-                    'Bukti Pembayaran Diunggah',
-                    'Bukti pembayaran berhasil diunggah dan menunggu verifikasi admin.',
-                    $paymentSubmittedAt,
-                    'payment'
-                );
-            }
-
             if ($latestPayment->method === 'gateway' && $latestPayment->status === 'pending') {
                 $append(
                     'payment_session_created',
@@ -804,22 +793,17 @@ class AppraisalService
                 $append(
                     'payment_verified',
                     'Pembayaran Terkonfirmasi',
-                    $latestPayment->method === 'gateway'
-                        ? 'Pembayaran berhasil dikonfirmasi Midtrans. Proses penilaian dimulai.'
-                        : 'Pembayaran telah dikonfirmasi admin. Proses penilaian dimulai.',
+                    'Pembayaran berhasil dikonfirmasi Midtrans. Proses penilaian dimulai.',
                     $latestPayment->paid_at ?? $latestPayment->updated_at,
                     'success'
                 );
             }
 
             if ($latestPayment->status === 'rejected') {
-                $reason = trim((string) data_get($latestPayment->metadata, 'admin_rejected_reason', ''));
                 $append(
                     'payment_rejected',
-                    'Bukti Pembayaran Ditolak',
-                    $reason !== ''
-                        ? "Admin menolak bukti pembayaran. Alasan: {$reason}"
-                        : 'Admin menolak bukti pembayaran. Silakan unggah ulang bukti yang valid.',
+                    'Pembayaran Ditolak',
+                    'Transaksi pembayaran ditolak oleh gateway atau tidak dapat diproses.',
                     data_get($latestPayment->metadata, 'admin_rejected_at') ?? $latestPayment->updated_at,
                     'danger'
                 );

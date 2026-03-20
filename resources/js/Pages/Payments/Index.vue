@@ -66,9 +66,6 @@ const statusMeta = (status) => {
   if (s.includes("kedaluwarsa")) {
     return { label: status, variant: "outline", icon: AlertTriangle, tone: "text-amber-700" };
   }
-  if (s.includes("menunggu verifikasi")) {
-    return { label: status, variant: "secondary", icon: AlertTriangle, tone: "text-amber-600" };
-  }
   if (s.includes("menunggu")) {
     return { label: status, variant: "secondary", icon: Clock, tone: "text-slate-500" };
   }
@@ -376,9 +373,6 @@ const downloadSelectedInvoices = () => {
               <Badge variant="secondary" class="gap-1">
                 <Clock class="h-3.5 w-3.5" /> Menunggu
               </Badge>
-              <Badge variant="secondary" class="gap-1">
-                <AlertTriangle class="h-3.5 w-3.5" /> Menunggu Verifikasi
-              </Badge>
             </div>
 
             <div class="flex items-center gap-2 text-xs text-slate-500">
@@ -543,7 +537,7 @@ const downloadSelectedInvoices = () => {
                         </div>
                       </div>
                       <div class="mt-3 text-xs text-slate-500">
-                        Dokumen: Invoice Pembayaran. Bukti upload hanya tersedia untuk histori manual lama.
+                        Dokumen: Invoice Pembayaran dan detail channel Midtrans.
                       </div>
                     </TableCell>
                   </TableRow>

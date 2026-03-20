@@ -8,14 +8,13 @@ import { useNotification } from "@/composables/useNotification";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CreditCard, RefreshCw, ShieldCheck, Wallet, Clock3, AlertTriangle } from "lucide-vue-next";
+import { ArrowLeft, CreditCard, RefreshCw, ShieldCheck, Wallet, Clock3 } from "lucide-vue-next";
 
 const props = defineProps({
     request: { type: Object, default: () => ({}) },
     payment: { type: Object, default: () => ({}) },
     midtrans: { type: Object, default: () => ({}) },
     canStartCheckout: { type: Boolean, default: false },
-    legacyManualMessage: { type: String, default: null },
 });
 
 const { notify } = useNotification();
@@ -74,7 +73,6 @@ const canPayNow = computed(() => {
     return Boolean(
         props.canStartCheckout &&
             props.midtrans?.configured &&
-            !paymentState.value?.is_legacy_manual &&
             !payLoading.value &&
             !switchMethodLoading.value
     );
@@ -86,7 +84,6 @@ const canSwitchMethod = computed(() => {
             props.midtrans?.configured &&
             paymentState.value?.status === "pending" &&
             paymentState.value?.checkout?.snap_token &&
-            !paymentState.value?.is_legacy_manual &&
             !payLoading.value &&
             !switchMethodLoading.value
     );
@@ -251,14 +248,7 @@ const startCheckout = async ({ forceNewAttempt = false } = {}) => {
                 </CardHeader>
                 <CardContent class="space-y-4">
                     <div
-                        v-if="legacyManualMessage"
-                        class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
-                    >
-                        {{ legacyManualMessage }}
-                    </div>
-
-                    <div
-                        v-else-if="!midtrans?.configured"
+                        v-if="!midtrans?.configured"
                         class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
                     >
                         Konfigurasi Midtrans belum lengkap. Isi credential sandbox/production di environment aplikasi.
@@ -342,18 +332,6 @@ const startCheckout = async ({ forceNewAttempt = false } = {}) => {
                         </p>
                     </div>
 
-                    <div
-                        v-if="paymentState.is_legacy_manual"
-                        class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
-                    >
-                        <div class="flex items-center gap-2 font-medium">
-                            <AlertTriangle class="h-4 w-4" />
-                            Record manual historis
-                        </div>
-                        <p class="mt-1 text-xs text-amber-800">
-                            Request ini masih memiliki pembayaran manual lama dan tidak dibuka ulang ke Midtrans secara otomatis.
-                        </p>
-                    </div>
                 </CardContent>
             </Card>
         </div>

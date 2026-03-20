@@ -49,11 +49,15 @@ class PaymentResource extends Resource
 
                         Select::make('method')
                             ->label('Metode')
-                            ->options([
-                                'manual' => 'Transfer Manual',
-                                'gateway' => 'Payment Gateway',
-                            ])
-                            ->default('manual')
+                            ->options(fn (?Payment $record) => $record && $record->method === 'manual'
+                                ? [
+                                    'manual' => 'Pembayaran Legacy',
+                                    'gateway' => 'Midtrans Gateway',
+                                ]
+                                : [
+                                    'gateway' => 'Midtrans Gateway',
+                                ])
+                            ->default('gateway')
                             ->required()
                             ->live(),
 
@@ -141,7 +145,7 @@ class PaymentResource extends Resource
 
                 Tables\Columns\TextColumn::make('method')
                     ->label('Metode')
-                    ->formatStateUsing(fn ($state) => $state === 'gateway' ? 'Gateway' : 'Manual'),
+                    ->formatStateUsing(fn ($state) => $state === 'gateway' ? 'Midtrans Gateway' : 'Pembayaran Legacy'),
 
                 Tables\Columns\TextColumn::make('gateway')
                     ->label('Gateway')

@@ -60,6 +60,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->group(function (): void {
                     Route::get('/', [AdminController::class, 'appraisalRequestsIndex'])->name('index');
                     Route::get('/{appraisalRequest}', [AdminController::class, 'appraisalRequestsShow'])->name('show');
+                    Route::get('/{appraisalRequest}/edit', [AdminController::class, 'appraisalRequestsEdit'])->name('edit');
+                    Route::put('/{appraisalRequest}', [AdminController::class, 'appraisalRequestsUpdate'])->name('update');
+                    Route::get('/{appraisalRequest}/assets/create', [AdminController::class, 'appraisalRequestAssetCreate'])->name('assets.create');
+                    Route::post('/{appraisalRequest}/assets', [AdminController::class, 'storeAppraisalRequestAsset'])->name('assets.store');
+                    Route::get('/{appraisalRequest}/assets/{asset}/edit', [AdminController::class, 'appraisalRequestAssetEdit'])->name('assets.edit');
+                    Route::put('/{appraisalRequest}/assets/{asset}', [AdminController::class, 'updateAppraisalRequestAsset'])->name('assets.update');
+                    Route::delete('/{appraisalRequest}/assets/{asset}', [AdminController::class, 'destroyAppraisalRequestAsset'])->name('assets.destroy');
+                    Route::post('/{appraisalRequest}/verify-docs', [AdminController::class, 'verifyDocs'])->name('actions.verify-docs');
+                    Route::post('/{appraisalRequest}/docs-incomplete', [AdminController::class, 'markDocsIncomplete'])->name('actions.docs-incomplete');
+                    Route::post('/{appraisalRequest}/contract-signed', [AdminController::class, 'markContractSigned'])->name('actions.contract-signed');
+                    Route::post('/{appraisalRequest}/verify-payment', [AdminController::class, 'verifyPayment'])->name('actions.verify-payment');
+                    Route::post('/{appraisalRequest}/send-offer', [AdminController::class, 'sendOffer'])->name('actions.send-offer');
+                    Route::post('/{appraisalRequest}/approve-latest-negotiation', [AdminController::class, 'approveLatestNegotiation'])->name('actions.approve-latest-negotiation');
+                    Route::post('/{appraisalRequest}/files', [AdminController::class, 'storeRequestFile'])->name('files.store');
+                    Route::delete('/{appraisalRequest}/files/{file}', [AdminController::class, 'destroyRequestFile'])->name('files.destroy');
                 });
             Route::get('/modul/{module}', [AdminController::class, 'moduleShow'])->name('modules.show');
         });

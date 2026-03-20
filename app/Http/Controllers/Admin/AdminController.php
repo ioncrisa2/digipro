@@ -4,13 +4,22 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\AppraisalStatusEnum;
 use App\Enums\AssetTypeEnum;
+use App\Enums\ContractStatusEnum;
+use App\Enums\ReportTypeEnum;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreAppraisalRequestFileRequest;
+use App\Http\Requests\Admin\StoreAppraisalOfferRequest;
+use App\Http\Requests\Admin\UpsertAppraisalAssetRequest;
+use App\Http\Requests\Admin\UpdateAppraisalRequestBasicRequest;
 use App\Models\AppraisalAsset;
+use App\Models\AppraisalRequestFile;
 use App\Models\AppraisalRequest;
 use App\Models\District;
 use App\Models\Province;
 use App\Models\Regency;
 use App\Models\Village;
+use App\Services\Admin\AppraisalContractNumberService;
+use App\Services\Admin\AppraisalRequestWorkflowService;
 use App\Support\AppraisalAssetFieldOptions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -186,7 +195,10 @@ class AdminController extends Controller
         ]);
     }
 
-    public function appraisalRequestsShow(AppraisalRequest $appraisalRequest): Response
+    public function appraisalRequestsShow(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    ): Response
     {
         $appraisalRequest->load([
             'guidelineSet',
@@ -233,6 +245,10 @@ class AdminController extends Controller
                 'name' => $appraisalRequest->user?->name ?? '-',
                 'email' => $appraisalRequest->user?->email ?? '-',
             ],
+            'availableActions' => $this->buildAvailableActions($appraisalRequest, $workflowService),
+            'offerAction' => $this->buildOfferAction($appraisalRequest, $workflowService),
+            'approveLatestNegotiationAction' => $this->buildApproveLatestNegotiationAction($appraisalRequest, $workflowService),
+            'paymentVerification' => $this->buildPaymentVerification($appraisalRequest, $workflowService),
             'requestFiles' => $appraisalRequest->files
                 ->map(fn ($file) => $this->transformRequestFile($file))
                 ->values(),
@@ -241,6 +257,7 @@ class AdminController extends Controller
                 ->values()
                 ->map(fn ($asset, $index) => $this->transformAsset($asset, $index + 1, $locationMaps))
                 ->values(),
+            'assetCreateUrl' => route('admin.appraisal-requests.assets.create', $appraisalRequest),
             'payments' => $appraisalRequest->payments->map(fn ($payment) => [
                 'id' => $payment->id,
                 'amount' => (int) $payment->amount,
@@ -261,8 +278,282 @@ class AdminController extends Controller
                 'reason' => $negotiation->reason,
                 'created_at' => $negotiation->created_at?->toIso8601String(),
             ])->values(),
+            'requestFileTypeOptions' => $this->requestFileTypeOptions(),
             'legacyPanelUrl' => url('/legacy-admin'),
         ]);
+    }
+
+    public function appraisalRequestsEdit(AppraisalRequest $appraisalRequest): Response
+    {
+        return inertia('Admin/AppraisalRequests/Edit', [
+            'record' => [
+                'id' => $appraisalRequest->id,
+                'request_number' => $appraisalRequest->request_number ?? ('REQ-' . $appraisalRequest->id),
+                'client_name' => $appraisalRequest->client_name,
+                'report_type' => $appraisalRequest->report_type?->value ?? $appraisalRequest->report_type,
+                'contract_sequence' => $appraisalRequest->contract_sequence,
+                'contract_number' => $appraisalRequest->contract_number,
+                'contract_date' => $appraisalRequest->contract_date?->toDateString(),
+                'contract_status' => $appraisalRequest->contract_status?->value ?? $appraisalRequest->contract_status,
+                'valuation_duration_days' => $appraisalRequest->valuation_duration_days,
+                'offer_validity_days' => $appraisalRequest->offer_validity_days,
+                'fee_total' => $appraisalRequest->fee_total,
+                'fee_has_dp' => (bool) $appraisalRequest->fee_has_dp,
+                'fee_dp_percent' => $appraisalRequest->fee_dp_percent,
+                'user_request_note' => $appraisalRequest->user_request_note,
+                'notes' => $appraisalRequest->notes,
+            ],
+            'contractStatusOptions' => array_map(
+                fn (ContractStatusEnum $status) => [
+                    'value' => $status->value,
+                    'label' => $status->label(),
+                ],
+                ContractStatusEnum::cases()
+            ),
+            'reportTypeOptions' => array_map(
+                fn (ReportTypeEnum $type) => [
+                    'value' => $type->value,
+                    'label' => $type->label(),
+                ],
+                ReportTypeEnum::cases()
+            ),
+            'legacyPanelUrl' => url('/legacy-admin'),
+        ]);
+    }
+
+    public function appraisalRequestsUpdate(
+        UpdateAppraisalRequestBasicRequest $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalContractNumberService $contractNumberService
+    ) {
+        $validated = $request->validated();
+        $contractMeta = $contractNumberService->deriveMetadata($validated['contract_sequence'] ?? null);
+        $contractDate = $this->blankToNull($validated['contract_date'] ?? null);
+        $contractStatus = array_key_exists('contract_status', $validated)
+            ? ($this->blankToNull($validated['contract_status']) ?? ContractStatusEnum::None->value)
+            : ($appraisalRequest->contract_status?->value ?? $appraisalRequest->contract_status ?? ContractStatusEnum::None->value);
+
+        if (($validated['contract_sequence'] ?? null) && $contractDate === null) {
+            $contractDate = now()->toDateString();
+        }
+
+        $appraisalRequest->update([
+            'client_name' => $this->blankToNull($validated['client_name'] ?? null),
+            'report_type' => $this->blankToNull($validated['report_type'] ?? null),
+            'contract_sequence' => $this->blankToNull($validated['contract_sequence'] ?? null),
+            'contract_number' => $contractMeta['contract_number'],
+            'contract_office_code' => $contractMeta['contract_office_code'],
+            'contract_month' => $contractMeta['contract_month'],
+            'contract_year' => $contractMeta['contract_year'],
+            'contract_date' => $contractDate,
+            'contract_status' => $contractStatus,
+            'valuation_duration_days' => $this->blankToNull($validated['valuation_duration_days'] ?? null),
+            'offer_validity_days' => $this->blankToNull($validated['offer_validity_days'] ?? null),
+            'fee_total' => $this->blankToNull($validated['fee_total'] ?? null),
+            'fee_has_dp' => (bool) ($validated['fee_has_dp'] ?? false),
+            'fee_dp_percent' => ($validated['fee_has_dp'] ?? false)
+                ? $this->blankToNull($validated['fee_dp_percent'] ?? null)
+                : null,
+            'user_request_note' => $this->blankToNull($validated['user_request_note'] ?? null),
+            'notes' => $this->blankToNull($validated['notes'] ?? null),
+        ]);
+
+        return redirect()
+            ->route('admin.appraisal-requests.show', $appraisalRequest)
+            ->with('success', 'Informasi dasar request berhasil diperbarui.');
+    }
+
+    public function appraisalRequestAssetCreate(Request $request, AppraisalRequest $appraisalRequest): Response
+    {
+        return inertia('Admin/AppraisalRequests/AssetForm', $this->buildAssetEditorProps($request, $appraisalRequest));
+    }
+
+    public function appraisalRequestAssetEdit(
+        Request $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalAsset $asset
+    ): Response {
+        $this->ensureAssetBelongsToRequest($appraisalRequest, $asset);
+
+        return inertia('Admin/AppraisalRequests/AssetForm', $this->buildAssetEditorProps($request, $appraisalRequest, $asset));
+    }
+
+    public function storeAppraisalRequestAsset(
+        UpsertAppraisalAssetRequest $request,
+        AppraisalRequest $appraisalRequest
+    )
+    {
+        $asset = $appraisalRequest->assets()->create($this->assetPayload($request->validated()));
+
+        return redirect()
+            ->route('admin.appraisal-requests.show', $appraisalRequest)
+            ->with('success', "Aset #{$asset->id} berhasil ditambahkan.");
+    }
+
+    public function updateAppraisalRequestAsset(
+        UpsertAppraisalAssetRequest $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalAsset $asset
+    )
+    {
+        $this->ensureAssetBelongsToRequest($appraisalRequest, $asset);
+
+        $asset->update($this->assetPayload($request->validated()));
+
+        return redirect()
+            ->route('admin.appraisal-requests.show', $appraisalRequest)
+            ->with('success', 'Data aset berhasil diperbarui.');
+    }
+
+    public function destroyAppraisalRequestAsset(
+        AppraisalRequest $appraisalRequest,
+        AppraisalAsset $asset
+    )
+    {
+        $this->ensureAssetBelongsToRequest($appraisalRequest, $asset);
+
+        foreach ($asset->files as $file) {
+            Storage::disk('public')->delete($file->path);
+        }
+
+        $asset->delete();
+
+        return back()->with('success', 'Aset berhasil dihapus.');
+    }
+
+    public function sendOffer(
+        StoreAppraisalOfferRequest $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    )
+    {
+        try {
+            $result = $workflowService->sendOffer(
+                $appraisalRequest,
+                (int) $request->user()->id,
+                $request->validated()
+            );
+
+            $message = $result['action'] === 'offer_revised'
+                ? 'Counter offer berhasil dikirim.'
+                : 'Penawaran berhasil dikirim.';
+
+            return back()->with('success', $message);
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+    }
+
+    public function approveLatestNegotiation(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService,
+        Request $request
+    )
+    {
+        try {
+            $workflowService->approveLatestNegotiation($appraisalRequest, (int) $request->user()->id);
+
+            return back()->with('success', 'Harapan fee user disetujui dan counter offer berhasil dikirim.');
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+    }
+
+    public function verifyDocs(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    )
+    {
+        try {
+            $workflowService->verifyDocs($appraisalRequest);
+
+            return back()->with('success', 'Dokumen berhasil diverifikasi. Request masuk ke tahap menunggu penawaran.');
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+    }
+
+    public function markDocsIncomplete(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    )
+    {
+        try {
+            $workflowService->markDocsIncomplete($appraisalRequest);
+
+            return back()->with('success', 'Request berhasil ditandai dokumen kurang.');
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+    }
+
+    public function markContractSigned(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    )
+    {
+        try {
+            $workflowService->markContractSigned($appraisalRequest);
+
+            return back()->with('success', 'Status kontrak berhasil diperbarui menjadi ditandatangani.');
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+    }
+
+    public function verifyPayment(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    )
+    {
+        try {
+            $workflowService->verifyPayment($appraisalRequest);
+
+            return back()->with('success', 'Pembayaran terverifikasi. Request masuk ke proses valuasi.');
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+    }
+
+    public function storeRequestFile(
+        StoreAppraisalRequestFileRequest $request,
+        AppraisalRequest $appraisalRequest
+    )
+    {
+        $validated = $request->validated();
+        $file = $request->file('file');
+        $storedPath = $file->storeAs(
+            "appraisal-requests/{$appraisalRequest->id}/request-files",
+            now()->format('YmdHis') . '-' . uniqid() . '.' . $file->getClientOriginalExtension(),
+            'public'
+        );
+
+        $appraisalRequest->files()->create([
+            'type' => $validated['type'],
+            'path' => $storedPath,
+            'original_name' => $file->getClientOriginalName(),
+            'mime' => $file->getMimeType(),
+            'size' => $file->getSize(),
+        ]);
+
+        return back()->with('success', 'File request berhasil diunggah.');
+    }
+
+    public function destroyRequestFile(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestFile $file
+    )
+    {
+        abort_unless((int) $file->appraisal_request_id === (int) $appraisalRequest->id, 404);
+
+        if ($file->type === 'contract_signed_pdf') {
+            return back()->with('error', 'File kontrak tertandatangani tidak bisa dihapus dari workspace admin Vue.');
+        }
+
+        Storage::disk('public')->delete($file->path);
+        $file->delete();
+
+        return back()->with('success', 'File request berhasil dihapus.');
     }
 
     public function moduleShow(string $module): Response
@@ -362,6 +653,7 @@ class AdminController extends Controller
             'id' => $file->id,
             'type' => (string) $file->type,
             'type_label' => $this->requestFileTypeLabel($file->type),
+            'can_delete' => (string) $file->type !== 'contract_signed_pdf',
             'original_name' => $file->original_name ?: basename((string) $file->path),
             'mime' => $file->mime,
             'size' => (int) ($file->size ?? 0),
@@ -408,6 +700,8 @@ class AdminController extends Controller
             'market_value_final' => $asset->market_value_final,
             'estimated_value_low' => $asset->estimated_value_low,
             'estimated_value_high' => $asset->estimated_value_high,
+            'edit_url' => route('admin.appraisal-requests.assets.edit', [$asset->appraisal_request_id, $asset]),
+            'destroy_url' => route('admin.appraisal-requests.assets.destroy', [$asset->appraisal_request_id, $asset]),
             'documents' => $files
                 ->whereIn('type', ['doc_pbb', 'doc_imb', 'doc_certs'])
                 ->map(fn ($file) => $this->transformAssetFile($file))
@@ -457,6 +751,10 @@ class AdminController extends Controller
     {
         return match ((string) $type) {
             'contract_signed_pdf' => 'PDF Kontrak Ditandatangani',
+            'npwp' => 'NPWP',
+            'representative' => 'Surat Kuasa',
+            'permission' => 'Surat Izin',
+            'other_request_document' => 'Lampiran Request',
             default => Arr::headline((string) $type),
         };
     }
@@ -506,6 +804,242 @@ class AdminController extends Controller
         }
 
         return $cards;
+    }
+
+    private function blankToNull(mixed $value): mixed
+    {
+        return is_string($value) && trim($value) === '' ? null : $value;
+    }
+
+    private function buildAssetEditorProps(
+        Request $request,
+        AppraisalRequest $appraisalRequest,
+        ?AppraisalAsset $asset = null
+    ): array {
+        $provinceId = $this->blankToNull($request->query('province_id', $asset?->province_id));
+        $regencyId = $this->blankToNull($request->query('regency_id', $asset?->regency_id));
+        $districtId = $this->blankToNull($request->query('district_id', $asset?->district_id));
+
+        return [
+            'mode' => $asset ? 'edit' : 'create',
+            'requestRecord' => [
+                'id' => $appraisalRequest->id,
+                'request_number' => $appraisalRequest->request_number ?? ('REQ-' . $appraisalRequest->id),
+                'show_url' => route('admin.appraisal-requests.show', $appraisalRequest),
+                'legacy_url' => $this->legacyAppraisalRequestUrl($appraisalRequest),
+            ],
+            'record' => $this->assetFormRecord($asset),
+            'assetTypeOptions' => [
+                ['value' => AssetTypeEnum::TANAH->value, 'label' => AssetTypeEnum::TANAH->label()],
+                ['value' => AssetTypeEnum::TANAH_BANGUNAN->value, 'label' => AssetTypeEnum::TANAH_BANGUNAN->label()],
+            ],
+            'usageOptions' => AppraisalAssetFieldOptions::usageOptions(),
+            'titleDocumentOptions' => AppraisalAssetFieldOptions::titleDocumentOptions(),
+            'landShapeOptions' => AppraisalAssetFieldOptions::landShapeOptions(),
+            'landPositionOptions' => AppraisalAssetFieldOptions::landPositionOptions(),
+            'landConditionOptions' => AppraisalAssetFieldOptions::landConditionOptions(),
+            'topographyOptions' => AppraisalAssetFieldOptions::topographyOptions(),
+            'provinces' => Province::query()->select(['id', 'name'])->orderBy('name')->get()->values(),
+            'regencies' => $provinceId
+                ? Regency::query()->select(['id', 'name'])->where('province_id', $provinceId)->orderBy('name')->get()->values()
+                : [],
+            'districts' => $regencyId
+                ? District::query()->select(['id', 'name'])->where('regency_id', $regencyId)->orderBy('name')->get()->values()
+                : [],
+            'villages' => $districtId
+                ? Village::query()->select(['id', 'name'])->where('district_id', $districtId)->orderBy('name')->get()->values()
+                : [],
+            'legacyPanelUrl' => url('/legacy-admin'),
+        ];
+    }
+
+    private function assetFormRecord(?AppraisalAsset $asset): array
+    {
+        return [
+            'id' => $asset?->id,
+            'asset_code' => $asset?->asset_code,
+            'asset_type' => $asset?->asset_type,
+            'peruntukan' => $asset?->peruntukan,
+            'title_document' => $asset?->title_document,
+            'land_shape' => $asset?->land_shape,
+            'land_position' => $asset?->land_position,
+            'land_condition' => $asset?->land_condition,
+            'topography' => $asset?->topography,
+            'province_id' => $asset?->province_id,
+            'regency_id' => $asset?->regency_id,
+            'district_id' => $asset?->district_id,
+            'village_id' => $asset?->village_id,
+            'address' => $asset?->address,
+            'maps_link' => $asset?->maps_link,
+            'coordinates_lat' => $asset?->coordinates_lat,
+            'coordinates_lng' => $asset?->coordinates_lng,
+            'land_area' => $asset?->land_area,
+            'building_area' => $asset?->building_area,
+            'building_floors' => $asset?->building_floors,
+            'build_year' => $asset?->build_year,
+            'renovation_year' => $asset?->renovation_year,
+            'frontage_width' => $asset?->frontage_width,
+            'access_road_width' => $asset?->access_road_width,
+        ];
+    }
+
+    private function assetPayload(array $validated): array
+    {
+        return [
+            'asset_code' => $this->blankToNull($validated['asset_code'] ?? null),
+            'asset_type' => $validated['asset_type'],
+            'peruntukan' => $this->blankToNull($validated['peruntukan'] ?? null),
+            'title_document' => $this->blankToNull($validated['title_document'] ?? null),
+            'land_shape' => $this->blankToNull($validated['land_shape'] ?? null),
+            'land_position' => $this->blankToNull($validated['land_position'] ?? null),
+            'land_condition' => $this->blankToNull($validated['land_condition'] ?? null),
+            'topography' => $this->blankToNull($validated['topography'] ?? null),
+            'province_id' => $this->blankToNull($validated['province_id'] ?? null),
+            'regency_id' => $this->blankToNull($validated['regency_id'] ?? null),
+            'district_id' => $this->blankToNull($validated['district_id'] ?? null),
+            'village_id' => $this->blankToNull($validated['village_id'] ?? null),
+            'address' => $this->blankToNull($validated['address'] ?? null),
+            'maps_link' => $this->blankToNull($validated['maps_link'] ?? null),
+            'coordinates_lat' => $this->blankToNull($validated['coordinates_lat'] ?? null),
+            'coordinates_lng' => $this->blankToNull($validated['coordinates_lng'] ?? null),
+            'land_area' => $this->blankToNull($validated['land_area'] ?? null),
+            'building_area' => $this->blankToNull($validated['building_area'] ?? null),
+            'building_floors' => $this->blankToNull($validated['building_floors'] ?? null),
+            'build_year' => $this->blankToNull($validated['build_year'] ?? null),
+            'renovation_year' => $this->blankToNull($validated['renovation_year'] ?? null),
+            'frontage_width' => $this->blankToNull($validated['frontage_width'] ?? null),
+            'access_road_width' => $this->blankToNull($validated['access_road_width'] ?? null),
+        ];
+    }
+
+    private function ensureAssetBelongsToRequest(AppraisalRequest $appraisalRequest, AppraisalAsset $asset): void
+    {
+        abort_unless((int) $asset->appraisal_request_id === (int) $appraisalRequest->id, 404);
+    }
+
+    private function buildAvailableActions(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    ): array {
+        $actions = [];
+
+        if ($workflowService->canVerifyDocs($appraisalRequest)) {
+            $actions[] = [
+                'key' => 'verify-docs',
+                'label' => 'Verifikasi Dokumen',
+                'variant' => 'default',
+                'message' => 'Lanjutkan request ini ke tahap menunggu penawaran?',
+                'url' => route('admin.appraisal-requests.actions.verify-docs', $appraisalRequest),
+            ];
+        }
+
+        if ($workflowService->canMarkDocsIncomplete($appraisalRequest)) {
+            $actions[] = [
+                'key' => 'docs-incomplete',
+                'label' => 'Tandai Dokumen Kurang',
+                'variant' => 'outline',
+                'message' => 'Tandai request ini sebagai dokumen kurang?',
+                'url' => route('admin.appraisal-requests.actions.docs-incomplete', $appraisalRequest),
+            ];
+        }
+
+        if ($workflowService->canMarkContractSigned($appraisalRequest)) {
+            $actions[] = [
+                'key' => 'contract-signed',
+                'label' => 'Kontrak Ditandatangani',
+                'variant' => 'default',
+                'message' => 'Ubah status request ini menjadi kontrak ditandatangani?',
+                'url' => route('admin.appraisal-requests.actions.contract-signed', $appraisalRequest),
+            ];
+        }
+
+        if ($workflowService->canVerifyPayment($appraisalRequest)) {
+            $actions[] = [
+                'key' => 'verify-payment',
+                'label' => 'Verifikasi Pembayaran',
+                'variant' => 'default',
+                'message' => 'Pembayaran sudah valid. Lanjutkan request ini ke proses valuasi?',
+                'url' => route('admin.appraisal-requests.actions.verify-payment', $appraisalRequest),
+            ];
+        }
+
+        return $actions;
+    }
+
+    private function buildOfferAction(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    ): ?array {
+        if (! $workflowService->canSendOffer($appraisalRequest)) {
+            return null;
+        }
+
+        $defaults = $workflowService->resolveOfferDefaults($appraisalRequest);
+        $statusValue = $appraisalRequest->status?->value ?? $appraisalRequest->status;
+
+        return [
+            'label' => $statusValue === AppraisalStatusEnum::WaitingOffer->value
+                ? 'Kirim Counter Offer'
+                : 'Kirim Penawaran',
+            'description' => $statusValue === AppraisalStatusEnum::WaitingOffer->value
+                ? 'Gunakan form ini untuk merespons negosiasi user dengan penawaran revisi.'
+                : 'Gunakan form ini untuk mengirim penawaran awal ke user.',
+            'url' => route('admin.appraisal-requests.actions.send-offer', $appraisalRequest),
+            'defaults' => $defaults,
+        ];
+    }
+
+    private function buildApproveLatestNegotiationAction(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    ): ?array {
+        if (! $workflowService->canApproveLatestNegotiation($appraisalRequest)) {
+            return null;
+        }
+
+        $latestCounter = $workflowService->latestCounterRequest($appraisalRequest);
+
+        if ($latestCounter === null) {
+            return null;
+        }
+
+        return [
+            'label' => 'Setujui Harapan Fee User',
+            'message' => 'Fee akan mengikuti harapan fee terbaru dari user dan counter offer langsung dikirim. Lanjutkan?',
+            'url' => route('admin.appraisal-requests.actions.approve-latest-negotiation', $appraisalRequest),
+            'expected_fee' => $latestCounter->expected_fee,
+            'round' => $latestCounter->round,
+            'reason' => $latestCounter->reason,
+        ];
+    }
+
+    private function buildPaymentVerification(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    ): ?array {
+        $state = $workflowService->paymentVerificationState($appraisalRequest);
+
+        if (! ($state['show'] ?? false)) {
+            return null;
+        }
+
+        return [
+            'ready' => (bool) ($state['ready'] ?? false),
+            'message' => $state['message'] ?? null,
+            'action_url' => $workflowService->canVerifyPayment($appraisalRequest)
+                ? route('admin.appraisal-requests.actions.verify-payment', $appraisalRequest)
+                : null,
+        ];
+    }
+
+    private function requestFileTypeOptions(): array
+    {
+        return [
+            ['value' => 'npwp', 'label' => 'NPWP'],
+            ['value' => 'representative', 'label' => 'Surat Kuasa'],
+            ['value' => 'permission', 'label' => 'Surat Izin'],
+            ['value' => 'other_request_document', 'label' => 'Lampiran Request'],
+        ];
     }
 
     private function moduleStatusLabel(string $status): string
