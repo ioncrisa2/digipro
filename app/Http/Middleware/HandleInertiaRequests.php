@@ -50,6 +50,9 @@ class HandleInertiaRequests extends Middleware
                     'avatar_url' => $request->user()->avatar_url
                         ? Storage::disk('public')->url($request->user()->avatar_url)
                         : null,
+                    'roles' => $request->user()->getRoleNames()->values()->all(),
+                    'is_admin' => $request->user()->hasAdminAccess(),
+                    'is_reviewer' => $request->user()->isReviewer(),
                     'two_factor_enabled' => ! is_null($request->user()->two_factor_secret),
                     'two_factor_confirmed_at' => $request->user()->two_factor_confirmed_at
                         ? $request->user()->two_factor_confirmed_at->toDateTimeString()

@@ -232,7 +232,7 @@ class AppraisalRequestService
             if ($adminUsers->isNotEmpty()) {
                 $requestNumber = $appraisalRequest->request_number ?? ('#' . $appraisalRequest->id);
                 $creatorName = $request->user()?->name ?? 'User';
-                $url = route('filament.admin.resources.appraisal-requests.view', ['record' => $appraisalRequest->id]);
+                $url = route('admin.appraisal-requests.show', ['appraisalRequest' => $appraisalRequest->id]);
 
                 FilamentNotification::make()
                     ->title('Permohonan penilaian baru')

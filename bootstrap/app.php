@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Application;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsureNotReviewerRole;
 use App\Http\Middleware\EnsureReviewerRole;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'admin.role' => EnsureAdminRole::class,
             'not.reviewer' => EnsureNotReviewerRole::class,
             'reviewer.role' => EnsureReviewerRole::class,
         ]);

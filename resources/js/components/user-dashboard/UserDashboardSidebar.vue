@@ -42,6 +42,11 @@ defineProps({
 });
 
 const year = new Date().getFullYear();
+
+const resolveHref = (item) => {
+  if (item.href) return item.href;
+  return route(item.routeName, item.routeParams ?? {});
+};
 </script>
 
 <template>
@@ -77,8 +82,8 @@ const year = new Date().getFullYear();
     <nav class="flex-1 overflow-y-auto py-4 space-y-1">
       <Link
         v-for="item in navItems"
-        :key="item.routeName"
-        :href="route(item.routeName)"
+        :key="item.key ?? item.routeName"
+        :href="resolveHref(item)"
         :title="sidebarCollapsed ? item.label : ''"
         class="flex items-center text-sm rounded-md mx-2 transition-colors"
         :class="[

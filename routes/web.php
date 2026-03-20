@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\AppraisalController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\PaymentController;
@@ -48,6 +49,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/notifications/read-all', [UserNotificationController::class, 'readAll'])->name('notifications.readAll');
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    Route::prefix('admin')
+        ->name('admin.')
+        ->middleware('admin.role')
+        ->group(function (): void {
+            Route::get('/', [AdminController::class, 'dashboard'])->name('dashboard');
+            Route::prefix('permohonan-penilaian')
+                ->name('appraisal-requests.')
+                ->group(function (): void {
+                    Route::get('/', [AdminController::class, 'appraisalRequestsIndex'])->name('index');
+                    Route::get('/{appraisalRequest}', [AdminController::class, 'appraisalRequestsShow'])->name('show');
+                });
+            Route::get('/modul/{module}', [AdminController::class, 'moduleShow'])->name('modules.show');
+        });
 
     Route::middleware('not.reviewer')->group(function (): void {
         // user dashboard route

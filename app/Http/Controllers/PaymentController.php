@@ -754,7 +754,7 @@ class PaymentController extends Controller
         $targetUrl = null;
         if ($appraisal?->id) {
             try {
-                $targetUrl = route('filament.admin.resources.appraisal-requests.view', ['record' => $appraisal->id]);
+                $targetUrl = route('admin.appraisal-requests.show', ['appraisalRequest' => $appraisal->id]);
             } catch (\Throwable) {
                 $targetUrl = null;
             }

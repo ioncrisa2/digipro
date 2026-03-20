@@ -59,6 +59,23 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->avatar_url ? Storage::url($this->avatar_url) : null ;
     }
 
+    public function hasAdminAccess(): bool
+    {
+        $roles = array_values(array_filter([
+            config('filament-shield.super_admin.enabled', true)
+                ? config('filament-shield.super_admin.name', 'super_admin')
+                : null,
+            'admin',
+        ]));
+
+        return ! empty($roles) && $this->hasAnyRole($roles);
+    }
+
+    public function isReviewer(): bool
+    {
+        return $this->hasRole('Reviewer');
+    }
+
     // public function sendPasswordResetNotification($token): void
     // {
     //     $this->notify(new ResetPasswordNotification($token));

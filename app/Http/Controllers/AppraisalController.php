@@ -534,7 +534,7 @@ class AppraisalController extends Controller
             return;
         }
 
-        $url = route('filament.admin.resources.appraisal-requests.view', ['record' => $record->id]);
+        $url = route('admin.appraisal-requests.show', ['appraisalRequest' => $record->id]);
 
         FilamentNotification::make()
             ->title($title)

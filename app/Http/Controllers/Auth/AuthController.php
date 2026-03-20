@@ -62,9 +62,11 @@ class AuthController extends Controller
             return redirect()->intended(route('verification.notice'));
         }
 
-        $defaultRoute = $user->hasRole('Reviewer')
+        $defaultRoute = $user->isReviewer()
             ? route('reviewer.dashboard')
-            : route('dashboard');
+            : ($user->hasAdminAccess()
+                ? route('admin.dashboard')
+                : route('dashboard'));
 
         return redirect()->intended($defaultRoute);
     }
