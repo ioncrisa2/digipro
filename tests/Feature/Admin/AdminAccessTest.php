@@ -8,13 +8,35 @@ use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetFile;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestFile;
+use App\Models\AppraisalUserConsent;
+use App\Models\Article;
+use App\Models\ArticleCategory;
+use App\Models\ConsentDocument;
+use App\Models\ConstructionCostIndex;
+use App\Models\ContactMessage;
+use App\Models\CostElement;
+use App\Models\Faq;
+use App\Models\Feature;
+use App\Models\FloorIndex;
+use App\Models\GuidelineSet;
 use App\Models\OfficeBankAccount;
 use App\Models\Payment;
+use App\Models\PrivacyPolicy;
+use App\Models\Province;
+use App\Models\Regency;
+use App\Models\MappiRcnStandard;
+use App\Models\Tag;
+use App\Models\Testimonial;
+use App\Models\TermsDocument;
 use App\Models\User;
+use App\Models\ValuationSetting;
+use App\Models\District;
+use App\Models\Village;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
@@ -22,6 +44,22 @@ uses(RefreshDatabase::class);
 beforeEach(function (): void {
     Role::findOrCreate('Reviewer', 'web');
     Role::findOrCreate('admin', 'web');
+    Role::findOrCreate('super_admin', 'web');
+    Role::findOrCreate('customer', 'web');
+
+    foreach ([
+        'view_any_role',
+        'view_role',
+        'create_role',
+        'update_role',
+        'delete_role',
+        'delete_any_role',
+        'view_article',
+        'create_article',
+        'update_article',
+    ] as $permissionName) {
+        Permission::findOrCreate($permissionName, 'web');
+    }
 });
 
 function createAdminUser(): User
@@ -31,6 +69,17 @@ function createAdminUser(): User
     ]);
 
     $user->assignRole('admin');
+
+    return $user;
+}
+
+function createSuperAdminUser(): User
+{
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $user->assignRole('super_admin');
 
     return $user;
 }
@@ -405,6 +454,582 @@ it('updates a payment from the vue admin workspace', function () {
     expect($payment->status)->toBe('paid');
     expect($payment->external_payment_id)->toBe('MID-ADMIN-UPDATED');
     expect(data_get($payment->metadata, 'invoice_number'))->toBe('INV-2026-90004A');
+});
+
+it('renders the admin articles index in the vue workspace', function () {
+    $admin = createAdminUser();
+
+    $category = ArticleCategory::create([
+        'name' => 'Insight',
+        'slug' => 'insight',
+        'is_active' => true,
+        'show_in_nav' => true,
+    ]);
+
+    $tag = Tag::create([
+        'name' => 'Valuation',
+        'slug' => 'valuation',
+        'is_active' => true,
+    ]);
+
+    $article = Article::create([
+        'title' => 'Analisis Pasar Properti',
+        'slug' => 'analisis-pasar-properti',
+        'excerpt' => 'Ringkasan analisis',
+        'content_html' => '<p>Konten</p>',
+        'category_id' => $category->id,
+        'is_published' => true,
+        'published_at' => now(),
+    ]);
+    $article->tags()->sync([$tag->id]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.content.articles.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Articles/Index')
+            ->where('records.data.0.title', 'Analisis Pasar Properti')
+            ->where('summary.published', 1));
+});
+
+it('stores an article from the vue admin workspace', function () {
+    Storage::fake('public');
+
+    $admin = createAdminUser();
+    $category = ArticleCategory::create([
+        'name' => 'Berita',
+        'slug' => 'berita',
+        'is_active' => true,
+        'show_in_nav' => true,
+    ]);
+    $tag = Tag::create([
+        'name' => 'Properti',
+        'slug' => 'properti',
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.articles.store'), [
+            'title' => 'Artikel Baru',
+            'slug' => 'artikel-baru',
+            'excerpt' => 'Ringkasan artikel baru',
+            'content_html' => '<p>Isi artikel baru</p>',
+            'cover_image' => UploadedFile::fake()->image('cover.jpg'),
+            'meta_title' => 'Meta Artikel Baru',
+            'meta_description' => 'Meta description',
+            'category_id' => $category->id,
+            'tag_ids' => [$tag->id],
+            'is_published' => true,
+            'published_at' => '2026-03-20 09:00:00',
+        ])
+        ->assertRedirect(route('admin.content.articles.index'));
+
+    $article = Article::query()->where('slug', 'artikel-baru')->first();
+
+    expect($article)->not->toBeNull();
+    expect($article->is_published)->toBeTrue();
+    expect($article->category_id)->toBe($category->id);
+    expect($article->tags()->count())->toBe(1);
+    Storage::disk('public')->assertExists($article->cover_image_path);
+});
+
+it('updates an article from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $categoryA = ArticleCategory::create([
+        'name' => 'Kategori A',
+        'slug' => 'kategori-a',
+        'is_active' => true,
+    ]);
+    $categoryB = ArticleCategory::create([
+        'name' => 'Kategori B',
+        'slug' => 'kategori-b',
+        'is_active' => true,
+    ]);
+    $tagA = Tag::create([
+        'name' => 'Tag A',
+        'slug' => 'tag-a',
+        'is_active' => true,
+    ]);
+    $tagB = Tag::create([
+        'name' => 'Tag B',
+        'slug' => 'tag-b',
+        'is_active' => true,
+    ]);
+
+    $article = Article::create([
+        'title' => 'Artikel Lama',
+        'slug' => 'artikel-lama',
+        'content_html' => '<p>Lama</p>',
+        'category_id' => $categoryA->id,
+        'is_published' => false,
+    ]);
+    $article->tags()->sync([$tagA->id]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.content.articles.update', $article), [
+            'title' => 'Artikel Final',
+            'slug' => 'artikel-final',
+            'excerpt' => 'Ringkasan final',
+            'content_html' => '<p>Final</p>',
+            'meta_title' => 'Meta Final',
+            'meta_description' => 'Deskripsi final',
+            'category_id' => $categoryB->id,
+            'tag_ids' => [$tagB->id],
+            'is_published' => true,
+            'published_at' => '2026-03-20 11:00:00',
+        ])
+        ->assertRedirect(route('admin.content.articles.index'));
+
+    $article->refresh();
+
+    expect($article->title)->toBe('Artikel Final');
+    expect($article->slug)->toBe('artikel-final');
+    expect($article->category_id)->toBe($categoryB->id);
+    expect($article->is_published)->toBeTrue();
+    expect($article->tags()->pluck('tags.id')->all())->toBe([$tagB->id]);
+});
+
+it('deletes an article from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $article = Article::create([
+        'title' => 'Artikel Hapus',
+        'slug' => 'artikel-hapus',
+        'content_html' => '<p>Hapus</p>',
+        'is_published' => false,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.content.articles.destroy', $article))
+        ->assertRedirect(route('admin.content.articles.index'));
+
+    expect(Article::find($article->id))->toBeNull();
+});
+
+it('stores and updates an article category from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.categories.store'), [
+            'name' => 'Kategori Baru',
+            'slug' => 'kategori-baru',
+            'description' => 'Deskripsi kategori',
+            'sort_order' => 3,
+            'is_active' => true,
+            'show_in_nav' => true,
+        ])
+        ->assertRedirect(route('admin.content.categories.index'));
+
+    $category = ArticleCategory::query()->where('slug', 'kategori-baru')->first();
+    expect($category)->not->toBeNull();
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.content.categories.update', $category), [
+            'name' => 'Kategori Final',
+            'slug' => 'kategori-final',
+            'description' => 'Final',
+            'sort_order' => 5,
+            'is_active' => false,
+            'show_in_nav' => false,
+        ])
+        ->assertRedirect(route('admin.content.categories.index'));
+
+    $category->refresh();
+
+    expect($category->name)->toBe('Kategori Final');
+    expect($category->is_active)->toBeFalse();
+    expect($category->show_in_nav)->toBeFalse();
+});
+
+it('deletes an article category from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $category = ArticleCategory::create([
+        'name' => 'Kategori Delete',
+        'slug' => 'kategori-delete',
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.content.categories.destroy', $category))
+        ->assertRedirect(route('admin.content.categories.index'));
+
+    expect(ArticleCategory::find($category->id))->toBeNull();
+});
+
+it('stores and updates a tag from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.tags.store'), [
+            'name' => 'Tag Baru',
+            'slug' => 'tag-baru',
+            'is_active' => true,
+        ])
+        ->assertRedirect(route('admin.content.tags.index'));
+
+    $tag = Tag::query()->where('slug', 'tag-baru')->first();
+    expect($tag)->not->toBeNull();
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.content.tags.update', $tag), [
+            'name' => 'Tag Final',
+            'slug' => 'tag-final',
+            'is_active' => false,
+        ])
+        ->assertRedirect(route('admin.content.tags.index'));
+
+    $tag->refresh();
+
+    expect($tag->name)->toBe('Tag Final');
+    expect($tag->is_active)->toBeFalse();
+});
+
+it('deletes a tag from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $tag = Tag::create([
+        'name' => 'Tag Delete',
+        'slug' => 'tag-delete',
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.content.tags.destroy', $tag))
+        ->assertRedirect(route('admin.content.tags.index'));
+
+    expect(Tag::find($tag->id))->toBeNull();
+});
+
+it('stores and updates an faq from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.legal.faqs.store'), [
+            'question' => 'Apa itu DigiPro?',
+            'answer' => 'Platform appraisal.',
+            'sort_order' => 1,
+            'is_active' => true,
+        ])
+        ->assertRedirect(route('admin.content.legal.faqs.index'));
+
+    $faq = Faq::query()->where('question', 'Apa itu DigiPro?')->first();
+    expect($faq)->not->toBeNull();
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.content.legal.faqs.update', $faq), [
+            'question' => 'Apa itu DigiPro Final?',
+            'answer' => 'Platform appraisal final.',
+            'sort_order' => 2,
+            'is_active' => false,
+        ])
+        ->assertRedirect(route('admin.content.legal.faqs.index'));
+
+    $faq->refresh();
+
+    expect($faq->question)->toBe('Apa itu DigiPro Final?');
+    expect($faq->is_active)->toBeFalse();
+});
+
+it('stores and updates a feature from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.legal.features.store'), [
+            'icon' => 'ShieldCheck',
+            'title' => 'Aman',
+            'description' => 'Proses aman',
+            'sort_order' => 1,
+            'is_active' => true,
+        ])
+        ->assertRedirect(route('admin.content.legal.features.index'));
+
+    $feature = Feature::query()->where('title', 'Aman')->first();
+    expect($feature)->not->toBeNull();
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.content.legal.features.update', $feature), [
+            'icon' => 'Star',
+            'title' => 'Aman Final',
+            'description' => 'Proses aman final',
+            'sort_order' => 3,
+            'is_active' => false,
+        ])
+        ->assertRedirect(route('admin.content.legal.features.index'));
+
+    $feature->refresh();
+
+    expect($feature->icon)->toBe('Star');
+    expect($feature->is_active)->toBeFalse();
+});
+
+it('stores and updates a testimonial from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.legal.testimonials.store'), [
+            'name' => 'Budi',
+            'role' => 'Direktur',
+            'quote' => 'Sangat membantu',
+            'sort_order' => 1,
+            'is_active' => true,
+        ])
+        ->assertRedirect(route('admin.content.legal.testimonials.index'));
+
+    $testimonial = Testimonial::query()->where('name', 'Budi')->first();
+    expect($testimonial)->not->toBeNull();
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.content.legal.testimonials.update', $testimonial), [
+            'name' => 'Budi Final',
+            'role' => 'CEO',
+            'quote' => 'Sangat membantu final',
+            'sort_order' => 4,
+            'is_active' => false,
+        ])
+        ->assertRedirect(route('admin.content.legal.testimonials.index'));
+
+    $testimonial->refresh();
+
+    expect($testimonial->name)->toBe('Budi Final');
+    expect($testimonial->is_active)->toBeFalse();
+});
+
+it('stores a terms document from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.legal.terms.store'), [
+            'title' => 'Terms Baru',
+            'company' => 'DigiPro',
+            'version' => 'v2.0',
+            'effective_since' => '2026-03-20',
+            'content_html' => '<p>Terms</p>',
+            'is_active' => true,
+            'published_at' => '2026-03-20 10:00:00',
+        ])
+        ->assertRedirect(route('admin.content.legal.terms.index'));
+
+    $terms = TermsDocument::query()->where('title', 'Terms Baru')->first();
+    expect($terms)->not->toBeNull();
+    expect($terms->is_active)->toBeTrue();
+});
+
+it('stores a privacy policy from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.legal.privacy.store'), [
+            'title' => 'Privacy Baru',
+            'company' => 'DigiPro',
+            'version' => 'v2.0',
+            'effective_since' => '2026-03-20',
+            'content_html' => '<p>Privacy</p>',
+            'is_active' => true,
+            'published_at' => '2026-03-20 10:00:00',
+        ])
+        ->assertRedirect(route('admin.content.legal.privacy.index'));
+
+    $policy = PrivacyPolicy::query()->where('title', 'Privacy Baru')->first();
+    expect($policy)->not->toBeNull();
+    expect($policy->is_active)->toBeTrue();
+});
+
+it('stores and publishes a consent document from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.legal.consent.store'), [
+            'code' => 'appraisal_request_consent',
+            'version' => '2026-03-20-v1',
+            'title' => 'Consent Baru',
+            'status' => 'draft',
+            'checkbox_label' => 'Saya setuju',
+            'sections_json' => json_encode([
+                [
+                    'heading' => 'Bagian 1',
+                    'lead' => 'Lead',
+                    'items' => ['Item 1', 'Item 2'],
+                ],
+            ]),
+        ])
+        ->assertRedirect(route('admin.content.legal.consent.index'));
+
+    $document = ConsentDocument::query()->where('title', 'Consent Baru')->first();
+    expect($document)->not->toBeNull();
+    expect($document->status)->toBe('draft');
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.legal.consent.publish', $document))
+        ->assertRedirect(route('admin.content.legal.consent.index'));
+
+    $document->refresh();
+
+    expect($document->status)->toBe('published');
+    expect($document->hash)->not->toBe(str_repeat('0', 64));
+});
+
+it('renders the appraisal user consents pages in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    $document = ConsentDocument::create([
+        'code' => 'appraisal_request_consent',
+        'version' => '2026-03-20-v2',
+        'title' => 'Consent Audit',
+        'sections' => [['heading' => 'A', 'lead' => null, 'items' => ['X']]],
+        'checkbox_label' => 'Setuju',
+        'hash' => str_repeat('1', 64),
+        'status' => 'published',
+        'published_at' => now(),
+        'created_by' => $admin->id,
+        'updated_by' => $admin->id,
+    ]);
+
+    $consent = AppraisalUserConsent::create([
+        'user_id' => $user->id,
+        'consent_document_id' => $document->id,
+        'code' => $document->code,
+        'version' => $document->version,
+        'hash' => $document->hash,
+        'accepted_at' => now(),
+        'ip' => '127.0.0.1',
+        'user_agent' => 'Pest Test',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.content.legal.user-consents.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/AppraisalUserConsents/Index')
+            ->where('records.data.0.user_email', $user->email));
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.content.legal.user-consents.show', $consent))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/AppraisalUserConsents/Show')
+            ->where('record.code', 'appraisal_request_consent'));
+});
+
+it('renders the admin contact messages index in the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    ContactMessage::query()->create([
+        'name' => 'Rina Support',
+        'email' => 'rina@example.com',
+        'subject' => 'Butuh bantuan appraisal',
+        'message' => 'Halo admin, saya ingin bertanya tentang appraisal.',
+        'status' => 'new',
+        'source' => 'landing-contact',
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'Pest',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.communications.contact-messages.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/ContactMessages/Index')
+            ->where('summary.total', 1)
+            ->where('records.meta.total', 1));
+});
+
+it('marks a contact message as read when opening the detail page', function () {
+    $admin = createAdminUser();
+    $message = ContactMessage::query()->create([
+        'name' => 'Budi Contact',
+        'email' => 'budi@example.com',
+        'subject' => 'Follow up',
+        'message' => 'Mohon follow up penawaran.',
+        'status' => 'new',
+        'source' => 'landing-contact',
+        'ip_address' => '127.0.0.2',
+        'user_agent' => 'Pest',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.communications.contact-messages.show', $message))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/ContactMessages/Show')
+            ->where('record.name', 'Budi Contact')
+            ->where('record.status', 'in_progress'));
+
+    $message->refresh();
+
+    expect($message->read_at)->not->toBeNull();
+    expect($message->status)->toBe('in_progress');
+});
+
+it('updates contact message workflow actions from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $message = ContactMessage::query()->create([
+        'name' => 'Sari Contact',
+        'email' => 'sari@example.com',
+        'subject' => 'Status request',
+        'message' => 'Tolong update status permohonan saya.',
+        'status' => 'new',
+        'source' => 'landing-contact',
+        'ip_address' => '127.0.0.3',
+        'user_agent' => 'Pest',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.communications.contact-messages.in-progress', $message))
+        ->assertRedirect(route('admin.communications.contact-messages.show', $message));
+
+    $message->refresh();
+    expect($message->status)->toBe('in_progress');
+    expect($message->read_at)->not->toBeNull();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.communications.contact-messages.done', $message))
+        ->assertRedirect(route('admin.communications.contact-messages.show', $message));
+
+    $message->refresh();
+    expect($message->status)->toBe('done');
+    expect($message->handled_at)->not->toBeNull();
+    expect($message->handled_by)->toBe($admin->id);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.communications.contact-messages.archive', $message))
+        ->assertRedirect(route('admin.communications.contact-messages.show', $message));
+
+    $message->refresh();
+    expect($message->status)->toBe('archived');
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.communications.contact-messages.destroy', $message))
+        ->assertRedirect(route('admin.communications.contact-messages.index'));
+
+    expect(ContactMessage::query()->whereKey($message->id)->exists())->toBeFalse();
 });
 
 it('includes request files and grouped asset files in the admin request detail payload', function () {
@@ -1312,4 +1937,1187 @@ it('validates report type on the vue admin edit form', function () {
         ])
         ->assertRedirect(route('admin.appraisal-requests.edit', $record))
         ->assertSessionHasErrors(['report_type']);
+});
+
+it('renders the admin provinces index in the vue workspace', function () {
+    $admin = createAdminUser();
+
+    Province::query()->create([
+        'id' => '31',
+        'name' => 'DKI Jakarta',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.master-data.provinces.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Locations/Index')
+            ->where('resource.key', 'provinces')
+            ->where('records.meta.total', 1));
+});
+
+it('stores, updates, and deletes a province from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.master-data.provinces.store'), [
+            'name' => 'Jawa Barat',
+        ])
+        ->assertRedirect(route('admin.master-data.provinces.index'));
+
+    $province = Province::query()->firstOrFail();
+
+    expect($province->id)->toBe('11');
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.master-data.provinces.update', $province), [
+            'id' => '32',
+            'name' => 'Jawa Barat Update',
+        ])
+        ->assertRedirect(route('admin.master-data.provinces.index'));
+
+    expect($province->fresh()->name)->toBe('Jawa Barat Update');
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.master-data.provinces.destroy', $province))
+        ->assertRedirect(route('admin.master-data.provinces.index'));
+
+    expect(Province::query()->find('11'))->toBeNull();
+});
+
+it('stores, updates, and deletes a regency from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $province = Province::query()->create([
+        'id' => '33',
+        'name' => 'Banten',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.master-data.regencies.store'), [
+            'province_id' => $province->id,
+            'name' => 'Kota Tangerang Selatan',
+        ])
+        ->assertRedirect(route('admin.master-data.regencies.index'));
+
+    $regency = Regency::query()->firstOrFail();
+
+    expect($regency->id)->toBe('3301');
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.master-data.regencies.update', $regency), [
+            'id' => '3301',
+            'province_id' => $province->id,
+            'name' => 'Kota Tangerang Selatan Update',
+        ])
+        ->assertRedirect(route('admin.master-data.regencies.index'));
+
+    expect($regency->fresh()->name)->toBe('Kota Tangerang Selatan Update');
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.master-data.regencies.destroy', $regency))
+        ->assertRedirect(route('admin.master-data.regencies.index'));
+
+    expect(Regency::query()->find('3301'))->toBeNull();
+});
+
+it('stores, updates, and deletes a district from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $province = Province::query()->create([
+        'id' => '34',
+        'name' => 'DI Yogyakarta',
+    ]);
+    $regency = Regency::query()->create([
+        'id' => '3401',
+        'province_id' => $province->id,
+        'name' => 'Kabupaten Kulon Progo',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.master-data.districts.store'), [
+            'regency_id' => $regency->id,
+            'name' => 'Temon',
+        ])
+        ->assertRedirect(route('admin.master-data.districts.index'));
+
+    $district = District::query()->firstOrFail();
+
+    expect($district->id)->toBe('3401001');
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.master-data.districts.update', $district), [
+            'id' => '3401001',
+            'regency_id' => $regency->id,
+            'name' => 'Temon Update',
+        ])
+        ->assertRedirect(route('admin.master-data.districts.index'));
+
+    expect($district->fresh()->name)->toBe('Temon Update');
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.master-data.districts.destroy', $district))
+        ->assertRedirect(route('admin.master-data.districts.index'));
+
+    expect(District::query()->find('3401001'))->toBeNull();
+});
+
+it('stores, updates, and deletes a village from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $province = Province::query()->create([
+        'id' => '35',
+        'name' => 'Jawa Timur',
+    ]);
+    $regency = Regency::query()->create([
+        'id' => '3578',
+        'province_id' => $province->id,
+        'name' => 'Kota Surabaya',
+    ]);
+    $district = District::query()->create([
+        'id' => '3578010',
+        'regency_id' => $regency->id,
+        'name' => 'Tegalsari',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.master-data.villages.store'), [
+            'district_id' => $district->id,
+            'name' => 'Kedungdoro',
+        ])
+        ->assertRedirect(route('admin.master-data.villages.index'));
+
+    $village = Village::query()->findOrFail('3578010001');
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.master-data.villages.update', $village), [
+            'id' => '3578010001',
+            'district_id' => $district->id,
+            'name' => 'Kedungdoro Update',
+        ])
+        ->assertRedirect(route('admin.master-data.villages.index'));
+
+    expect($village->fresh()->name)->toBe('Kedungdoro Update');
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.master-data.villages.destroy', $village))
+        ->assertRedirect(route('admin.master-data.villages.index'));
+
+    expect(Village::query()->find('3578010001'))->toBeNull();
+});
+
+it('returns a generated location id preview for nested location resources', function () {
+    $admin = createAdminUser();
+    $province = Province::query()->create([
+        'id' => '35',
+        'name' => 'Jawa Timur',
+    ]);
+    Regency::query()->create([
+        'id' => '3501',
+        'province_id' => $province->id,
+        'name' => 'Kabupaten Pacitan',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->getJson(route('admin.master-data.locations.id-preview', [
+            'type' => 'regency',
+            'province_id' => $province->id,
+        ]))
+        ->assertOk()
+        ->assertJson([
+            'id' => '3502',
+        ]);
+});
+
+it('returns filtered location options for village form selects', function () {
+    $admin = createAdminUser();
+    $province = Province::query()->create([
+        'id' => '35',
+        'name' => 'Jawa Timur',
+    ]);
+    Regency::query()->create([
+        'id' => '3501',
+        'province_id' => $province->id,
+        'name' => 'Kabupaten Pacitan',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->getJson(route('admin.master-data.locations.options', [
+            'type' => 'regencies',
+            'province_id' => $province->id,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('options.0.value', '3501')
+        ->assertJsonPath('options.0.label', 'Kabupaten Pacitan (3501)');
+});
+
+it('returns filtered district options for district and village form selects', function () {
+    $admin = createAdminUser();
+    $province = Province::query()->create([
+        'id' => '36',
+        'name' => 'Banten',
+    ]);
+    $regency = Regency::query()->create([
+        'id' => '3601',
+        'province_id' => $province->id,
+        'name' => 'Kabupaten Pandeglang',
+    ]);
+    District::query()->create([
+        'id' => '3601001',
+        'regency_id' => $regency->id,
+        'name' => 'Labuan',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->getJson(route('admin.master-data.locations.options', [
+            'type' => 'districts',
+            'regency_id' => $regency->id,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('options.0.value', '3601001')
+        ->assertJsonPath('options.0.label', 'Labuan (3601001)');
+});
+
+it('renders the admin users index in the vue workspace', function () {
+    $admin = createAdminUser();
+    $user = User::factory()->create([
+        'name' => 'Portal User',
+        'email' => 'portal@example.com',
+        'email_verified_at' => now(),
+    ]);
+    $user->assignRole('customer');
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.master-data.users.index', ['q' => 'portal@example.com']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Users/Index')
+            ->where('records.meta.total', 1)
+            ->where('records.data.0.email', 'portal@example.com'));
+});
+
+it('renders the admin user detail page in the vue workspace', function () {
+    $admin = createAdminUser();
+    $user = User::factory()->create([
+        'name' => 'Detail User',
+        'email' => 'detail@example.com',
+        'email_verified_at' => now(),
+    ]);
+    $user->assignRole('customer');
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.master-data.users.show', $user))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Users/Show')
+            ->where('record.email', 'detail@example.com'));
+});
+
+it('allows super admin to create a user from the vue admin workspace', function () {
+    $superAdmin = createSuperAdminUser();
+
+    $this
+        ->actingAs($superAdmin)
+        ->post(route('admin.master-data.users.store'), [
+            'name' => 'New Managed User',
+            'email' => 'managed@example.com',
+            'password' => 'password123',
+            'email_verified_at' => now()->format('Y-m-d H:i:s'),
+            'roles' => ['customer'],
+        ])
+        ->assertRedirect();
+
+    $user = User::query()->where('email', 'managed@example.com')->first();
+
+    expect($user)->not->toBeNull();
+    expect($user->hasRole('customer'))->toBeTrue();
+    expect($user->email_verified_at)->not->toBeNull();
+});
+
+it('blocks normal admin from opening the create user page', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.master-data.users.create'))
+        ->assertForbidden();
+});
+
+it('updates a managed user from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $user = User::factory()->create([
+        'name' => 'Managed User',
+        'email' => 'managed-update@example.com',
+        'email_verified_at' => null,
+    ]);
+    $user->assignRole('customer');
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.master-data.users.update', $user), [
+            'name' => 'Managed User Final',
+            'email' => 'managed-update@example.com',
+            'password' => 'password999',
+            'email_verified_at' => now()->format('Y-m-d H:i:s'),
+            'roles' => ['Reviewer'],
+        ])
+        ->assertRedirect(route('admin.master-data.users.show', $user));
+
+    $user->refresh();
+
+    expect($user->name)->toBe('Managed User Final');
+    expect($user->email_verified_at)->not->toBeNull();
+    expect($user->hasRole('Reviewer'))->toBeTrue();
+    expect($user->hasRole('customer'))->toBeFalse();
+});
+
+it('blocks normal admin from accessing the access control role index', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.access-control.roles.index'))
+        ->assertForbidden();
+});
+
+it('renders the admin roles index for super admin users', function () {
+    $superAdmin = createSuperAdminUser();
+    Role::findOrCreate('content_editor', 'web')->givePermissionTo(['view_article', 'create_article']);
+
+    $this
+        ->actingAs($superAdmin)
+        ->get(route('admin.access-control.roles.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Roles/Index')
+            ->where('records.meta.total', 5));
+});
+
+it('renders the admin role detail for super admin users', function () {
+    $superAdmin = createSuperAdminUser();
+    $role = Role::findOrCreate('qa_admin', 'web');
+    $role->syncPermissions(['view_article', 'update_article']);
+
+    $this
+        ->actingAs($superAdmin)
+        ->get(route('admin.access-control.roles.show', $role))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Roles/Show')
+            ->where('record.name', 'qa_admin')
+            ->where('record.permissions_count', 2));
+});
+
+it('creates a role from the vue admin access control workspace', function () {
+    $superAdmin = createSuperAdminUser();
+
+    $this
+        ->actingAs($superAdmin)
+        ->post(route('admin.access-control.roles.store'), [
+            'name' => 'finance_admin',
+            'guard_name' => 'web',
+            'permissions' => ['view_article', 'create_article'],
+        ])
+        ->assertRedirect();
+
+    $role = Role::query()->where('name', 'finance_admin')->first();
+
+    expect($role)->not->toBeNull();
+    expect($role->hasPermissionTo('view_article'))->toBeTrue();
+    expect($role->hasPermissionTo('create_article'))->toBeTrue();
+});
+
+it('updates a role from the vue admin access control workspace', function () {
+    $superAdmin = createSuperAdminUser();
+    $role = Role::findOrCreate('ops_admin', 'web');
+    $role->syncPermissions(['view_article']);
+
+    $this
+        ->actingAs($superAdmin)
+        ->put(route('admin.access-control.roles.update', $role), [
+            'name' => 'ops_admin',
+            'guard_name' => 'web',
+            'permissions' => ['view_article', 'update_article'],
+        ])
+        ->assertRedirect(route('admin.access-control.roles.show', $role));
+
+    $role->refresh();
+
+    expect($role->hasPermissionTo('view_article'))->toBeTrue();
+    expect($role->hasPermissionTo('update_article'))->toBeTrue();
+    expect($role->permissions()->count())->toBe(2);
+});
+
+it('deletes a role from the vue admin access control workspace', function () {
+    $superAdmin = createSuperAdminUser();
+    $role = Role::findOrCreate('temporary_role', 'web');
+
+    $this
+        ->actingAs($superAdmin)
+        ->delete(route('admin.access-control.roles.destroy', $role))
+        ->assertRedirect(route('admin.access-control.roles.index'));
+
+    expect(Role::query()->where('name', 'temporary_role')->exists())->toBeFalse();
+});
+
+it('renders the guideline sets index in the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    GuidelineSet::query()->create([
+        'name' => 'Pedoman 2026',
+        'year' => 2026,
+        'description' => 'Acuan appraisal tahun 2026.',
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.guideline-sets.index', ['q' => '2026']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/GuidelineSets/Index')
+            ->where('records.meta.total', 1)
+            ->where('records.data.0.name', 'Pedoman 2026'));
+});
+
+it('creates a guideline set from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.guideline-sets.store'), [
+            'name' => 'Pedoman 2027',
+            'year' => 2027,
+            'description' => 'Acuan appraisal tahun 2027.',
+            'is_active' => true,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.guideline-sets.index'));
+
+    $record = GuidelineSet::query()->where('name', 'Pedoman 2027')->first();
+
+    expect($record)->not->toBeNull();
+    expect($record->year)->toBe(2027);
+    expect($record->is_active)->toBeTrue();
+});
+
+it('updates a guideline set from the vue admin workspace and deactivates the old active set', function () {
+    $admin = createAdminUser();
+    $active = GuidelineSet::query()->create([
+        'name' => 'Pedoman Aktif 2025',
+        'year' => 2025,
+        'description' => 'Guideline lama.',
+        'is_active' => true,
+    ]);
+    $target = GuidelineSet::query()->create([
+        'name' => 'Pedoman Draft 2026',
+        'year' => 2026,
+        'description' => 'Guideline draft.',
+        'is_active' => false,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.ref-guidelines.guideline-sets.update', $target), [
+            'name' => 'Pedoman Final 2026',
+            'year' => 2026,
+            'description' => 'Guideline final.',
+            'is_active' => true,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.guideline-sets.index'));
+
+    $active->refresh();
+    $target->refresh();
+
+    expect($target->name)->toBe('Pedoman Final 2026');
+    expect($target->is_active)->toBeTrue();
+    expect($active->is_active)->toBeFalse();
+});
+
+it('deletes a guideline set from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $record = GuidelineSet::query()->create([
+        'name' => 'Pedoman Hapus',
+        'year' => 2028,
+        'description' => null,
+        'is_active' => false,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.ref-guidelines.guideline-sets.destroy', $record))
+        ->assertRedirect(route('admin.ref-guidelines.guideline-sets.index'));
+
+    expect(GuidelineSet::query()->whereKey($record->id)->exists())->toBeFalse();
+});
+
+it('renders the valuation settings index in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman Nilai 2026',
+        'year' => 2026,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    ValuationSetting::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2026,
+        'key' => ValuationSetting::KEY_PPN_PERCENT,
+        'label' => 'PPN (%)',
+        'value_number' => 12,
+        'value_text' => 'Standar 2026',
+        'notes' => 'Dipakai reviewer.',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.valuation-settings.index', ['key' => ValuationSetting::KEY_PPN_PERCENT]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/ValuationSettings/Index')
+            ->where('records.meta.total', 1)
+            ->where('records.data.0.key', ValuationSetting::KEY_PPN_PERCENT));
+});
+
+it('creates a valuation setting from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman 2029',
+        'year' => 2029,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.valuation-settings.store'), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2029,
+            'key' => ValuationSetting::KEY_PPN_PERCENT,
+            'label' => 'PPN (%)',
+            'value_number' => 13,
+            'value_text' => 'Tarif 2029',
+            'notes' => 'Catatan setting baru.',
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.valuation-settings.index'));
+
+    $record = ValuationSetting::query()
+        ->where('guideline_set_id', $guidelineSet->id)
+        ->where('year', 2029)
+        ->where('key', ValuationSetting::KEY_PPN_PERCENT)
+        ->first();
+
+    expect($record)->not->toBeNull();
+    expect((float) $record->value_number)->toBe(13.0);
+});
+
+it('updates a valuation setting from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman 2030',
+        'year' => 2030,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $record = ValuationSetting::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2030,
+        'key' => ValuationSetting::KEY_PPN_PERCENT,
+        'label' => 'PPN (%)',
+        'value_number' => 11,
+        'value_text' => null,
+        'notes' => 'Nilai awal.',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.ref-guidelines.valuation-settings.update', $record), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2030,
+            'key' => ValuationSetting::KEY_PPN_PERCENT,
+            'label' => 'PPN Final (%)',
+            'value_number' => 12,
+            'value_text' => 'Tarif final',
+            'notes' => 'Sudah diperbarui.',
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.valuation-settings.index'));
+
+    $record->refresh();
+
+    expect($record->label)->toBe('PPN Final (%)');
+    expect((float) $record->value_number)->toBe(12.0);
+    expect($record->value_text)->toBe('Tarif final');
+});
+
+it('deletes a valuation setting from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman 2031',
+        'year' => 2031,
+        'description' => null,
+        'is_active' => false,
+    ]);
+    $record = ValuationSetting::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2031,
+        'key' => ValuationSetting::KEY_PPN_PERCENT,
+        'label' => 'PPN (%)',
+        'value_number' => 10,
+        'value_text' => null,
+        'notes' => null,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.ref-guidelines.valuation-settings.destroy', $record))
+        ->assertRedirect(route('admin.ref-guidelines.valuation-settings.index'));
+
+    expect(ValuationSetting::query()->whereKey($record->id)->exists())->toBeFalse();
+});
+
+it('renders the construction cost index list in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IKK 2026',
+        'year' => 2026,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $province = Province::query()->create([
+        'id' => '31',
+        'name' => 'DKI Jakarta',
+    ]);
+    Regency::query()->create([
+        'id' => '3171',
+        'province_id' => $province->id,
+        'name' => 'Jakarta Pusat',
+    ]);
+    ConstructionCostIndex::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2026,
+        'region_code' => '3171',
+        'region_name' => 'Jakarta Pusat',
+        'ikk_value' => 1.1250,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.construction-cost-indices.index', ['province_id' => $province->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/ConstructionCostIndices/Index')
+            ->where('records.meta.total', 1)
+            ->where('records.data.0.region_name', 'Jakarta Pusat'));
+});
+
+it('creates a construction cost index from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IKK 2027',
+        'year' => 2027,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $province = Province::query()->create([
+        'id' => '32',
+        'name' => 'Jawa Barat',
+    ]);
+    $regency = Regency::query()->create([
+        'id' => '3273',
+        'province_id' => $province->id,
+        'name' => 'Kota Bandung',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.construction-cost-indices.store'), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2027,
+            'region_code' => $regency->id,
+            'ikk_value' => 1.2345,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.construction-cost-indices.index'));
+
+    $record = ConstructionCostIndex::query()->where('guideline_set_id', $guidelineSet->id)->where('region_code', $regency->id)->first();
+
+    expect($record)->not->toBeNull();
+    expect($record->region_name)->toBe('Kota Bandung');
+    expect((float) $record->ikk_value)->toBe(1.2345);
+});
+
+it('updates a construction cost index from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IKK 2028',
+        'year' => 2028,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $province = Province::query()->create([
+        'id' => '33',
+        'name' => 'Jawa Tengah',
+    ]);
+    $regency = Regency::query()->create([
+        'id' => '3374',
+        'province_id' => $province->id,
+        'name' => 'Kota Semarang',
+    ]);
+    $record = ConstructionCostIndex::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2028,
+        'region_code' => $regency->id,
+        'region_name' => $regency->name,
+        'ikk_value' => 1.0100,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.ref-guidelines.construction-cost-indices.update', $record), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2028,
+            'region_code' => $regency->id,
+            'ikk_value' => 1.1111,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.construction-cost-indices.index'));
+
+    $record->refresh();
+
+    expect((float) $record->ikk_value)->toBe(1.1111);
+});
+
+it('deletes a construction cost index from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IKK 2029',
+        'year' => 2029,
+        'description' => null,
+        'is_active' => false,
+    ]);
+    $province = Province::query()->create([
+        'id' => '34',
+        'name' => 'DI Yogyakarta',
+    ]);
+    $regency = Regency::query()->create([
+        'id' => '3471',
+        'province_id' => $province->id,
+        'name' => 'Kota Yogyakarta',
+    ]);
+    $record = ConstructionCostIndex::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2029,
+        'region_code' => $regency->id,
+        'region_name' => $regency->name,
+        'ikk_value' => 1.0500,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.ref-guidelines.construction-cost-indices.destroy', $record))
+        ->assertRedirect(route('admin.ref-guidelines.construction-cost-indices.index'));
+
+    expect(ConstructionCostIndex::query()->whereKey($record->id)->exists())->toBeFalse();
+});
+
+it('renders the cost elements list in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman Cost 2026',
+        'year' => 2026,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    CostElement::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2026,
+        'base_region' => 'DKI Jakarta',
+        'group' => 'Struktur',
+        'element_code' => 'STR-001',
+        'element_name' => 'Pondasi',
+        'building_type' => 'Rumah Tinggal',
+        'building_class' => 'A',
+        'storey_pattern' => '1-2',
+        'unit' => 'm2',
+        'unit_cost' => 250000,
+        'spec_json' => ['line_order' => 1],
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.cost-elements.index', ['group' => 'Struktur']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/CostElements/Index')
+            ->where('records.meta.total', 1)
+            ->where('records.data.0.element_name', 'Pondasi'));
+});
+
+it('creates a cost element from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman Cost 2027',
+        'year' => 2027,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.cost-elements.store'), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2027,
+            'base_region' => 'DKI Jakarta',
+            'group' => 'Arsitektur',
+            'element_code' => 'ARC-101',
+            'element_name' => 'Dinding',
+            'building_type' => 'Ruko',
+            'building_class' => 'B',
+            'storey_pattern' => '1-3',
+            'unit' => 'm2',
+            'unit_cost' => 325000,
+            'spec_json' => '{"line_order":2,"material_spec":"Bata ringan"}',
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.cost-elements.index'));
+
+    $record = CostElement::query()->where('element_code', 'ARC-101')->first();
+
+    expect($record)->not->toBeNull();
+    expect($record->element_name)->toBe('Dinding');
+    expect($record->spec_json)->toBe(['line_order' => 2, 'material_spec' => 'Bata ringan']);
+});
+
+it('updates a cost element from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman Cost 2028',
+        'year' => 2028,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $record = CostElement::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2028,
+        'base_region' => 'DKI Jakarta',
+        'group' => 'MEP',
+        'element_code' => 'MEP-010',
+        'element_name' => 'Plumbing',
+        'building_type' => null,
+        'building_class' => null,
+        'storey_pattern' => null,
+        'unit' => 'm2',
+        'unit_cost' => 450000,
+        'spec_json' => ['line_order' => 10],
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.ref-guidelines.cost-elements.update', $record), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2028,
+            'base_region' => 'DKI Jakarta',
+            'group' => 'MEP',
+            'element_code' => 'MEP-010',
+            'element_name' => 'Plumbing Final',
+            'building_type' => 'Hotel',
+            'building_class' => 'Premium',
+            'storey_pattern' => '>=6',
+            'unit' => 'm2',
+            'unit_cost' => 550000,
+            'spec_json' => '{"line_order":11}',
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.cost-elements.index'));
+
+    $record->refresh();
+
+    expect($record->element_name)->toBe('Plumbing Final');
+    expect((int) $record->unit_cost)->toBe(550000);
+    expect($record->spec_json)->toBe(['line_order' => 11]);
+});
+
+it('deletes a cost element from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman Cost 2029',
+        'year' => 2029,
+        'description' => null,
+        'is_active' => false,
+    ]);
+    $record = CostElement::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2029,
+        'base_region' => 'DKI Jakarta',
+        'group' => 'Finishing',
+        'element_code' => 'FIN-001',
+        'element_name' => 'Cat',
+        'building_type' => null,
+        'building_class' => null,
+        'storey_pattern' => null,
+        'unit' => 'm2',
+        'unit_cost' => 120000,
+        'spec_json' => null,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.ref-guidelines.cost-elements.destroy', $record))
+        ->assertRedirect(route('admin.ref-guidelines.cost-elements.index'));
+
+    expect(CostElement::query()->whereKey($record->id)->exists())->toBeFalse();
+});
+
+it('renders the floor indices list in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IL 2026',
+        'year' => 2026,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    FloorIndex::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2026,
+        'building_class' => 'DEFAULT',
+        'floor_count' => 2,
+        'il_value' => 1.0500,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.floor-indices.index', ['building_class' => 'DEFAULT']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/FloorIndices/Index')
+            ->where('records.meta.total', 1)
+            ->where('records.data.0.floor_count', 2));
+});
+
+it('creates a floor index from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IL 2027',
+        'year' => 2027,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.floor-indices.store'), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2027,
+            'building_class' => 'GRADE_A',
+            'floor_count' => 5,
+            'il_value' => 1.1250,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.floor-indices.index'));
+
+    $record = FloorIndex::query()
+        ->where('guideline_set_id', $guidelineSet->id)
+        ->where('building_class', 'GRADE_A')
+        ->where('floor_count', 5)
+        ->first();
+
+    expect($record)->not->toBeNull();
+    expect((float) $record->il_value)->toBe(1.1250);
+});
+
+it('updates a floor index from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IL 2028',
+        'year' => 2028,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $record = FloorIndex::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2028,
+        'building_class' => 'GRADE_B',
+        'floor_count' => 3,
+        'il_value' => 1.0100,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.ref-guidelines.floor-indices.update', $record), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2028,
+            'building_class' => 'GRADE_B',
+            'floor_count' => 3,
+            'il_value' => 1.0750,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.floor-indices.index'));
+
+    $record->refresh();
+
+    expect((float) $record->il_value)->toBe(1.0750);
+});
+
+it('deletes a floor index from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IL 2029',
+        'year' => 2029,
+        'description' => null,
+        'is_active' => false,
+    ]);
+    $record = FloorIndex::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2029,
+        'building_class' => 'DEFAULT',
+        'floor_count' => 1,
+        'il_value' => 1.0000,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.ref-guidelines.floor-indices.destroy', $record))
+        ->assertRedirect(route('admin.ref-guidelines.floor-indices.index'));
+
+    expect(FloorIndex::query()->whereKey($record->id)->exists())->toBeFalse();
+});
+
+it('renders the mappi rcn list in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman RCN 2026',
+        'year' => 2026,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    MappiRcnStandard::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2026,
+        'reference_region' => 'DKI Jakarta',
+        'building_type' => 'RUKO',
+        'building_class' => null,
+        'storey_pattern' => '1-2',
+        'rcn_value' => 4250000,
+        'notes' => 'Standar ruko.',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.mappi-rcn-standards.index', ['building_type' => 'RUKO']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/MappiRcnStandards/Index')
+            ->where('records.meta.total', 1)
+            ->where('records.data.0.building_type', 'RUKO'));
+});
+
+it('creates a mappi rcn standard from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman RCN 2027',
+        'year' => 2027,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.mappi-rcn-standards.store'), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2027,
+            'reference_region' => 'DKI Jakarta',
+            'building_type' => 'BANGUNAN_GEDUNG_BERTINGKAT',
+            'building_class' => 'LOW_RISE',
+            'storey_pattern' => '3-5',
+            'rcn_value' => 6500000,
+            'notes' => 'RCN low rise.',
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.mappi-rcn-standards.index'));
+
+    $record = MappiRcnStandard::query()
+        ->where('guideline_set_id', $guidelineSet->id)
+        ->where('building_type', 'BANGUNAN_GEDUNG_BERTINGKAT')
+        ->where('storey_pattern', '3-5')
+        ->first();
+
+    expect($record)->not->toBeNull();
+    expect((int) $record->rcn_value)->toBe(6500000);
+});
+
+it('updates a mappi rcn standard from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman RCN 2028',
+        'year' => 2028,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $record = MappiRcnStandard::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2028,
+        'reference_region' => 'DKI Jakarta',
+        'building_type' => 'MODEL_APARTEMEN',
+        'building_class' => 'GRADE_B',
+        'storey_pattern' => '>=6',
+        'rcn_value' => 7800000,
+        'notes' => 'Awal.',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.ref-guidelines.mappi-rcn-standards.update', $record), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2028,
+            'reference_region' => 'DKI Jakarta',
+            'building_type' => 'MODEL_APARTEMEN',
+            'building_class' => 'GRADE_B',
+            'storey_pattern' => '>=6',
+            'rcn_value' => 8000000,
+            'notes' => 'Revisi final.',
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.mappi-rcn-standards.index'));
+
+    $record->refresh();
+
+    expect((int) $record->rcn_value)->toBe(8000000);
+    expect($record->notes)->toBe('Revisi final.');
+});
+
+it('deletes a mappi rcn standard from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman RCN 2029',
+        'year' => 2029,
+        'description' => null,
+        'is_active' => false,
+    ]);
+    $record = MappiRcnStandard::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2029,
+        'reference_region' => 'DKI Jakarta',
+        'building_type' => 'BANGUNAN_GUDANG',
+        'building_class' => null,
+        'storey_pattern' => null,
+        'rcn_value' => 3900000,
+        'notes' => null,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.ref-guidelines.mappi-rcn-standards.destroy', $record))
+        ->assertRedirect(route('admin.ref-guidelines.mappi-rcn-standards.index'));
+
+    expect(MappiRcnStandard::query()->whereKey($record->id)->exists())->toBeFalse();
 });

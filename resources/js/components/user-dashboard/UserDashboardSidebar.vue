@@ -1,8 +1,9 @@
 <script setup>
+import { ref, watch } from "vue";
 import { Link } from "@inertiajs/vue3";
-import { User, X } from "lucide-vue-next";
+import { ChevronDown, ChevronRight, User, X } from "lucide-vue-next";
 
-defineProps({
+const props = defineProps({
   navItems: {
     type: Array,
     required: true,
@@ -18,6 +19,10 @@ defineProps({
   isActive: {
     type: Function,
     required: true,
+  },
+  openGroups: {
+    type: Object,
+    default: () => ({}),
   },
   isProfileActive: {
     type: Boolean,
@@ -42,11 +47,27 @@ defineProps({
 });
 
 const year = new Date().getFullYear();
+const localOpenGroups = ref({ ...(props.openGroups ?? {}) });
 
 const resolveHref = (item) => {
   if (item.href) return item.href;
   return route(item.routeName, item.routeParams ?? {});
 };
+
+const toggleGroup = (key) => {
+  localOpenGroups.value = {
+    ...localOpenGroups.value,
+    [key]: !localOpenGroups.value[key],
+  };
+};
+
+watch(
+  () => props.openGroups,
+  (value) => {
+    localOpenGroups.value = { ...(value ?? {}) };
+  },
+  { deep: true },
+);
 </script>
 
 <template>
@@ -80,29 +101,79 @@ const resolveHref = (item) => {
     </div>
 
     <nav class="flex-1 overflow-y-auto py-4 space-y-1">
-      <Link
-        v-for="item in navItems"
-        :key="item.key ?? item.routeName"
-        :href="resolveHref(item)"
-        :title="sidebarCollapsed ? item.label : ''"
-        class="flex items-center text-sm rounded-md mx-2 transition-colors"
-        :class="[
-          sidebarCollapsed ? 'justify-center px-2 py-2' : 'px-4 py-2',
-          isActive(item)
-            ? 'bg-slate-800 text-white'
-            : 'text-slate-300 hover:bg-slate-800/60 hover:text-white',
-        ]"
-      >
-        <component
-          :is="item.icon"
+      <div v-for="item in navItems" :key="item.key ?? item.routeName" class="mx-2">
+        <Link
+          v-if="!item.subItems?.length || sidebarCollapsed"
+          :href="resolveHref(item)"
+          :title="sidebarCollapsed ? item.label : ''"
+          class="flex items-center text-sm rounded-md transition-colors"
           :class="[
-            'h-5 w-5',
-            sidebarCollapsed ? '' : 'mr-3',
-            isActive(item) ? 'text-white' : 'text-slate-400',
+            sidebarCollapsed ? 'justify-center px-2 py-2' : 'px-4 py-2',
+            isActive(item)
+              ? 'bg-slate-800 text-white'
+              : 'text-slate-300 hover:bg-slate-800/60 hover:text-white',
           ]"
-        />
-        <span v-if="!sidebarCollapsed">{{ item.label }}</span>
-      </Link>
+        >
+          <component
+            :is="item.icon"
+            :class="[
+              'h-5 w-5',
+              sidebarCollapsed ? '' : 'mr-3',
+              isActive(item) ? 'text-white' : 'text-slate-400',
+            ]"
+          />
+          <span v-if="!sidebarCollapsed">{{ item.label }}</span>
+        </Link>
+
+        <div v-else class="space-y-1">
+          <button
+            type="button"
+            class="flex items-center rounded-md px-4 py-2 text-sm transition-colors"
+            :class="[
+              isActive(item)
+                ? 'bg-slate-800 text-white'
+                : 'text-slate-300 hover:bg-slate-800/60 hover:text-white',
+            ]"
+            @click="toggleGroup(item.key)"
+          >
+            <component
+              :is="item.icon"
+              :class="[
+                'mr-3 h-5 w-5',
+                isActive(item) ? 'text-white' : 'text-slate-400',
+              ]"
+            />
+            <span class="flex-1">{{ item.label }}</span>
+            <component
+              :is="localOpenGroups[item.key] ? ChevronDown : ChevronRight"
+              class="h-4 w-4"
+              :class="isActive(item) ? 'text-white' : 'text-slate-400'"
+            />
+          </button>
+
+          <div v-if="localOpenGroups[item.key]" class="space-y-1 pl-4">
+            <Link
+              v-for="subItem in item.subItems"
+              :key="subItem.key ?? subItem.routeName"
+              :href="resolveHref(subItem)"
+              class="flex items-center rounded-md px-4 py-2 text-sm transition-colors"
+              :class="[
+                isActive(subItem)
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-white',
+              ]"
+            >
+              <component
+                v-if="subItem.icon"
+                :is="subItem.icon"
+                class="mr-3 h-4 w-4"
+                :class="isActive(subItem) ? 'text-white' : 'text-slate-500'"
+              />
+              <span>{{ subItem.label }}</span>
+            </Link>
+          </div>
+        </div>
+      </div>
     </nav>
 
     <div class="px-3 py-3 border-t border-slate-800">

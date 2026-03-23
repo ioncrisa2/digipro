@@ -2,7 +2,7 @@
 import { reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import PaginationBar from '@/components/reviewer/PaginationBar.vue';
+import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,14 +20,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { formatCurrency, formatDateTime } from '@/utils/reviewer';
 
 const props = defineProps({
@@ -104,6 +96,16 @@ const summaryCards = [
   { key: 'needs_action', label: 'Butuh Tindakan' },
   { key: 'payment_pending', label: 'Menunggu Pembayaran' },
 ];
+
+const columns = [
+  { key: 'request', label: 'Request', cellClass: 'min-w-[180px]' },
+  { key: 'client', label: 'Klien / Pemohon', cellClass: 'min-w-[180px]' },
+  { key: 'status', label: 'Status', cellClass: 'min-w-[140px]' },
+  { key: 'contract', label: 'Kontrak', cellClass: 'min-w-[140px]' },
+  { key: 'assets_count', label: 'Aset', cellClass: 'w-[80px]' },
+  { key: 'fee_total', label: 'Fee', cellClass: 'min-w-[120px]' },
+  { key: 'actions', label: 'Aksi', cellClass: 'min-w-[200px]' },
+];
 </script>
 
 <template>
@@ -169,62 +171,51 @@ const summaryCards = [
           </CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
-          <div class="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Request</TableHead>
-                  <TableHead>Klien / Pemohon</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Kontrak</TableHead>
-                  <TableHead>Aset</TableHead>
-                  <TableHead>Fee</TableHead>
-                  <TableHead>Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow v-for="record in records.data" :key="record.id">
-                  <TableCell>
-                    <Button variant="link" class="h-auto px-0 font-medium" as-child>
-                      <Link :href="record.show_url">{{ record.request_number }}</Link>
-                    </Button>
-                    <p class="mt-1 text-xs text-slate-500">{{ formatDateTime(record.requested_at) }}</p>
-                  </TableCell>
-                  <TableCell>
-                    <p class="font-medium text-slate-900">{{ record.client_name }}</p>
-                    <p class="mt-1 text-xs text-slate-500">{{ record.requester_name }}</p>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" :class="statusTone(record.status_value)">{{ record.status_label }}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" :class="statusTone(record.contract_status_value)">{{ record.contract_status_label }}</Badge>
-                    <p class="mt-1 text-xs text-slate-500">Nego: {{ record.negotiation_rounds_used }}</p>
-                  </TableCell>
-                  <TableCell>{{ record.assets_count }}</TableCell>
-                  <TableCell>{{ formatCurrency(record.fee_total) }}</TableCell>
-                  <TableCell>
-                    <div class="flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" as-child>
-                        <Link :href="record.show_url">Detail</Link>
-                      </Button>
-                      <Button variant="ghost" size="sm" as-child>
-                        <Link :href="route('admin.appraisal-requests.edit', record.id)">Edit</Link>
-                      </Button>
-                      <Button v-if="record.legacy_url" variant="ghost" size="sm" as-child>
-                        <a :href="record.legacy_url">Legacy Admin</a>
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-                <TableRow v-if="!records.data.length">
-                  <TableCell :colspan="7" class="text-center text-slate-500">Tidak ada data untuk filter ini.</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
+          <AdminDataTable
+            :columns="columns"
+            :rows="records.data"
+            :meta="records.meta"
+            empty-text="Tidak ada data untuk filter ini."
+          >
+            <template #cell-request="{ row }">
+              <Button variant="link" class="h-auto px-0 font-medium" as-child>
+                <Link :href="row.show_url">{{ row.request_number }}</Link>
+              </Button>
+              <p class="mt-1 text-xs text-slate-500">{{ formatDateTime(row.requested_at) }}</p>
+            </template>
 
-          <PaginationBar :links="records.meta.links ?? []" />
+            <template #cell-client="{ row }">
+              <p class="font-medium text-slate-900">{{ row.client_name }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ row.requester_name }}</p>
+            </template>
+
+            <template #cell-status="{ row }">
+              <Badge variant="outline" :class="statusTone(row.status_value)">{{ row.status_label }}</Badge>
+            </template>
+
+            <template #cell-contract="{ row }">
+              <Badge variant="outline" :class="statusTone(row.contract_status_value)">{{ row.contract_status_label }}</Badge>
+              <p class="mt-1 text-xs text-slate-500">Nego: {{ row.negotiation_rounds_used }}</p>
+            </template>
+
+            <template #cell-fee_total="{ row }">
+              {{ formatCurrency(row.fee_total) }}
+            </template>
+
+            <template #cell-actions="{ row }">
+              <div class="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" as-child>
+                  <Link :href="row.show_url">Detail</Link>
+                </Button>
+                <Button variant="ghost" size="sm" as-child>
+                  <Link :href="route('admin.appraisal-requests.edit', row.id)">Edit</Link>
+                </Button>
+                <Button v-if="row.legacy_url" variant="ghost" size="sm" as-child>
+                  <a :href="row.legacy_url">Legacy Admin</a>
+                </Button>
+              </div>
+            </template>
+          </AdminDataTable>
         </CardContent>
       </Card>
     </div>

@@ -15,13 +15,16 @@ class ContactMessage extends Model
         'subject',
         'message',
         'status',
+        'read_at',
         'handled_at',
         'handled_by',
         'source',
         'ip_address',
+        'user_agent',
     ];
 
     protected $casts = [
+        'read_at' => 'datetime',
         'handled_at' => 'datetime',
     ];
 

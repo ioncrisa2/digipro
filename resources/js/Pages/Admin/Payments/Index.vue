@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
+import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,14 +20,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { formatCurrency, formatDateTime } from '@/utils/reviewer';
 
 const props = defineProps({
@@ -88,6 +81,16 @@ const statusTone = (status) => {
       return 'bg-slate-100 text-slate-800 border-slate-200';
   }
 };
+
+const columns = [
+  { key: 'invoice', label: 'Invoice', cellClass: 'min-w-[170px]' },
+  { key: 'request', label: 'Permohonan', cellClass: 'min-w-[180px]' },
+  { key: 'client', label: 'Klien', cellClass: 'min-w-[180px]' },
+  { key: 'method', label: 'Metode', cellClass: 'min-w-[130px]' },
+  { key: 'status', label: 'Status', cellClass: 'min-w-[120px]' },
+  { key: 'amount', label: 'Jumlah', cellClass: 'min-w-[120px]' },
+  { key: 'paid', label: 'Dibayar', cellClass: 'min-w-[150px]' },
+];
 </script>
 
 <template>
@@ -201,77 +204,54 @@ const statusTone = (status) => {
           <CardDescription>List pembayaran utama admin. Edit transaksi Midtrans-safe sudah tersedia tanpa buka legacy.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div class="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Permohonan</TableHead>
-                  <TableHead>Klien</TableHead>
-                  <TableHead>Metode</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Jumlah</TableHead>
-                  <TableHead>Dibayar</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow v-for="item in records.data" :key="item.id">
-                  <TableCell>
-                    <Button variant="link" class="h-auto px-0 font-medium" as-child>
-                      <Link :href="item.show_url">{{ item.invoice_number }}</Link>
-                    </Button>
-                    <p class="mt-1 text-xs text-slate-500">{{ item.external_payment_id || '-' }}</p>
-                  </TableCell>
-                  <TableCell>
-                    <Button v-if="item.request_show_url" variant="link" class="h-auto px-0 font-medium" as-child>
-                      <Link :href="item.request_show_url">{{ item.request_number }}</Link>
-                    </Button>
-                    <span v-else>{{ item.request_number }}</span>
-                    <p class="mt-1 text-xs text-slate-500">{{ item.requester_name }}</p>
-                  </TableCell>
-                  <TableCell>
-                    <p class="font-medium text-slate-950">{{ item.client_name }}</p>
-                    <p class="mt-1 text-xs text-slate-500">{{ item.bank_label || '-' }}</p>
-                  </TableCell>
-                  <TableCell>
-                    <p>{{ item.method_label }}</p>
-                    <p class="mt-1 text-xs text-slate-500">{{ item.reference || item.gateway || '-' }}</p>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" :class="statusTone(item.status)">
-                      {{ item.status_label }}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{{ formatCurrency(item.amount) }}</TableCell>
-                  <TableCell>
-                    <p>{{ formatDateTime(item.paid_at) }}</p>
-                    <Button variant="link" class="mt-1 h-auto px-0 text-xs" as-child>
-                      <Link :href="item.edit_url">Edit pembayaran</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-                <TableRow v-if="!records.data.length">
-                  <TableCell :colspan="7" class="text-center text-slate-500">
-                    Tidak ada pembayaran yang cocok dengan filter saat ini.
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
+          <AdminDataTable
+            :columns="columns"
+            :rows="records.data"
+            :meta="records.meta"
+            empty-text="Tidak ada pembayaran yang cocok dengan filter saat ini."
+          >
+            <template #cell-invoice="{ row }">
+              <Button variant="link" class="h-auto px-0 font-medium" as-child>
+                <Link :href="row.show_url">{{ row.invoice_number }}</Link>
+              </Button>
+              <p class="mt-1 text-xs text-slate-500">{{ row.external_payment_id || '-' }}</p>
+            </template>
 
-          <div v-if="records.meta?.links?.length" class="mt-4 flex flex-wrap gap-2">
-            <Button
-              v-for="link in records.meta.links"
-              :key="`${link.label}-${link.url}`"
-              type="button"
-              size="sm"
-              :variant="link.active ? 'default' : 'outline'"
-              :disabled="!link.url"
-              @click="link.url && router.visit(link.url, { preserveScroll: true, preserveState: true })"
-            >
-              <span v-html="link.label" />
-            </Button>
-          </div>
+            <template #cell-request="{ row }">
+              <Button v-if="row.request_show_url" variant="link" class="h-auto px-0 font-medium" as-child>
+                <Link :href="row.request_show_url">{{ row.request_number }}</Link>
+              </Button>
+              <span v-else>{{ row.request_number }}</span>
+              <p class="mt-1 text-xs text-slate-500">{{ row.requester_name }}</p>
+            </template>
+
+            <template #cell-client="{ row }">
+              <p class="font-medium text-slate-950">{{ row.client_name }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ row.bank_label || '-' }}</p>
+            </template>
+
+            <template #cell-method="{ row }">
+              <p>{{ row.method_label }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ row.reference || row.gateway || '-' }}</p>
+            </template>
+
+            <template #cell-status="{ row }">
+              <Badge variant="outline" :class="statusTone(row.status)">
+                {{ row.status_label }}
+              </Badge>
+            </template>
+
+            <template #cell-amount="{ row }">
+              {{ formatCurrency(row.amount) }}
+            </template>
+
+            <template #cell-paid="{ row }">
+              <p>{{ formatDateTime(row.paid_at) }}</p>
+              <Button variant="link" class="mt-1 h-auto px-0 text-xs" as-child>
+                <Link :href="row.edit_url">Edit pembayaran</Link>
+              </Button>
+            </template>
+          </AdminDataTable>
         </CardContent>
       </Card>
     </div>

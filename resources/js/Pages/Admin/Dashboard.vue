@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
+import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import {
   Card,
   CardContent,
@@ -10,14 +11,6 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { formatCurrency, formatDateTime } from '@/utils/reviewer';
 
 defineProps({
@@ -87,6 +80,13 @@ const moduleTone = (status) => {
       return 'bg-slate-100 text-slate-800 border-slate-200';
   }
 };
+
+const actionColumns = [
+  { key: 'request', label: 'Request', cellClass: 'min-w-[180px]' },
+  { key: 'requester_name', label: 'Pemohon', cellClass: 'min-w-[140px]' },
+  { key: 'status', label: 'Status', cellClass: 'min-w-[120px]' },
+  { key: 'assets_count', label: 'Aset', cellClass: 'w-[80px]' },
+];
 </script>
 
 <template>
@@ -142,36 +142,22 @@ const moduleTone = (status) => {
             </div>
           </CardHeader>
           <CardContent>
-            <div class="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Request</TableHead>
-                    <TableHead>Pemohon</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Aset</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow v-for="item in actionItems" :key="item.id">
-                    <TableCell>
-                      <Button variant="link" class="h-auto px-0 font-medium" as-child>
-                        <Link :href="item.show_url">{{ item.request_number }}</Link>
-                      </Button>
-                      <p class="mt-1 text-xs text-slate-500">{{ item.client_name }}</p>
-                    </TableCell>
-                    <TableCell>{{ item.requester_name }}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" :class="statusTone(item.status_value)">{{ item.status_label }}</Badge>
-                    </TableCell>
-                    <TableCell>{{ item.assets_count }}</TableCell>
-                  </TableRow>
-                  <TableRow v-if="!actionItems.length">
-                    <TableCell :colspan="4" class="text-center text-slate-500">Tidak ada request yang butuh tindakan sekarang.</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
+            <AdminDataTable
+              :columns="actionColumns"
+              :rows="actionItems"
+              empty-text="Tidak ada request yang butuh tindakan sekarang."
+            >
+              <template #cell-request="{ row }">
+                <Button variant="link" class="h-auto px-0 font-medium" as-child>
+                  <Link :href="row.show_url">{{ row.request_number }}</Link>
+                </Button>
+                <p class="mt-1 text-xs text-slate-500">{{ row.client_name }}</p>
+              </template>
+
+              <template #cell-status="{ row }">
+                <Badge variant="outline" :class="statusTone(row.status_value)">{{ row.status_label }}</Badge>
+              </template>
+            </AdminDataTable>
           </CardContent>
         </Card>
 

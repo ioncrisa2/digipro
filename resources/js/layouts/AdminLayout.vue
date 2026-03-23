@@ -2,9 +2,31 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import {
+  BookMarked,
+  BookOpen,
+  BookText,
+  Building2,
   ClipboardList,
+  ClipboardCheck,
   CreditCard,
+  Factory,
+  House,
+  FolderTree,
+  FileText,
+  Layers3,
+  Map,
+  MapPinned,
+  Mail,
+  MessageSquareQuote,
   LayoutDashboard,
+  LockKeyhole,
+  CircleHelp,
+  Ruler,
+  ScrollText,
+  ShieldCheck,
+  Sparkles,
+  Tags,
+  Users,
 } from 'lucide-vue-next';
 import { useNotification } from '@/composables/useNotification';
 import GlobalDialog from '@/components/GlobalDialog.vue';
@@ -28,6 +50,7 @@ const flash = computed(() => page.props.flash ?? {});
 const defaultAvatarUrl = '/images/avatar-default.svg';
 const avatarUrl = computed(() => user.value?.avatar_url || defaultAvatarUrl);
 const shownFlashFingerprint = ref('');
+const openGroups = ref({});
 const profileHref = computed(() => {
   try {
     return route('profile.edit');
@@ -61,6 +84,262 @@ const navItems = [
     activePatterns: ['admin.finance.*'],
     pathPrefixes: ['/admin/keuangan'],
   },
+  {
+    key: 'admin.master-data',
+    label: 'Master Data',
+    icon: MapPinned,
+    routeName: 'admin.master-data.provinces.index',
+    activePatterns: ['admin.master-data.*'],
+    pathPrefixes: ['/admin/master-data'],
+    subItems: [
+      {
+        key: 'admin.master-data.users',
+        label: 'User Terdaftar',
+        icon: Users,
+        routeName: 'admin.master-data.users.index',
+        activePatterns: ['admin.master-data.users.*'],
+        pathPrefixes: ['/admin/master-data/users'],
+      },
+      {
+        key: 'admin.master-data.provinces',
+        label: 'Provinsi',
+        icon: Map,
+        routeName: 'admin.master-data.provinces.index',
+        activePatterns: ['admin.master-data.provinces.*'],
+        pathPrefixes: ['/admin/master-data/provinsi'],
+      },
+      {
+        key: 'admin.master-data.regencies',
+        label: 'Kabupaten/Kota',
+        icon: Building2,
+        routeName: 'admin.master-data.regencies.index',
+        activePatterns: ['admin.master-data.regencies.*'],
+        pathPrefixes: ['/admin/master-data/kabupaten-kota'],
+      },
+      {
+        key: 'admin.master-data.districts',
+        label: 'Kecamatan',
+        icon: MapPinned,
+        routeName: 'admin.master-data.districts.index',
+        activePatterns: ['admin.master-data.districts.*'],
+        pathPrefixes: ['/admin/master-data/kecamatan'],
+      },
+      {
+        key: 'admin.master-data.villages',
+        label: 'Kelurahan/Desa',
+        icon: House,
+        routeName: 'admin.master-data.villages.index',
+        activePatterns: ['admin.master-data.villages.*'],
+        pathPrefixes: ['/admin/master-data/kelurahan-desa'],
+      },
+    ],
+  },
+  {
+    key: 'admin.ref-guidelines',
+    label: 'Pedoman Referensi',
+    icon: BookOpen,
+    routeName: 'admin.ref-guidelines.guideline-sets.index',
+    activePatterns: ['admin.ref-guidelines.*'],
+    pathPrefixes: ['/admin/ref-guidelines'],
+    subItems: [
+      {
+        key: 'admin.ref-guidelines.guideline-sets',
+        label: 'Set Pedoman',
+        icon: BookText,
+        routeName: 'admin.ref-guidelines.guideline-sets.index',
+        activePatterns: ['admin.ref-guidelines.guideline-sets.*'],
+        pathPrefixes: ['/admin/ref-guidelines/guideline-sets'],
+      },
+      {
+        key: 'admin.ref-guidelines.construction-cost-indices',
+        label: 'Indeks Kemahalan Konstruksi',
+        icon: Factory,
+        routeName: 'admin.ref-guidelines.construction-cost-indices.index',
+        activePatterns: ['admin.ref-guidelines.construction-cost-indices.*'],
+        pathPrefixes: ['/admin/ref-guidelines/ikk'],
+      },
+      {
+        key: 'admin.ref-guidelines.cost-elements',
+        label: 'Biaya Unit Terpasang',
+        icon: Layers3,
+        routeName: 'admin.ref-guidelines.cost-elements.index',
+        activePatterns: ['admin.ref-guidelines.cost-elements.*'],
+        pathPrefixes: ['/admin/ref-guidelines/cost-elements'],
+      },
+      {
+        key: 'admin.ref-guidelines.floor-indices',
+        label: 'Indeks Lantai',
+        icon: Building2,
+        routeName: 'admin.ref-guidelines.floor-indices.index',
+        activePatterns: ['admin.ref-guidelines.floor-indices.*'],
+        pathPrefixes: ['/admin/ref-guidelines/floor-indices'],
+      },
+      {
+        key: 'admin.ref-guidelines.mappi-rcn-standards',
+        label: 'MAPPI RCN',
+        icon: Ruler,
+        routeName: 'admin.ref-guidelines.mappi-rcn-standards.index',
+        activePatterns: ['admin.ref-guidelines.mappi-rcn-standards.*'],
+        pathPrefixes: ['/admin/ref-guidelines/mappi-rcn-standards'],
+      },
+      {
+        key: 'admin.ref-guidelines.building-economic-lives',
+        label: 'BEL',
+        icon: BookMarked,
+        href: '/legacy-admin/ref-guidelines/building-economic-lives',
+      },
+      {
+        key: 'admin.ref-guidelines.ikk-by-province',
+        label: 'IKK by Province',
+        icon: MapPinned,
+        href: '/legacy-admin/ref-guidelines/ikk-by-province',
+      },
+      {
+        key: 'admin.ref-guidelines.valuation-settings',
+        label: 'Pengaturan Valuasi',
+        icon: ClipboardList,
+        routeName: 'admin.ref-guidelines.valuation-settings.index',
+        activePatterns: ['admin.ref-guidelines.valuation-settings.*'],
+        pathPrefixes: ['/admin/ref-guidelines/valuation-settings'],
+      },
+    ],
+  },
+  {
+    key: 'admin.access-control',
+    label: 'Hak Akses',
+    icon: LockKeyhole,
+    routeName: 'admin.access-control.roles.index',
+    activePatterns: ['admin.access-control.*'],
+    pathPrefixes: ['/admin/hak-akses'],
+    subItems: [
+      {
+        key: 'admin.access-control.roles',
+        label: 'Roles',
+        icon: ShieldCheck,
+        routeName: 'admin.access-control.roles.index',
+        activePatterns: ['admin.access-control.roles.*'],
+        pathPrefixes: ['/admin/hak-akses/roles'],
+      },
+    ],
+  },
+  {
+    key: 'admin.content',
+    label: 'Konten',
+    icon: BookOpen,
+    routeName: 'admin.content.articles.index',
+    activePatterns: ['admin.content.articles.*', 'admin.content.categories.*', 'admin.content.tags.*'],
+    pathPrefixes: ['/admin/konten/artikel', '/admin/konten/kategori-artikel', '/admin/konten/tag'],
+    subItems: [
+      {
+        key: 'admin.content.articles',
+        label: 'Artikel',
+        icon: BookText,
+        routeName: 'admin.content.articles.index',
+        activePatterns: ['admin.content.articles.*'],
+        pathPrefixes: ['/admin/konten/artikel'],
+      },
+      {
+        key: 'admin.content.categories',
+        label: 'Kategori Artikel',
+        icon: FolderTree,
+        routeName: 'admin.content.categories.index',
+        activePatterns: ['admin.content.categories.*'],
+        pathPrefixes: ['/admin/konten/kategori-artikel'],
+      },
+      {
+        key: 'admin.content.tags',
+        label: 'Tag',
+        icon: Tags,
+        routeName: 'admin.content.tags.index',
+        activePatterns: ['admin.content.tags.*'],
+        pathPrefixes: ['/admin/konten/tag'],
+      },
+    ],
+  },
+  {
+    key: 'admin.legal',
+    label: 'Konten & Legal',
+    icon: FileText,
+    routeName: 'admin.content.legal.faqs.index',
+    activePatterns: ['admin.content.legal.*'],
+    pathPrefixes: ['/admin/konten/legal'],
+    subItems: [
+      {
+        key: 'admin.legal.faqs',
+        label: 'FAQ',
+        icon: CircleHelp,
+        routeName: 'admin.content.legal.faqs.index',
+        activePatterns: ['admin.content.legal.faqs.*'],
+        pathPrefixes: ['/admin/konten/legal/faq'],
+      },
+      {
+        key: 'admin.legal.features',
+        label: 'Fitur',
+        icon: Sparkles,
+        routeName: 'admin.content.legal.features.index',
+        activePatterns: ['admin.content.legal.features.*'],
+        pathPrefixes: ['/admin/konten/legal/fitur'],
+      },
+      {
+        key: 'admin.legal.testimonials',
+        label: 'Testimoni',
+        icon: MessageSquareQuote,
+        routeName: 'admin.content.legal.testimonials.index',
+        activePatterns: ['admin.content.legal.testimonials.*'],
+        pathPrefixes: ['/admin/konten/legal/testimoni'],
+      },
+      {
+        key: 'admin.legal.terms',
+        label: 'Terms',
+        icon: ScrollText,
+        routeName: 'admin.content.legal.terms.index',
+        activePatterns: ['admin.content.legal.terms.*'],
+        pathPrefixes: ['/admin/konten/legal/terms'],
+      },
+      {
+        key: 'admin.legal.privacy',
+        label: 'Privacy',
+        icon: ShieldCheck,
+        routeName: 'admin.content.legal.privacy.index',
+        activePatterns: ['admin.content.legal.privacy.*'],
+        pathPrefixes: ['/admin/konten/legal/privacy'],
+      },
+      {
+        key: 'admin.legal.consent',
+        label: 'Consent',
+        icon: FileText,
+        routeName: 'admin.content.legal.consent.index',
+        activePatterns: ['admin.content.legal.consent.*'],
+        pathPrefixes: ['/admin/konten/legal/consent'],
+      },
+      {
+        key: 'admin.legal.user-consents',
+        label: 'Audit Consent',
+        icon: ClipboardCheck,
+        routeName: 'admin.content.legal.user-consents.index',
+        activePatterns: ['admin.content.legal.user-consents.*'],
+        pathPrefixes: ['/admin/konten/legal/persetujuan-pengguna'],
+      },
+    ],
+  },
+  {
+    key: 'admin.communications',
+    label: 'Komunikasi',
+    icon: Mail,
+    routeName: 'admin.communications.contact-messages.index',
+    activePatterns: ['admin.communications.*'],
+    pathPrefixes: ['/admin/komunikasi'],
+    subItems: [
+      {
+        key: 'admin.communications.contact-messages',
+        label: 'Contact Message',
+        icon: Mail,
+        routeName: 'admin.communications.contact-messages.index',
+        activePatterns: ['admin.communications.contact-messages.*'],
+        pathPrefixes: ['/admin/komunikasi/contact-messages'],
+      },
+    ],
+  },
 ];
 
 const sidebarOpen = ref(true);
@@ -76,6 +355,7 @@ const handleResize = () => {
 onMounted(() => {
   handleResize();
   window.addEventListener('resize', handleResize);
+  syncOpenGroups();
 
   refreshNotifications();
   notifTimer = setInterval(refreshNotifications, 15000);
@@ -113,6 +393,16 @@ const isActive = (item) => {
 
     return false;
   }
+};
+
+const syncOpenGroups = () => {
+  openGroups.value = navItems.reduce((carry, item) => {
+    if (item.subItems?.length) {
+      carry[item.key] = isActive(item);
+    }
+
+    return carry;
+  }, {});
 };
 
 const isProfileActive = computed(() => {
@@ -230,6 +520,7 @@ watch(
 watch(
   () => page.url,
   () => {
+    syncOpenGroups();
     closeSidebar();
   },
 );
@@ -249,6 +540,7 @@ watch(
       :sidebar-open="sidebarOpen"
       :sidebar-collapsed="sidebarCollapsed"
       :is-active="isActive"
+      :open-groups="openGroups"
       :is-profile-active="isProfileActive"
       :user="user"
       :close-sidebar="closeSidebar"

@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
+import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { formatDateTime } from '@/utils/reviewer';
 
 const props = defineProps({
   filters: {
@@ -71,6 +73,14 @@ const destroyRecord = (item) => {
     preserveScroll: true,
   });
 };
+
+const columns = [
+  { key: 'bank', label: 'Bank', cellClass: 'min-w-[180px]' },
+  { key: 'owner', label: 'Pemilik', cellClass: 'min-w-[180px]' },
+  { key: 'status', label: 'Status', cellClass: 'min-w-[110px]' },
+  { key: 'meta', label: 'Meta', cellClass: 'min-w-[120px]' },
+  { key: 'actions', label: 'Aksi', cellClass: 'min-w-[200px]' },
+];
 </script>
 
 <template>
@@ -162,46 +172,49 @@ const destroyRecord = (item) => {
           <CardTitle>Daftar Rekening</CardTitle>
           <CardDescription>CRUD rekening kantor sekarang berjalan di workspace admin Vue.</CardDescription>
         </CardHeader>
-        <CardContent class="space-y-3">
-          <div
-            v-for="item in records"
-            :key="item.id"
-            class="rounded-2xl border p-4"
+        <CardContent>
+          <AdminDataTable
+            :columns="columns"
+            :rows="records"
+            empty-text="Tidak ada rekening kantor yang cocok dengan filter saat ini."
           >
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <p class="font-medium text-slate-950">{{ item.bank_name }}</p>
-                  <Badge variant="outline" :class="item.is_active ? 'bg-emerald-100 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-800 border-slate-200'">
-                    {{ item.is_active ? 'Aktif' : 'Nonaktif' }}
-                  </Badge>
-                </div>
-                <p class="mt-1 text-sm text-slate-700">{{ item.account_number }}</p>
-                <p class="mt-1 text-xs text-slate-500">{{ item.account_holder }}<span v-if="item.branch"> - {{ item.branch }}</span></p>
-              </div>
-              <div class="text-right text-sm text-slate-600">
-                <p>{{ item.currency }}</p>
-                <p class="mt-1">Urutan: {{ item.sort_order }}</p>
-                <p class="mt-1">{{ item.updated_at ? new Date(item.updated_at).toLocaleString('id-ID') : '-' }}</p>
-              </div>
-            </div>
-            <p v-if="item.notes" class="mt-3 text-sm text-slate-600">{{ item.notes }}</p>
-            <div class="mt-3 flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" as-child>
-                <Link :href="item.edit_url">Edit</Link>
-              </Button>
-              <Button variant="outline" size="sm" @click="destroyRecord(item)">
-                Hapus
-              </Button>
-              <Button v-if="item.legacy_url" variant="outline" size="sm" as-child>
-                <a :href="item.legacy_url">Lihat di Legacy</a>
-              </Button>
-            </div>
-          </div>
+            <template #cell-bank="{ row }">
+              <p class="font-medium text-slate-950">{{ row.bank_name }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ row.account_number }}</p>
+            </template>
 
-          <div v-if="!records.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
-            Tidak ada rekening kantor yang cocok dengan filter saat ini.
-          </div>
+            <template #cell-owner="{ row }">
+              <p>{{ row.account_holder }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ row.branch || '-' }}</p>
+              <p v-if="row.notes" class="mt-1 text-xs text-slate-500 line-clamp-2">{{ row.notes }}</p>
+            </template>
+
+            <template #cell-status="{ row }">
+              <Badge variant="outline" :class="row.is_active ? 'bg-emerald-100 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-800 border-slate-200'">
+                {{ row.is_active ? 'Aktif' : 'Nonaktif' }}
+              </Badge>
+            </template>
+
+            <template #cell-meta="{ row }">
+              <p>{{ row.currency }}</p>
+              <p class="mt-1 text-xs text-slate-500">Urutan: {{ row.sort_order }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ formatDateTime(row.updated_at) }}</p>
+            </template>
+
+            <template #cell-actions="{ row }">
+              <div class="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" as-child>
+                  <Link :href="row.edit_url">Edit</Link>
+                </Button>
+                <Button variant="outline" size="sm" @click="destroyRecord(row)">
+                  Hapus
+                </Button>
+                <Button v-if="row.legacy_url" variant="outline" size="sm" as-child>
+                  <a :href="row.legacy_url">Legacy</a>
+                </Button>
+              </div>
+            </template>
+          </AdminDataTable>
         </CardContent>
       </Card>
     </div>
