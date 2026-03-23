@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,6 @@ const props = defineProps({
   records: { type: Object, required: true },
   canCreate: { type: Boolean, default: false },
   createUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const applyFilters = (patch = {}) => {
@@ -57,16 +57,15 @@ const columns = [
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 10</p>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">User Terdaftar</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Workspace admin Vue untuk melihat dan mengelola user terdaftar tanpa membuka resource Filament.
+            Workspace admin Vue untuk melihat dan mengelola user terdaftar dari satu panel yang konsisten.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
           <Button v-if="canCreate" as-child>
             <Link :href="createUrl">Tambah User</Link>
           </Button>
-          <Button variant="outline" as-child>
-            <a :href="legacyPanelUrl">Buka di Legacy Admin</a>
-          </Button>
+
+
         </div>
       </section>
 
@@ -146,11 +145,12 @@ const columns = [
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" as-child><Link :href="row.show_url">Detail</Link></Button>
-                <Button variant="outline" size="sm" as-child><Link :href="row.edit_url">Edit</Link></Button>
-                <Button v-if="row.legacy_url" variant="outline" size="sm" as-child><a :href="row.legacy_url">Legacy</a></Button>
-              </div>
+              <AdminEntityActions
+                :detail-href="row.show_url"
+                :edit-href="row.edit_url"
+                entity-label="user"
+                :entity-name="row.name"
+              />
             </template>
           </AdminDataTable>
         </CardContent>

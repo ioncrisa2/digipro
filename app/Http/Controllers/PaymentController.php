@@ -5,17 +5,14 @@ namespace App\Http\Controllers;
 use App\Enums\AppraisalStatusEnum;
 use App\Models\AppraisalRequest;
 use App\Models\Payment;
-use App\Models\User;
 use App\Notifications\AppraisalPaymentStatusNotification;
+use App\Services\Admin\AdminNotificationService;
 use App\Services\Payments\MidtransSnapService;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Filament\Notifications\Actions\Action as FilamentNotificationAction;
-use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
-use Spatie\Permission\Models\Role;
 
 /**
  * Handles Midtrans Snap payment pages, sessions, and invoice flows.
@@ -696,33 +693,6 @@ class PaymentController extends Controller
 
     private function notifyAdminsPaymentConfirmed(Payment $payment): void
     {
-        $guardName = config('auth.defaults.guard', 'web');
-        $roleCandidates = array_values(array_filter([
-            config('filament-shield.super_admin.enabled', true)
-                ? config('filament-shield.super_admin.name', 'super_admin')
-                : null,
-            'admin',
-        ]));
-
-        $existingRoleNames = Role::query()
-            ->whereIn('name', $roleCandidates)
-            ->where('guard_name', $guardName)
-            ->pluck('name')
-            ->values()
-            ->all();
-
-        if (empty($existingRoleNames)) {
-            return;
-        }
-
-        $adminUsers = User::query()
-            ->role($existingRoleNames, $guardName)
-            ->get();
-
-        if ($adminUsers->isEmpty()) {
-            return;
-        }
-
         $appraisal = $payment->appraisalRequest;
         $requestNumber = $appraisal?->request_number ?? ('REQ-' . ($appraisal?->id ?? '-'));
         $body = "{$requestNumber} pembayaran terkonfirmasi dan masuk Proses Valuasi Berjalan.";
@@ -736,16 +706,11 @@ class PaymentController extends Controller
             }
         }
 
-        FilamentNotification::make()
-            ->title('Pembayaran terkonfirmasi')
-            ->body($body)
-            ->actions($targetUrl ? [
-                FilamentNotificationAction::make('view')
-                    ->label('Lihat Request')
-                    ->url($targetUrl)
-                    ->markAsRead(),
-            ] : [])
-            ->icon('heroicon-o-banknotes')
-            ->sendToDatabase($adminUsers, true);
+        app(AdminNotificationService::class)->notifyAdmins(
+            'Pembayaran terkonfirmasi',
+            $body,
+            $targetUrl,
+            'heroicon-o-banknotes',
+        );
     }
 }

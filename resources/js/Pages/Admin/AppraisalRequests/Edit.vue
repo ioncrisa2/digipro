@@ -35,10 +35,6 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  legacyPanelUrl: {
-    type: String,
-    default: '/legacy-admin',
-  },
 });
 
 const form = useForm({
@@ -92,9 +88,8 @@ const submit = () => {
           <Button variant="outline" as-child>
             <Link :href="route('admin.appraisal-requests.show', record.id)">Kembali ke detail</Link>
           </Button>
-          <Button variant="outline" as-child>
-            <a :href="legacyPanelUrl">Buka di Legacy Admin</a>
-          </Button>
+
+
         </div>
       </section>
 
@@ -102,7 +97,7 @@ const submit = () => {
         <Card>
           <CardHeader>
             <CardTitle>Informasi Dasar</CardTitle>
-            <CardDescription>Field aman yang sudah dipindahkan lebih dulu dari Filament.</CardDescription>
+            <CardDescription>Field aman yang dipakai admin untuk pembaruan dasar permohonan.</CardDescription>
           </CardHeader>
           <CardContent class="space-y-6">
             <div class="grid gap-6 md:grid-cols-2">
@@ -159,7 +154,7 @@ const submit = () => {
         <Card>
           <CardHeader>
             <CardTitle>Kontrak & Penawaran</CardTitle>
-            <CardDescription>Nomor penawaran dibentuk otomatis dari nomor urut dengan format yang sama seperti legacy Filament.</CardDescription>
+            <CardDescription>Nomor penawaran dibentuk otomatis dari nomor urut dengan format backend yang konsisten.</CardDescription>
           </CardHeader>
           <CardContent class="space-y-6">
             <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -250,9 +245,12 @@ const submit = () => {
           <Button type="button" variant="outline" as-child>
             <Link :href="route('admin.appraisal-requests.show', record.id)">Batal</Link>
           </Button>
+
+
           <Button type="submit" :disabled="form.processing">
             Simpan Perubahan
           </Button>
+
         </div>
       </form>
     </div>

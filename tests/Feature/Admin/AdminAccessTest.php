@@ -11,6 +11,7 @@ use App\Models\AppraisalRequestFile;
 use App\Models\AppraisalUserConsent;
 use App\Models\Article;
 use App\Models\ArticleCategory;
+use App\Models\BuildingEconomicLife;
 use App\Models\ConsentDocument;
 use App\Models\ConstructionCostIndex;
 use App\Models\ContactMessage;
@@ -3120,4 +3121,220 @@ it('deletes a mappi rcn standard from the vue admin workspace', function () {
         ->assertRedirect(route('admin.ref-guidelines.mappi-rcn-standards.index'));
 
     expect(MappiRcnStandard::query()->whereKey($record->id)->exists())->toBeFalse();
+});
+
+it('renders the building economic life list in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman BEL 2026',
+        'year' => 2026,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    BuildingEconomicLife::query()->create([
+        'guideline_item_id' => $guidelineSet->id,
+        'year' => 2026,
+        'category' => 'Rumah Tinggal',
+        'sub_category' => 'Menengah',
+        'building_type' => 'RUMAH',
+        'building_class' => 'GRADE_A',
+        'storey_min' => 1,
+        'storey_max' => 2,
+        'economic_life' => 40,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.building-economic-lives.index', ['category' => 'Rumah Tinggal']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/BuildingEconomicLives/Index')
+            ->where('records.meta.total', 1)
+            ->where('records.data.0.economic_life', 40));
+});
+
+it('creates a building economic life record from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman BEL 2027',
+        'year' => 2027,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.building-economic-lives.store'), [
+            'guideline_item_id' => $guidelineSet->id,
+            'year' => 2027,
+            'category' => 'Ruko',
+            'sub_category' => 'Komersial',
+            'building_type' => 'RUKO',
+            'building_class' => 'GRADE_B',
+            'storey_min' => 2,
+            'storey_max' => 4,
+            'economic_life' => 35,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.building-economic-lives.index'));
+
+    $record = BuildingEconomicLife::query()
+        ->where('guideline_item_id', $guidelineSet->id)
+        ->where('category', 'Ruko')
+        ->where('building_class', 'GRADE_B')
+        ->first();
+
+    expect($record)->not->toBeNull();
+    expect((int) $record->economic_life)->toBe(35);
+});
+
+it('updates a building economic life record from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman BEL 2028',
+        'year' => 2028,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $record = BuildingEconomicLife::query()->create([
+        'guideline_item_id' => $guidelineSet->id,
+        'year' => 2028,
+        'category' => 'Apartemen',
+        'sub_category' => 'High Rise',
+        'building_type' => 'APARTEMEN',
+        'building_class' => 'GRADE_A',
+        'storey_min' => 6,
+        'storey_max' => 20,
+        'economic_life' => 45,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.ref-guidelines.building-economic-lives.update', $record), [
+            'guideline_item_id' => $guidelineSet->id,
+            'year' => 2028,
+            'category' => 'Apartemen',
+            'sub_category' => 'High Rise',
+            'building_type' => 'APARTEMEN',
+            'building_class' => 'GRADE_A',
+            'storey_min' => 6,
+            'storey_max' => 20,
+            'economic_life' => 48,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.building-economic-lives.index'));
+
+    $record->refresh();
+
+    expect((int) $record->economic_life)->toBe(48);
+});
+
+it('deletes a building economic life record from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman BEL 2029',
+        'year' => 2029,
+        'description' => null,
+        'is_active' => false,
+    ]);
+    $record = BuildingEconomicLife::query()->create([
+        'guideline_item_id' => $guidelineSet->id,
+        'year' => 2029,
+        'category' => 'Gudang',
+        'sub_category' => null,
+        'building_type' => 'GUDANG',
+        'building_class' => null,
+        'storey_min' => null,
+        'storey_max' => null,
+        'economic_life' => 30,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.ref-guidelines.building-economic-lives.destroy', $record))
+        ->assertRedirect(route('admin.ref-guidelines.building-economic-lives.index'));
+
+    expect(BuildingEconomicLife::query()->whereKey($record->id)->exists())->toBeFalse();
+});
+
+it('renders the ikk by province page in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IKK Provinsi 2026',
+        'year' => 2026,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $province = Province::query()->create(['id' => '31', 'name' => 'DKI Jakarta']);
+    $regency = Regency::query()->create(['id' => '3171', 'name' => 'Jakarta Selatan', 'province_id' => $province->id]);
+
+    ConstructionCostIndex::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2026,
+        'region_code' => $regency->id,
+        'region_name' => $regency->name,
+        'ikk_value' => 1.1250,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.ikk-by-province.index', [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2026,
+            'province_id' => $province->id,
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/IkkByProvince/Index')
+            ->where('items.0.region_code', '3171')
+            ->where('items.0.ikk_value', 1.125));
+});
+
+it('saves ikk by province from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IKK Provinsi 2027',
+        'year' => 2027,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $province = Province::query()->create(['id' => '32', 'name' => 'Jawa Barat']);
+    $regencyA = Regency::query()->create(['id' => '3201', 'name' => 'Kabupaten Bogor', 'province_id' => $province->id]);
+    $regencyB = Regency::query()->create(['id' => '3202', 'name' => 'Kabupaten Sukabumi', 'province_id' => $province->id]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.ikk-by-province.save'), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2027,
+            'province_id' => $province->id,
+            'items' => [
+                [
+                    'region_code' => $regencyA->id,
+                    'regency_name' => $regencyA->name,
+                    'ikk_value' => 0.9785,
+                ],
+                [
+                    'region_code' => $regencyB->id,
+                    'regency_name' => $regencyB->name,
+                    'ikk_value' => 1.0342,
+                ],
+            ],
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.ikk-by-province.index', [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2027,
+            'province_id' => $province->id,
+        ]));
+
+    expect((float) ConstructionCostIndex::query()
+        ->where('guideline_set_id', $guidelineSet->id)
+        ->where('year', 2027)
+        ->where('region_code', $regencyA->id)
+        ->value('ikk_value'))->toBe(0.9785);
+
+    expect((float) ConstructionCostIndex::query()
+        ->where('guideline_set_id', $guidelineSet->id)
+        ->where('year', 2027)
+        ->where('region_code', $regencyB->id)
+        ->value('ikk_value'))->toBe(1.0342);
 });

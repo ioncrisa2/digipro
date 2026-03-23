@@ -29,7 +29,6 @@ const props = defineProps({
   showIdField: { type: Boolean, default: true },
   submitUrl: { type: String, required: true },
   indexUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const isEditMode = computed(() => props.mode === 'edit');
@@ -225,9 +224,8 @@ const submit = () => {
           <Button variant="outline" as-child>
             <Link :href="indexUrl">Kembali ke daftar</Link>
           </Button>
-          <Button variant="outline" as-child>
-            <a :href="record.legacy_url || legacyPanelUrl">Legacy</a>
-          </Button>
+
+
         </div>
       </section>
 
@@ -300,9 +298,12 @@ const submit = () => {
           <Button type="button" variant="outline" as-child>
             <Link :href="indexUrl">Batal</Link>
           </Button>
+
+
           <Button type="submit" :disabled="form.processing">
             {{ isEditMode ? 'Simpan Perubahan' : resource.create_label }}
           </Button>
+
         </div>
       </form>
     </div>

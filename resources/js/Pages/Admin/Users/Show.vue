@@ -10,7 +10,6 @@ const props = defineProps({
   record: { type: Object, required: true },
   indexUrl: { type: String, required: true },
   editUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 </script>
 
@@ -28,7 +27,6 @@ const props = defineProps({
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
           <Button variant="outline" as-child><Link :href="editUrl">Edit User</Link></Button>
-          <Button variant="outline" as-child><a :href="record.legacy_url || legacyPanelUrl">Legacy</a></Button>
         </div>
       </section>
 

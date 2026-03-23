@@ -22,7 +22,6 @@ const props = defineProps({
   formOptions: { type: Object, default: () => ({}) },
   submitUrl: { type: String, required: true },
   indexUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin/ref-guidelines/mappi-rcn-standards' },
 });
 
 const isEditMode = computed(() => props.mode === 'edit');
@@ -72,7 +71,6 @@ const submit = () => {
         </div>
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
-          <Button variant="outline" as-child><a :href="record.legacy_url || legacyPanelUrl">Legacy</a></Button>
         </div>
       </section>
 
@@ -154,6 +152,7 @@ const submit = () => {
           <Button type="submit" :disabled="form.processing">
             {{ isEditMode ? 'Simpan Perubahan' : 'Tambah MAPPI RCN' }}
           </Button>
+
         </div>
       </form>
     </div>

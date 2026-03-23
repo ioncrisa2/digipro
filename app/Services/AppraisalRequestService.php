@@ -10,8 +10,7 @@ use App\Models\AppraisalRequest;
 use App\Models\GuidelineSet;
 use App\Models\User;
 use App\Notifications\AppraisalRequestCreated;
-use Filament\Notifications\Actions\Action as FilamentAction;
-use Filament\Notifications\Notification as FilamentNotification;
+use App\Services\Admin\AdminNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -204,47 +203,20 @@ class AppraisalRequestService
                 );
             }
 
-            $adminRoleNames = array_values(array_filter([
-                config('filament-shield.super_admin.enabled', true)
-                    ? config('filament-shield.super_admin.name', 'super_admin')
-                    : null,
-            ]));
-
-            if (empty($adminRoleNames)) {
-                $adminRoleNames = ['admin'];
-            }
-
-            $existingAdminRoleNames = Role::query()
-                ->whereIn('name', $adminRoleNames)
-                ->where('guard_name', $guardName)
-                ->pluck('name')
-                ->values()
-                ->all();
-
-            $adminUsers = collect();
-            if (!empty($existingAdminRoleNames)) {
-                $adminUsers = User::query()
-                    ->role($existingAdminRoleNames, $guardName)
-                    ->whereKeyNot(Auth::id())
-                    ->get();
-            }
+            $adminUsers = app(AdminNotificationService::class)->recipients(Auth::id());
 
             if ($adminUsers->isNotEmpty()) {
                 $requestNumber = $appraisalRequest->request_number ?? ('#' . $appraisalRequest->id);
                 $creatorName = $request->user()?->name ?? 'User';
                 $url = route('admin.appraisal-requests.show', ['appraisalRequest' => $appraisalRequest->id]);
 
-                FilamentNotification::make()
-                    ->title('Permohonan penilaian baru')
-                    ->body("{$requestNumber} dibuat oleh {$creatorName}.")
-                    ->actions([
-                        FilamentAction::make('view')
-                            ->label('Lihat')
-                            ->url($url)
-                            ->markAsRead(),
-                    ])
-                    ->icon('heroicon-o-clipboard-document-check')
-                    ->sendToDatabase($adminUsers, true);
+                app(AdminNotificationService::class)->notifyAdmins(
+                    'Permohonan penilaian baru',
+                    "{$requestNumber} dibuat oleh {$creatorName}.",
+                    $url,
+                    'heroicon-o-clipboard-document-check',
+                    Auth::id(),
+                );
             }
 
             return $appraisalRequest;

@@ -47,10 +47,6 @@ const props = defineProps({
     type: String,
     required: true,
   },
-  legacyPanelUrl: {
-    type: String,
-    default: '/legacy-admin',
-  },
 });
 
 const applyFilters = (patch = {}) => {
@@ -103,16 +99,15 @@ const columns = [
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 8</p>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Workspace Keuangan</h1>
           <p class="mt-2 text-sm text-slate-600">
-            List pembayaran admin Vue menggantikan view list Filament untuk operasional baca dan audit cepat.
+            List pembayaran admin untuk operasional baca dan audit cepat.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" as-child>
             <Link :href="officeBankAccountsUrl">Lihat Rekening Kantor</Link>
           </Button>
-          <Button variant="outline" as-child>
-            <a :href="legacyPanelUrl">Buka di Legacy Admin</a>
-          </Button>
+
+
         </div>
       </section>
 
@@ -214,6 +209,8 @@ const columns = [
               <Button variant="link" class="h-auto px-0 font-medium" as-child>
                 <Link :href="row.show_url">{{ row.invoice_number }}</Link>
               </Button>
+
+
               <p class="mt-1 text-xs text-slate-500">{{ row.external_payment_id || '-' }}</p>
             </template>
 
@@ -221,6 +218,8 @@ const columns = [
               <Button v-if="row.request_show_url" variant="link" class="h-auto px-0 font-medium" as-child>
                 <Link :href="row.request_show_url">{{ row.request_number }}</Link>
               </Button>
+
+
               <span v-else>{{ row.request_number }}</span>
               <p class="mt-1 text-xs text-slate-500">{{ row.requester_name }}</p>
             </template>
@@ -250,6 +249,8 @@ const columns = [
               <Button variant="link" class="mt-1 h-auto px-0 text-xs" as-child>
                 <Link :href="row.edit_url">Edit pembayaran</Link>
               </Button>
+
+
             </template>
           </AdminDataTable>
         </CardContent>

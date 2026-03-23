@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +23,6 @@ const props = defineProps({
   summary: { type: Object, default: () => ({ total: 0, active: 0, valuation_settings: 0, ikk_rows: 0 }) },
   records: { type: Object, required: true },
   createUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const columns = [
@@ -42,10 +42,6 @@ const applyFilters = (patch = {}) => {
   });
 };
 
-const destroyRecord = (item) => {
-  if (!window.confirm(`Hapus guideline set "${item.name}"?`)) return;
-  router.delete(item.destroy_url, { preserveScroll: true });
-};
 </script>
 
 <template>
@@ -63,7 +59,6 @@ const destroyRecord = (item) => {
         </div>
         <div class="flex flex-wrap gap-2">
           <Button as-child><Link :href="createUrl">Tambah Guideline Set</Link></Button>
-          <Button variant="outline" as-child><a :href="legacyPanelUrl">Buka di Legacy Admin</a></Button>
         </div>
       </section>
 
@@ -127,11 +122,12 @@ const destroyRecord = (item) => {
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" as-child><Link :href="row.edit_url">Edit</Link></Button>
-                <Button variant="outline" size="sm" @click="destroyRecord(row)">Hapus</Button>
-                <Button v-if="row.legacy_url" variant="outline" size="sm" as-child><a :href="row.legacy_url">Legacy</a></Button>
-              </div>
+              <AdminEntityActions
+                :edit-href="row.edit_url"
+                :delete-url="row.destroy_url"
+                entity-label="set pedoman"
+                :entity-name="row.name"
+              />
             </template>
           </AdminDataTable>
         </CardContent>

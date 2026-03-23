@@ -29,10 +29,6 @@ const props = defineProps({
     type: String,
     required: true,
   },
-  legacyPanelUrl: {
-    type: String,
-    default: '/legacy-admin',
-  },
 });
 
 const statusTone = (status) => {
@@ -71,18 +67,19 @@ const statusTone = (status) => {
           <Button as-child>
             <Link :href="route('admin.finance.payments.edit', record.id)">Edit Pembayaran</Link>
           </Button>
+
+
           <Button variant="outline" as-child>
             <Link :href="indexUrl">Kembali ke daftar</Link>
           </Button>
+
+
           <Button variant="outline" as-child>
             <Link :href="officeBankAccountsUrl">Rekening Kantor</Link>
           </Button>
-          <Button v-if="record.legacy_url" as-child>
-            <a :href="record.legacy_url">Buka di Legacy Admin</a>
-          </Button>
-          <Button v-else as-child>
-            <a :href="legacyPanelUrl">Buka Legacy Admin</a>
-          </Button>
+
+
+
         </div>
       </section>
 
@@ -169,7 +166,7 @@ const statusTone = (status) => {
           <Card>
             <CardHeader>
               <CardTitle>Metadata</CardTitle>
-              <CardDescription>Flattened metadata agar inspeksi transaksi tidak perlu buka raw JSON di Filament.</CardDescription>
+              <CardDescription>Metadata transaksi diringkas agar inspeksi admin lebih cepat dan mudah dibaca.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-3">
               <div
@@ -195,6 +192,8 @@ const statusTone = (status) => {
                   <Button v-if="record.request_show_url" variant="link" class="h-auto px-0 font-medium" as-child>
                     <Link :href="record.request_show_url">{{ record.request_number }}</Link>
                   </Button>
+
+
                   <p v-else class="font-medium text-slate-950">{{ record.request_number }}</p>
                 </div>
               </div>
@@ -234,6 +233,8 @@ const statusTone = (status) => {
                 <Button variant="outline" as-child>
                   <a :href="record.proof_url" target="_blank" rel="noreferrer">Buka Bukti</a>
                 </Button>
+
+
               </div>
             </CardContent>
           </Card>

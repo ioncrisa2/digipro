@@ -33,10 +33,6 @@ const props = defineProps({
     type: String,
     required: true,
   },
-  legacyPanelUrl: {
-    type: String,
-    default: '/legacy-admin',
-  },
 });
 
 const form = useForm({
@@ -72,15 +68,14 @@ const submit = () => {
           <Button variant="outline" as-child>
             <Link :href="record.show_url">Kembali ke detail</Link>
           </Button>
+
+
           <Button variant="outline" as-child>
             <Link :href="indexUrl">Kembali ke daftar</Link>
           </Button>
-          <Button v-if="record.legacy_url" variant="outline" as-child>
-            <a :href="record.legacy_url">Buka di Legacy</a>
-          </Button>
-          <Button v-else variant="outline" as-child>
-            <a :href="legacyPanelUrl">Buka Legacy Admin</a>
-          </Button>
+
+
+
         </div>
       </section>
 
@@ -188,9 +183,12 @@ const submit = () => {
           <Button type="button" variant="outline" as-child>
             <Link :href="record.show_url">Batal</Link>
           </Button>
+
+
           <Button type="submit" :disabled="form.processing">
             Simpan Perubahan
           </Button>
+
         </div>
       </form>
     </div>

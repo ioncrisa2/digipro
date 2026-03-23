@@ -78,10 +78,6 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  legacyPanelUrl: {
-    type: String,
-    default: '/legacy-admin',
-  },
 });
 
 const form = useForm({
@@ -141,7 +137,6 @@ const submitLabel = computed(() => (
   props.mode === 'edit' ? 'Simpan Perubahan Aset' : 'Tambah Aset'
 ));
 
-const legacyTargetUrl = computed(() => props.requestRecord.legacy_url || props.legacyPanelUrl);
 
 const isLandOnly = computed(() => form.asset_type === 'tanah');
 
@@ -260,9 +255,8 @@ const submit = () => {
           <Button variant="outline" as-child>
             <Link :href="requestRecord.show_url">Kembali ke detail</Link>
           </Button>
-          <Button variant="outline" as-child>
-            <a :href="legacyTargetUrl">Buka di Legacy Admin</a>
-          </Button>
+
+
         </div>
       </section>
 
@@ -270,7 +264,7 @@ const submit = () => {
         <Card>
           <CardHeader>
             <CardTitle>Informasi Objek</CardTitle>
-            <CardDescription>Field inti yang sebelumnya diisi dari relation manager aset pada panel Filament.</CardDescription>
+            <CardDescription>Field inti aset untuk operasional admin dan proses valuasi.</CardDescription>
           </CardHeader>
           <CardContent class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             <div class="space-y-2">
@@ -624,9 +618,12 @@ const submit = () => {
           <Button type="button" variant="outline" as-child>
             <Link :href="requestRecord.show_url">Batal</Link>
           </Button>
+
+
           <Button type="submit" :disabled="form.processing">
             {{ submitLabel }}
           </Button>
+
         </div>
       </form>
     </div>

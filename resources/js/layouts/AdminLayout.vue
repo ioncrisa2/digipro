@@ -184,15 +184,11 @@ const navItems = [
       },
       {
         key: 'admin.ref-guidelines.building-economic-lives',
-        label: 'BEL',
+        label: 'Umur Ekonomis Bangunan',
         icon: BookMarked,
-        href: '/legacy-admin/ref-guidelines/building-economic-lives',
-      },
-      {
-        key: 'admin.ref-guidelines.ikk-by-province',
-        label: 'IKK by Province',
-        icon: MapPinned,
-        href: '/legacy-admin/ref-guidelines/ikk-by-province',
+        routeName: 'admin.ref-guidelines.building-economic-lives.index',
+        activePatterns: ['admin.ref-guidelines.building-economic-lives.*'],
+        pathPrefixes: ['/admin/ref-guidelines/building-economic-lives'],
       },
       {
         key: 'admin.ref-guidelines.valuation-settings',
@@ -211,24 +207,14 @@ const navItems = [
     routeName: 'admin.access-control.roles.index',
     activePatterns: ['admin.access-control.*'],
     pathPrefixes: ['/admin/hak-akses'],
-    subItems: [
-      {
-        key: 'admin.access-control.roles',
-        label: 'Roles',
-        icon: ShieldCheck,
-        routeName: 'admin.access-control.roles.index',
-        activePatterns: ['admin.access-control.roles.*'],
-        pathPrefixes: ['/admin/hak-akses/roles'],
-      },
-    ],
   },
   {
     key: 'admin.content',
     label: 'Konten',
     icon: BookOpen,
     routeName: 'admin.content.articles.index',
-    activePatterns: ['admin.content.articles.*', 'admin.content.categories.*', 'admin.content.tags.*'],
-    pathPrefixes: ['/admin/konten/artikel', '/admin/konten/kategori-artikel', '/admin/konten/tag'],
+    activePatterns: ['admin.content.*', 'admin.content.legal.*'],
+    pathPrefixes: ['/admin/konten'],
     subItems: [
       {
         key: 'admin.content.articles',
@@ -254,16 +240,6 @@ const navItems = [
         activePatterns: ['admin.content.tags.*'],
         pathPrefixes: ['/admin/konten/tag'],
       },
-    ],
-  },
-  {
-    key: 'admin.legal',
-    label: 'Konten & Legal',
-    icon: FileText,
-    routeName: 'admin.content.legal.faqs.index',
-    activePatterns: ['admin.content.legal.*'],
-    pathPrefixes: ['/admin/konten/legal'],
-    subItems: [
       {
         key: 'admin.legal.faqs',
         label: 'FAQ',
@@ -329,16 +305,6 @@ const navItems = [
     routeName: 'admin.communications.contact-messages.index',
     activePatterns: ['admin.communications.*'],
     pathPrefixes: ['/admin/komunikasi'],
-    subItems: [
-      {
-        key: 'admin.communications.contact-messages',
-        label: 'Contact Message',
-        icon: Mail,
-        routeName: 'admin.communications.contact-messages.index',
-        activePatterns: ['admin.communications.contact-messages.*'],
-        pathPrefixes: ['/admin/komunikasi/contact-messages'],
-      },
-    ],
   },
 ];
 

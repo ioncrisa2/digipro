@@ -1,8 +1,10 @@
 <script setup>
 import { computed, reactive, toRefs, watch } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-vue-next';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import BaseFileUpload from '@/components/base/BaseFileUpload.vue';
+import { useAdminConfirmDialog } from '@/composables/useAdminConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -83,10 +85,6 @@ const props = defineProps({
       cancelled: 0,
     }),
   },
-  legacyPanelUrl: {
-    type: String,
-    default: '/legacy-admin',
-  },
   offerAction: {
     type: Object,
     default: null,
@@ -115,11 +113,12 @@ const {
   negotiations,
   negotiationActionOptions,
   negotiationSummary,
-  legacyPanelUrl,
   offerAction,
   approveLatestNegotiationAction,
   paymentVerification,
 } = toRefs(props);
+
+const { confirmDelete } = useAdminConfirmDialog();
 
 const offerForm = useForm({
   fee_total: offerAction.value?.defaults?.fee_total ?? '',
@@ -308,12 +307,17 @@ const submitRequestFile = () => {
   });
 };
 
-const deleteRequestFile = (file) => {
+const deleteRequestFile = async (file) => {
   if (!file?.can_delete) {
     return;
   }
 
-  if (!window.confirm(`Hapus file "${file.original_name}" dari request ini?`)) {
+  const confirmed = await confirmDelete({
+    entityLabel: 'file request',
+    entityName: file.original_name,
+  });
+
+  if (!confirmed) {
     return;
   }
 
@@ -322,12 +326,17 @@ const deleteRequestFile = (file) => {
   });
 };
 
-const deleteAsset = (asset) => {
+const deleteAsset = async (asset) => {
   if (!asset?.destroy_url) {
     return;
   }
 
-  if (!window.confirm(`Hapus aset #${asset.order} dari request ini?`)) {
+  const confirmed = await confirmDelete({
+    entityLabel: 'aset',
+    entityName: `#${asset.order}`,
+  });
+
+  if (!confirmed) {
     return;
   }
 
@@ -381,12 +390,17 @@ const submitAssetPhoto = (asset) => {
   });
 };
 
-const deleteAssetFile = (asset, file) => {
+const deleteAssetFile = async (asset, file) => {
   if (!file?.destroy_url) {
     return;
   }
 
-  if (!window.confirm(`Hapus file "${file.original_name}" dari aset #${asset.order}?`)) {
+  const confirmed = await confirmDelete({
+    entityLabel: `file aset #${asset.order}`,
+    entityName: file.original_name,
+  });
+
+  if (!confirmed) {
     return;
   }
 
@@ -444,18 +458,19 @@ const filteredNegotiations = computed(() => {
           >
             {{ action.label }}
           </Button>
+
           <Button variant="outline" as-child>
-            <Link :href="route('admin.appraisal-requests.edit', record.id)">Edit Dasar</Link>
+            <Link :href="route('admin.appraisal-requests.edit', record.id)"><Pencil class="h-4 w-4" />Edit Dasar</Link>
           </Button>
+
+
+
           <Button variant="outline" as-child>
-            <Link :href="route('admin.appraisal-requests.index')">Kembali ke daftar</Link>
+            <Link :href="route('admin.appraisal-requests.index')"><ArrowLeft class="h-4 w-4" />Kembali ke daftar</Link>
           </Button>
-          <Button v-if="record.legacy_url" as-child>
-            <a :href="record.legacy_url">Buka di Legacy Admin</a>
-          </Button>
-          <Button v-else variant="outline" as-child>
-            <a :href="legacyPanelUrl">Buka Legacy Admin</a>
-          </Button>
+
+
+
         </div>
       </section>
 
@@ -464,7 +479,7 @@ const filteredNegotiations = computed(() => {
           <Card>
             <CardHeader>
               <CardTitle>Ringkasan Permohonan</CardTitle>
-              <CardDescription>Data inti request yang sebelumnya tersebar di form dan infolist Filament.</CardDescription>
+              <CardDescription>Data inti request untuk verifikasi dan tindak lanjut admin.</CardDescription>
             </CardHeader>
             <CardContent class="grid gap-4 md:grid-cols-2">
               <div>
@@ -572,6 +587,7 @@ const filteredNegotiations = computed(() => {
                   <Button type="button" :disabled="requestFileForm.processing || !requestFileForm.file" @click="submitRequestFile">
                     Upload File Request
                   </Button>
+
                 </div>
               </div>
 
@@ -586,9 +602,13 @@ const filteredNegotiations = computed(() => {
                     <Button variant="outline" size="sm" as-child>
                       <a :href="file.url" target="_blank" rel="noreferrer">Buka File</a>
                     </Button>
-                    <Button v-if="file.can_delete" type="button" variant="outline" size="sm" @click="deleteRequestFile(file)">
+
+
+                    <Button v-if="file.can_delete" type="button" variant="destructive" size="sm" @click="deleteRequestFile(file)">
+                      <Trash2 class="h-4 w-4" />
                       Hapus
                     </Button>
+
                   </div>
                 </div>
               </div>
@@ -603,11 +623,13 @@ const filteredNegotiations = computed(() => {
               <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <CardTitle>Aset Terkait</CardTitle>
-                  <CardDescription>Ringkasan aset, metadata properti, dokumen, dan foto yang sebelumnya tersebar di relation manager Filament.</CardDescription>
+                  <CardDescription>Ringkasan aset, metadata properti, dokumen, dan foto dalam satu tampilan operasional.</CardDescription>
                 </div>
                 <Button v-if="assetCreateUrl" variant="outline" as-child>
                   <Link :href="assetCreateUrl">Tambah Aset</Link>
                 </Button>
+
+
               </div>
             </CardHeader>
             <CardContent class="space-y-4">
@@ -631,15 +653,19 @@ const filteredNegotiations = computed(() => {
                       <Button v-if="asset.edit_url" variant="outline" size="sm" as-child>
                         <Link :href="asset.edit_url">Edit Aset</Link>
                       </Button>
+
+
                       <Button
                         v-if="asset.destroy_url"
                         type="button"
-                        variant="outline"
+                        variant="destructive"
                         size="sm"
                         @click="deleteAsset(asset)"
                       >
+                        <Trash2 class="h-4 w-4" />
                         Hapus
                       </Button>
+
                     </div>
                   </div>
                 </div>
@@ -686,6 +712,8 @@ const filteredNegotiations = computed(() => {
                       <Button variant="outline" size="sm" as-child>
                         <a :href="asset.maps_link" target="_blank" rel="noreferrer">Buka Maps</a>
                       </Button>
+
+
                     </div>
                   </div>
                   <div>
@@ -751,6 +779,7 @@ const filteredNegotiations = computed(() => {
                           >
                             Upload Dokumen Aset
                           </Button>
+
                         </div>
                       </div>
 
@@ -761,9 +790,13 @@ const filteredNegotiations = computed(() => {
                           <Button variant="outline" size="sm" as-child>
                             <a :href="file.url" target="_blank" rel="noreferrer">Buka Dokumen</a>
                           </Button>
-                          <Button v-if="file.can_delete" type="button" variant="outline" size="sm" @click="deleteAssetFile(asset, file)">
+
+
+                          <Button v-if="file.can_delete" type="button" variant="destructive" size="sm" @click="deleteAssetFile(asset, file)">
+                            <Trash2 class="h-4 w-4" />
                             Hapus
                           </Button>
+
                         </div>
                       </div>
                       <div v-if="!asset.documents.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
@@ -824,6 +857,7 @@ const filteredNegotiations = computed(() => {
                           >
                             Upload Foto Aset
                           </Button>
+
                         </div>
                       </div>
 
@@ -840,9 +874,11 @@ const filteredNegotiations = computed(() => {
                           <p class="text-sm font-medium text-slate-950">{{ photo.type_label }}</p>
                           <p class="mt-1 text-xs text-slate-500">{{ photo.original_name }}</p>
                           <div class="mt-3">
-                            <Button v-if="photo.can_delete" type="button" variant="outline" size="sm" @click.prevent="deleteAssetFile(asset, photo)">
+                            <Button v-if="photo.can_delete" type="button" variant="destructive" size="sm" @click.prevent="deleteAssetFile(asset, photo)">
+                              <Trash2 class="h-4 w-4" />
                               Hapus
                             </Button>
+
                           </div>
                         </div>
                       </a>
@@ -899,6 +935,7 @@ const filteredNegotiations = computed(() => {
                   >
                     {{ approveLatestNegotiationAction.label }}
                   </Button>
+
                 </div>
               </div>
 
@@ -946,6 +983,7 @@ const filteredNegotiations = computed(() => {
                   <Button type="submit" :disabled="offerForm.processing">
                     {{ offerAction.label }}
                   </Button>
+
                 </div>
               </form>
             </CardContent>
@@ -973,6 +1011,7 @@ const filteredNegotiations = computed(() => {
                   <Button type="button" size="sm" @click="verifyPayment">
                     Verifikasi Pembayaran
                   </Button>
+
                 </div>
               </div>
 

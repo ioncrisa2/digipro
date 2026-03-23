@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,6 @@ const props = defineProps({
   codeOptions: { type: Array, default: () => [] },
   records: { type: Object, required: true },
   links: { type: Array, default: () => [] },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const columns = [
@@ -42,7 +42,6 @@ const applyFilters = (patch = {}) => {
       <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div><p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 9</p><h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Persetujuan Pengguna</h1></div>
         <div class="flex flex-wrap gap-2">
-          <Button variant="outline" as-child><a :href="legacyPanelUrl">Legacy</a></Button>
         </div>
       </section>
 
@@ -79,7 +78,7 @@ const applyFilters = (patch = {}) => {
             <template #cell-document_title="{ row }">
               <div class="space-y-1">
                 <p class="text-sm text-slate-900">{{ row.document_title }}</p>
-                <p class="text-xs text-slate-500">{{ row.version }} · {{ row.ip || '-' }}</p>
+                <p class="text-xs text-slate-500">{{ row.version }} Â· {{ row.ip || '-' }}</p>
               </div>
             </template>
 
@@ -88,10 +87,11 @@ const applyFilters = (patch = {}) => {
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" as-child><Link :href="row.show_url">Detail</Link></Button>
-                <Button v-if="row.legacy_url" variant="outline" size="sm" as-child><a :href="row.legacy_url">Legacy</a></Button>
-              </div>
+              <AdminEntityActions
+                :detail-href="row.show_url"
+                entity-label="audit consent"
+                :entity-name="row.document_title"
+              />
             </template>
           </AdminDataTable>
         </CardContent>

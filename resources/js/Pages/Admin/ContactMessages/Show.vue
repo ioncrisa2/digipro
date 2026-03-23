@@ -1,16 +1,19 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
+import { Archive, ArrowLeft, Check, LoaderCircle, Trash2 } from 'lucide-vue-next';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAdminConfirmDialog } from '@/composables/useAdminConfirmDialog';
 import { formatDateTime } from '@/utils/reviewer';
 
 const props = defineProps({
   record: { type: Object, required: true },
   indexUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
+
+const { confirmDelete } = useAdminConfirmDialog();
 
 const statusTone = (status) => {
   switch (status) {
@@ -27,7 +30,7 @@ const statusTone = (status) => {
   }
 };
 
-const runAction = (type) => {
+const runAction = async (type) => {
   const map = {
     in_progress: {
       method: 'post',
@@ -53,7 +56,18 @@ const runAction = (type) => {
 
   const action = map[type];
   if (!action) return;
-  if (!window.confirm(action.confirm)) return;
+
+  if (type === 'delete') {
+    const confirmed = await confirmDelete({
+      entityLabel: 'contact message',
+      entityName: props.record.subject || props.record.name,
+      description: `Anda akan menghapus contact message "${props.record.subject || props.record.name}". Aksi ini tidak dapat dibatalkan.`,
+    });
+
+    if (!confirmed) return;
+  } else if (!window.confirm(action.confirm)) {
+    return;
+  }
 
   if (action.method === 'delete') {
     router.delete(action.url, { preserveScroll: true });
@@ -76,12 +90,11 @@ const runAction = (type) => {
           <p class="mt-2 text-sm text-slate-600">{{ record.email }}</p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
-          <Button v-if="record.available_actions.in_progress" variant="outline" @click="runAction('in_progress')">In Progress</Button>
-          <Button v-if="record.available_actions.done" variant="outline" @click="runAction('done')">Done</Button>
-          <Button v-if="record.available_actions.archive" variant="outline" @click="runAction('archive')">Archive</Button>
-          <Button variant="outline" @click="runAction('delete')">Hapus</Button>
-          <Button variant="outline" as-child><a :href="record.legacy_url || legacyPanelUrl">Legacy</a></Button>
+          <Button variant="outline" as-child><Link :href="indexUrl"><ArrowLeft class="h-4 w-4" />Kembali ke daftar</Link></Button>
+          <Button v-if="record.available_actions.in_progress" variant="outline" @click="runAction('in_progress')"><LoaderCircle class="h-4 w-4" />In Progress</Button>
+          <Button v-if="record.available_actions.done" variant="outline" @click="runAction('done')"><Check class="h-4 w-4" />Done</Button>
+          <Button v-if="record.available_actions.archive" variant="outline" @click="runAction('archive')"><Archive class="h-4 w-4" />Archive</Button>
+          <Button variant="destructive" @click="runAction('delete')"><Trash2 class="h-4 w-4" />Hapus</Button>
         </div>
       </section>
 

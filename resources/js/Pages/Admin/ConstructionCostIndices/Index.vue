@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +25,7 @@ const props = defineProps({
   summary: { type: Object, default: () => ({ total: 0, guideline_sets: 0, provinces: 0, active_guideline: 0 }) },
   records: { type: Object, required: true },
   createUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin/ref-guidelines/construction-cost-indices' },
+  ikkByProvinceUrl: { type: String, default: '' },
 });
 
 const columns = [
@@ -45,10 +46,6 @@ const applyFilters = (patch = {}) => {
   });
 };
 
-const destroyRecord = (item) => {
-  if (!window.confirm(`Hapus IKK "${item.region_name}"?`)) return;
-  router.delete(item.destroy_url, { preserveScroll: true });
-};
 </script>
 
 <template>
@@ -65,8 +62,8 @@ const destroyRecord = (item) => {
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <Button v-if="ikkByProvinceUrl" variant="outline" as-child><Link :href="ikkByProvinceUrl">Input IKK by Provinsi</Link></Button>
           <Button as-child><Link :href="createUrl">Tambah IKK</Link></Button>
-          <Button variant="outline" as-child><a :href="legacyPanelUrl">Buka di Legacy Admin</a></Button>
         </div>
       </section>
 
@@ -146,11 +143,12 @@ const destroyRecord = (item) => {
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" as-child><Link :href="row.edit_url">Edit</Link></Button>
-                <Button variant="outline" size="sm" @click="destroyRecord(row)">Hapus</Button>
-                <Button v-if="row.legacy_url" variant="outline" size="sm" as-child><a :href="row.legacy_url">Legacy</a></Button>
-              </div>
+              <AdminEntityActions
+                :edit-href="row.edit_url"
+                :delete-url="row.destroy_url"
+                entity-label="IKK"
+                :entity-name="row.region_name"
+              />
             </template>
           </AdminDataTable>
         </CardContent>

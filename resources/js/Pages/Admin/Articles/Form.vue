@@ -29,7 +29,6 @@ const props = defineProps({
   tagOptions: { type: Array, default: () => [] },
   submitUrl: { type: String, required: true },
   indexUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const isEditMode = computed(() => props.mode === 'edit');
@@ -89,14 +88,12 @@ const submit = () => {
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 9</p>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ isEditMode ? 'Edit Artikel' : 'Tulis Artikel' }}</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Form editorial artikel sudah dipindah ke Inertia. Editor konten memakai HTML textarea agar tidak terikat ke plugin Filament.
+            Form editorial artikel berjalan di Inertia. Editor konten memakai HTML textarea yang ringan dan fleksibel.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
           <Button type="button" variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
           <Button v-if="record.preview_url" type="button" variant="outline" as-child><a :href="record.preview_url" target="_blank" rel="noreferrer">Preview</a></Button>
-          <Button v-if="record.legacy_url" type="button" variant="outline" as-child><a :href="record.legacy_url">Legacy</a></Button>
-          <Button v-else type="button" variant="outline" as-child><a :href="legacyPanelUrl">Legacy</a></Button>
         </div>
       </section>
 
@@ -173,7 +170,7 @@ const submit = () => {
             <div class="space-y-2 md:col-span-2">
               <Label for="content_html">Konten</Label>
               <Textarea id="content_html" v-model="form.content_html" rows="16" placeholder="<p>Konten HTML artikel</p>" />
-              <p class="text-xs text-slate-500">Gunakan HTML valid. Ini menggantikan editor Filament sementara.</p>
+              <p class="text-xs text-slate-500">Gunakan HTML valid. Editor ini sengaja dibuat ringan agar mudah dikustomisasi.</p>
               <p v-if="form.errors.content_html" class="text-xs text-rose-600">{{ form.errors.content_html }}</p>
             </div>
           </CardContent>

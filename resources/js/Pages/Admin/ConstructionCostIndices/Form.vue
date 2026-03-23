@@ -22,7 +22,7 @@ const props = defineProps({
   regencyOptions: { type: Array, default: () => [] },
   submitUrl: { type: String, required: true },
   indexUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin/ref-guidelines/construction-cost-indices' },
+  ikkByProvinceUrl: { type: String, default: '' },
 });
 
 const isEditMode = computed(() => props.mode === 'edit');
@@ -120,8 +120,8 @@ const submit = () => {
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <Button v-if="ikkByProvinceUrl" variant="outline" as-child><Link :href="ikkByProvinceUrl">Input IKK by Provinsi</Link></Button>
           <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
-          <Button variant="outline" as-child><a :href="record.legacy_url || legacyPanelUrl">Legacy</a></Button>
         </div>
       </section>
 
@@ -185,6 +185,7 @@ const submit = () => {
           <Button type="submit" :disabled="form.processing">
             {{ isEditMode ? 'Simpan Perubahan' : 'Tambah IKK' }}
           </Button>
+
         </div>
       </form>
     </div>

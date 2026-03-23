@@ -4,7 +4,6 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Notifications\Notifiable;
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -54,16 +53,11 @@ class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 
-    public function getFilamentAvatarUrl(): ?string
-    {
-        return $this->avatar_url ? Storage::url($this->avatar_url) : null ;
-    }
-
     public function hasAdminAccess(): bool
     {
         $roles = array_values(array_filter([
-            config('filament-shield.super_admin.enabled', true)
-                ? config('filament-shield.super_admin.name', 'super_admin')
+            config('access-control.super_admin.enabled', true)
+                ? config('access-control.super_admin.name', 'super_admin')
                 : null,
             'admin',
         ]));

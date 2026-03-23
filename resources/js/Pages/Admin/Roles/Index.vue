@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,6 @@ const props = defineProps({
   canCreate: { type: Boolean, default: false },
   canDeleteAny: { type: Boolean, default: false },
   createUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const applyFilters = (patch = {}) => {
@@ -36,11 +36,6 @@ const applyFilters = (patch = {}) => {
     preserveScroll: true,
     replace: true,
   });
-};
-
-const destroyRecord = (item) => {
-  if (!window.confirm(`Hapus role "${item.name}"?`)) return;
-  router.delete(item.destroy_url, { preserveScroll: true });
 };
 
 const columns = [
@@ -62,12 +57,11 @@ const columns = [
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Hak Akses</p>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Roles</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Kelola role dan permission matrix yang masih memakai backend `spatie/permission` dan `filament-shield`.
+            Kelola role dan permission matrix yang berjalan di backend `spatie/permission`.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
           <Button v-if="canCreate" as-child><Link :href="createUrl">Tambah Role</Link></Button>
-          <Button variant="outline" as-child><a :href="legacyPanelUrl">Buka di Legacy Admin</a></Button>
         </div>
       </section>
 
@@ -128,12 +122,13 @@ const columns = [
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" as-child><Link :href="row.show_url">Detail</Link></Button>
-                <Button v-if="row.can_update" variant="outline" size="sm" as-child><Link :href="row.edit_url">Edit</Link></Button>
-                <Button v-if="row.can_delete && canDeleteAny" variant="outline" size="sm" @click="destroyRecord(row)">Hapus</Button>
-                <Button v-if="row.legacy_url" variant="outline" size="sm" as-child><a :href="row.legacy_url">Legacy</a></Button>
-              </div>
+              <AdminEntityActions
+                :detail-href="row.show_url"
+                :edit-href="row.can_update ? row.edit_url : null"
+                :delete-url="row.can_delete && canDeleteAny ? row.destroy_url : null"
+                entity-label="role"
+                :entity-name="row.name"
+              />
             </template>
           </AdminDataTable>
         </CardContent>

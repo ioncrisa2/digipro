@@ -16,10 +16,6 @@ defineProps({
     type: Object,
     required: true,
   },
-  legacyPanelUrl: {
-    type: String,
-    default: '/legacy-admin',
-  },
 });
 
 const statusTone = (status) => {
@@ -43,15 +39,11 @@ const statusTone = (status) => {
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl">
             <div class="flex flex-wrap items-center gap-2">
-              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Modul Legacy</p>
               <Badge variant="outline" :class="statusTone(module.status)">{{ module.status_label }}</Badge>
             </div>
             <h1 class="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{{ module.title }}</h1>
             <p class="mt-3 text-sm leading-6 text-slate-600">{{ module.description }}</p>
           </div>
-          <Button as-child>
-            <a :href="legacyPanelUrl">Buka di Legacy Admin</a>
-          </Button>
         </div>
       </section>
 
@@ -59,7 +51,7 @@ const statusTone = (status) => {
         <Card>
           <CardHeader>
             <CardTitle>Surface Area</CardTitle>
-            <CardDescription>Resource Filament yang masih harus digantikan oleh halaman Vue.</CardDescription>
+            <CardDescription>Daftar resource lama yang sudah digantikan oleh halaman Vue.</CardDescription>
           </CardHeader>
           <CardContent class="space-y-3">
             <div
@@ -75,7 +67,7 @@ const statusTone = (status) => {
         <Card>
           <CardHeader>
             <CardTitle>Dependency Backend</CardTitle>
-            <CardDescription>Hal yang perlu diputus dari Filament sebelum modul ini bisa murni Vue.</CardDescription>
+            <CardDescription>Catatan backend dan integrasi yang perlu dijaga untuk modul ini.</CardDescription>
           </CardHeader>
           <CardContent class="space-y-3">
             <div

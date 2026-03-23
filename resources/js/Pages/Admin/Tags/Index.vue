@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +22,6 @@ const props = defineProps({
   summary: { type: Object, default: () => ({ total: 0, active: 0, articles: 0 }) },
   records: { type: Array, default: () => [] },
   createUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const columns = [
@@ -40,10 +40,6 @@ const applyFilters = (patch = {}) => {
   });
 };
 
-const destroyRecord = (item) => {
-  if (!window.confirm(`Hapus tag "${item.name}"?`)) return;
-  router.delete(item.destroy_url, { preserveScroll: true });
-};
 </script>
 
 <template>
@@ -55,7 +51,6 @@ const destroyRecord = (item) => {
         <div><p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 9</p><h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Tag Artikel</h1></div>
         <div class="flex flex-wrap gap-2">
           <Button as-child><Link :href="createUrl">Tambah Tag</Link></Button>
-          <Button variant="outline" as-child><a :href="legacyPanelUrl">Legacy</a></Button>
         </div>
       </section>
 
@@ -92,11 +87,12 @@ const destroyRecord = (item) => {
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" as-child><Link :href="row.edit_url">Edit</Link></Button>
-                <Button variant="outline" size="sm" @click="destroyRecord(row)">Hapus</Button>
-                <Button v-if="row.legacy_url" variant="outline" size="sm" as-child><a :href="row.legacy_url">Legacy</a></Button>
-              </div>
+              <AdminEntityActions
+                :edit-href="row.edit_url"
+                :delete-url="row.destroy_url"
+                entity-label="tag"
+                :entity-name="row.name"
+              />
             </template>
           </AdminDataTable>
         </CardContent>

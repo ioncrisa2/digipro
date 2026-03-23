@@ -6,16 +6,13 @@ use App\Enums\AppraisalStatusEnum;
 use App\Enums\ContractStatusEnum;
 use Illuminate\Http\Request;
 use App\Models\AppraisalRequest;
-use App\Models\User;
+use App\Services\Admin\AdminNotificationService;
 use App\Services\AppraisalService;
 use App\Services\AppraisalRequestService;
 use App\Http\Requests\StoreAppraisalRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Filament\Notifications\Actions\Action as FilamentAction;
-use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Spatie\Permission\Models\Role;
 
 /**
  * Handles appraisal request pages and consent flows.
@@ -536,45 +533,17 @@ class AppraisalController extends Controller
 
         $url = route('admin.appraisal-requests.show', ['appraisalRequest' => $record->id]);
 
-        FilamentNotification::make()
-            ->title($title)
-            ->body($body)
-            ->actions([
-                FilamentAction::make('view')
-                    ->label('Lihat')
-                    ->url($url)
-                    ->markAsRead(),
-            ])
-            ->icon($icon)
-            ->sendToDatabase($adminUsers, true);
+        app(AdminNotificationService::class)->notifyAdmins(
+            $title,
+            $body,
+            $url,
+            $icon,
+            $request->user()?->id,
+        );
     }
 
     private function resolveAdminUsers(Request $request)
     {
-        $guardName = config('auth.defaults.guard', 'web');
-        $configuredSuperAdmin = config('filament-shield.super_admin.enabled', true)
-            ? config('filament-shield.super_admin.name', 'super_admin')
-            : null;
-
-        $roleCandidates = array_values(array_filter([
-            $configuredSuperAdmin,
-            'admin',
-        ]));
-
-        $existingRoleNames = Role::query()
-            ->whereIn('name', $roleCandidates)
-            ->where('guard_name', $guardName)
-            ->pluck('name')
-            ->values()
-            ->all();
-
-        if (empty($existingRoleNames)) {
-            return collect();
-        }
-
-        return User::query()
-            ->role($existingRoleNames, $guardName)
-            ->whereKeyNot($request->user()->id)
-            ->get();
+        return app(AdminNotificationService::class)->recipients($request->user()?->id);
     }
 }

@@ -26,14 +26,6 @@ defineProps({
     type: Array,
     default: () => [],
   },
-  modules: {
-    type: Array,
-    default: () => [],
-  },
-  legacyPanelUrl: {
-    type: String,
-    default: '/legacy-admin',
-  },
 });
 
 const statTone = (tone) => {
@@ -70,17 +62,6 @@ const statusTone = (value) => {
   }
 };
 
-const moduleTone = (status) => {
-  switch (status) {
-    case 'in_progress':
-      return 'bg-emerald-100 text-emerald-900 border-emerald-200';
-    case 'bridge':
-      return 'bg-amber-100 text-amber-900 border-amber-200';
-    default:
-      return 'bg-slate-100 text-slate-800 border-slate-200';
-  }
-};
-
 const actionColumns = [
   { key: 'request', label: 'Request', cellClass: 'min-w-[180px]' },
   { key: 'requester_name', label: 'Pemohon', cellClass: 'min-w-[140px]' },
@@ -94,23 +75,6 @@ const actionColumns = [
 
   <AdminLayout title="Admin Dashboard">
     <div class="space-y-6">
-      <section class="rounded-3xl border bg-white p-6 shadow-sm">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div class="max-w-3xl">
-            <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Migrasi Admin</p>
-            <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-              Panel admin sudah dipindah ke Vue, Filament tetap hidup sebagai legacy bridge.
-            </h1>
-            <p class="mt-3 text-sm leading-6 text-slate-600">
-              Dashboard ini menggantikan entrypoint lama. Resource yang belum dipindah tetap bisa dibuka melalui legacy panel sampai modul Vue-nya selesai.
-            </p>
-          </div>
-          <Button as-child>
-            <a :href="legacyPanelUrl">Buka di Legacy Admin</a>
-          </Button>
-        </div>
-      </section>
-
       <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card v-for="item in stats" :key="item.key">
           <CardContent class="p-5">
@@ -134,11 +98,13 @@ const actionColumns = [
             <div class="flex items-center justify-between gap-3">
               <div>
                 <CardTitle>Permohonan Perlu Tindakan</CardTitle>
-                <CardDescription>Snapshot request yang sebelumnya muncul di widget Filament utama.</CardDescription>
+                <CardDescription>Snapshot request untuk tindak lanjut cepat di workspace admin.</CardDescription>
               </div>
               <Button variant="link" class="h-auto px-0" as-child>
                 <Link :href="route('admin.appraisal-requests.index')">Lihat semua</Link>
               </Button>
+
+
             </div>
           </CardHeader>
           <CardContent>
@@ -151,6 +117,8 @@ const actionColumns = [
                 <Button variant="link" class="h-auto px-0 font-medium" as-child>
                   <Link :href="row.show_url">{{ row.request_number }}</Link>
                 </Button>
+
+
                 <p class="mt-1 text-xs text-slate-500">{{ row.client_name }}</p>
               </template>
 
@@ -174,6 +142,8 @@ const actionColumns = [
                     <Button variant="link" class="h-auto px-0 font-medium" as-child>
                       <Link :href="item.show_url">{{ item.request_number }}</Link>
                     </Button>
+
+
                     <p class="mt-1 text-xs text-slate-500">{{ item.requester_name }}</p>
                   </div>
                   <Badge variant="outline" class="bg-amber-100 text-amber-900 border-amber-200">
@@ -187,30 +157,6 @@ const actionColumns = [
               </div>
               <div v-if="!paymentQueue.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
                 Tidak ada antrean pembayaran.
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader class="pb-4">
-              <CardTitle>Peta Migrasi Modul</CardTitle>
-              <CardDescription>Inventaris admin Filament yang masih harus dipindah ke Vue.</CardDescription>
-            </CardHeader>
-            <CardContent class="space-y-3">
-              <div v-for="module in modules" :key="module.slug" class="rounded-2xl border p-4">
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <p class="font-medium text-slate-950">{{ module.title }}</p>
-                    <p class="mt-1 text-sm text-slate-600">{{ module.description }}</p>
-                  </div>
-                  <Badge variant="outline" :class="moduleTone(module.status)">{{ module.status_label }}</Badge>
-                </div>
-                <div class="mt-3 flex items-center justify-between gap-3 text-sm text-slate-500">
-                  <span>{{ module.resource_count }} resource legacy</span>
-                  <Button variant="link" class="h-auto px-0" as-child>
-                    <Link :href="module.show_url">Lihat detail</Link>
-                  </Button>
-                </div>
               </div>
             </CardContent>
           </Card>

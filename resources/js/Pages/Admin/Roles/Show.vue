@@ -1,6 +1,8 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-vue-next';
 import AdminLayout from '@/layouts/AdminLayout.vue';
+import { useAdminConfirmDialog } from '@/composables/useAdminConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +15,17 @@ const props = defineProps({
   indexUrl: { type: String, required: true },
   editUrl: { type: String, required: true },
   deleteUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
-const destroyRole = () => {
-  if (!window.confirm(`Hapus role "${props.record.name}"?`)) return;
+const { confirmDelete } = useAdminConfirmDialog();
+
+const destroyRole = async () => {
+  const confirmed = await confirmDelete({
+    entityLabel: 'role',
+    entityName: props.record.name,
+  });
+
+  if (!confirmed) return;
   router.delete(props.deleteUrl, { preserveScroll: true });
 };
 </script>
@@ -33,10 +41,9 @@ const destroyRole = () => {
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ record.name }}</h1>
         </div>
         <div class="flex flex-wrap gap-2">
-          <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
-          <Button v-if="canUpdate" variant="outline" as-child><Link :href="editUrl">Edit Role</Link></Button>
-          <Button v-if="canDelete" variant="outline" @click="destroyRole">Hapus</Button>
-          <Button variant="outline" as-child><a :href="record.legacy_url || legacyPanelUrl">Legacy</a></Button>
+          <Button variant="outline" as-child><Link :href="indexUrl"><ArrowLeft class="h-4 w-4" />Kembali ke daftar</Link></Button>
+          <Button v-if="canUpdate" variant="outline" as-child><Link :href="editUrl"><Pencil class="h-4 w-4" />Edit Role</Link></Button>
+          <Button v-if="canDelete" variant="destructive" @click="destroyRole"><Trash2 class="h-4 w-4" />Hapus</Button>
         </div>
       </section>
 

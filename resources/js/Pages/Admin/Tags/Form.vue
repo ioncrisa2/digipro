@@ -13,7 +13,6 @@ const props = defineProps({
   record: { type: Object, required: true },
   submitUrl: { type: String, required: true },
   indexUrl: { type: String, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const isEditMode = computed(() => props.mode === 'edit');
@@ -40,8 +39,6 @@ const submit = () => form.post(props.submitUrl, { preserveScroll: true });
         <div><p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 9</p><h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ isEditMode ? 'Edit Tag Artikel' : 'Tambah Tag Artikel' }}</h1></div>
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
-          <Button v-if="record.legacy_url" variant="outline" as-child><a :href="record.legacy_url">Legacy</a></Button>
-          <Button v-else variant="outline" as-child><a :href="legacyPanelUrl">Legacy</a></Button>
         </div>
       </section>
 

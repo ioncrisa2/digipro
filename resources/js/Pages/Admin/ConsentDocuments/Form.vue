@@ -15,7 +15,6 @@ const props = defineProps({
   indexUrl: { type: String, required: true },
   submitUrl: { type: String, required: true },
   links: { type: Array, default: () => [] },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const isEditMode = computed(() => props.mode === 'edit');
@@ -40,14 +39,12 @@ const submit = () => form.post(props.submitUrl, { preserveScroll: true });
         <div><p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 9</p><h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ isEditMode ? 'Edit Consent Document' : 'Tambah Consent Document' }}</h1></div>
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
-          <Button v-if="record.legacy_url" variant="outline" as-child><a :href="record.legacy_url">Legacy</a></Button>
-          <Button v-else variant="outline" as-child><a :href="legacyPanelUrl">Legacy</a></Button>
         </div>
       </section>
 
       <form class="space-y-6" @submit.prevent="submit">
         <Card>
-          <CardHeader><CardTitle>Informasi Dokumen</CardTitle><CardDescription>Draft consent disimpan di Vue, publish tetap tersedia tanpa Filament.</CardDescription></CardHeader>
+          <CardHeader><CardTitle>Informasi Dokumen</CardTitle><CardDescription>Draft consent disimpan dan dipublikasikan langsung dari workspace admin Vue.</CardDescription></CardHeader>
           <CardContent class="grid gap-6 md:grid-cols-2">
             <div class="space-y-2"><Label for="code">Kode</Label><Input id="code" v-model="form.code" /><p v-if="form.errors.code" class="text-xs text-rose-600">{{ form.errors.code }}</p></div>
             <div class="space-y-2"><Label for="version">Versi</Label><Input id="version" v-model="form.version" /><p v-if="form.errors.version" class="text-xs text-rose-600">{{ form.errors.version }}</p></div>

@@ -1,7 +1,9 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
+import { Pencil, Trash2 } from 'lucide-vue-next';
 import AdminCardList from '@/components/admin/AdminCardList.vue';
 import AdminEntityCard from '@/components/admin/AdminEntityCard.vue';
+import { useAdminConfirmDialog } from '@/composables/useAdminConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,12 +21,13 @@ const props = defineProps({
   records: { type: Array, default: () => [] },
   createUrl: { type: String, required: true },
   links: { type: Array, default: () => [] },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const routeName = props.resource.key === 'terms'
   ? 'admin.content.legal.terms.index'
   : 'admin.content.legal.privacy.index';
+
+const { confirmDelete } = useAdminConfirmDialog();
 
 const applyFilters = (patch = {}) => {
   router.get(route(routeName), { ...props.filters, ...patch }, {
@@ -34,8 +37,13 @@ const applyFilters = (patch = {}) => {
   });
 };
 
-const destroyRecord = (item) => {
-  if (!window.confirm(`Hapus ${props.resource.title} "${item.title}"?`)) return;
+const destroyRecord = async (item) => {
+  const confirmed = await confirmDelete({
+    entityLabel: props.resource.title.toLowerCase(),
+    entityName: item.title,
+  });
+
+  if (!confirmed) return;
   router.delete(item.destroy_url, { preserveScroll: true });
 };
 </script>
@@ -49,7 +57,6 @@ const destroyRecord = (item) => {
         <div><p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 9</p><h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ resource.title }}</h1></div>
         <div class="flex flex-wrap gap-2">
           <Button as-child><Link :href="createUrl">{{ resource.create_label }}</Link></Button>
-          <Button variant="outline" as-child><a :href="legacyPanelUrl">Legacy</a></Button>
         </div>
       </section>
 
@@ -86,9 +93,8 @@ const destroyRecord = (item) => {
             </template>
 
             <template #footer>
-              <Button variant="outline" size="sm" as-child><Link :href="item.edit_url">Edit</Link></Button>
-              <Button variant="outline" size="sm" @click="destroyRecord(item)">Hapus</Button>
-              <Button v-if="item.legacy_url" variant="outline" size="sm" as-child><a :href="item.legacy_url">Legacy</a></Button>
+              <Button variant="outline" size="sm" as-child><Link :href="item.edit_url"><Pencil class="h-4 w-4" />Edit</Link></Button>
+              <Button variant="destructive" size="sm" @click="destroyRecord(item)"><Trash2 class="h-4 w-4" />Hapus</Button>
             </template>
           </AdminEntityCard>
         </template>

@@ -3,6 +3,7 @@ import { reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -38,10 +39,6 @@ const props = defineProps({
   records: {
     type: Object,
     required: true,
-  },
-  legacyPanelUrl: {
-    type: String,
-    default: '/legacy-admin',
   },
 });
 
@@ -120,9 +117,6 @@ const columns = [
             Ini adalah pengganti awal `AppraisalRequestResource`. Detail request sudah bisa dibuka dari Vue, edit lanjutan tetap lewat legacy panel.
           </p>
         </div>
-        <Button variant="outline" as-child>
-          <a :href="legacyPanelUrl">Buka di Legacy Admin</a>
-        </Button>
       </section>
 
       <section class="grid gap-4 md:grid-cols-3">
@@ -181,6 +175,8 @@ const columns = [
               <Button variant="link" class="h-auto px-0 font-medium" as-child>
                 <Link :href="row.show_url">{{ row.request_number }}</Link>
               </Button>
+
+
               <p class="mt-1 text-xs text-slate-500">{{ formatDateTime(row.requested_at) }}</p>
             </template>
 
@@ -203,17 +199,12 @@ const columns = [
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" as-child>
-                  <Link :href="row.show_url">Detail</Link>
-                </Button>
-                <Button variant="ghost" size="sm" as-child>
-                  <Link :href="route('admin.appraisal-requests.edit', row.id)">Edit</Link>
-                </Button>
-                <Button v-if="row.legacy_url" variant="ghost" size="sm" as-child>
-                  <a :href="row.legacy_url">Legacy Admin</a>
-                </Button>
-              </div>
+              <AdminEntityActions
+                :detail-href="row.show_url"
+                :edit-href="route('admin.appraisal-requests.edit', row.id)"
+                entity-label="permohonan"
+                :entity-name="row.request_number"
+              />
             </template>
           </AdminDataTable>
         </CardContent>

@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +24,6 @@ const props = defineProps({
   sourceOptions: { type: Array, default: () => [] },
   summary: { type: Object, default: () => ({ total: 0, new: 0, unread: 0, done: 0 }) },
   records: { type: Object, required: true },
-  legacyPanelUrl: { type: String, default: '/legacy-admin' },
 });
 
 const columns = [
@@ -70,12 +70,9 @@ const statusTone = (status) => {
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Komunikasi</p>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Contact Message</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Inbox pesan masuk dari halaman kontak publik, menggantikan `ContactMessageResource` Filament.
+            Inbox pesan masuk dari halaman kontak publik untuk tindak lanjut admin.
           </p>
         </div>
-        <Button variant="outline" as-child>
-          <a :href="legacyPanelUrl">Buka di Legacy Admin</a>
-        </Button>
       </section>
 
       <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -170,10 +167,11 @@ const statusTone = (status) => {
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" as-child><Link :href="row.show_url">Detail</Link></Button>
-                <Button v-if="row.legacy_url" variant="outline" size="sm" as-child><a :href="row.legacy_url">Legacy</a></Button>
-              </div>
+              <AdminEntityActions
+                :detail-href="row.show_url"
+                entity-label="contact message"
+                :entity-name="row.subject || row.name"
+              />
             </template>
           </AdminDataTable>
         </CardContent>
