@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateAppraisalRequestBasicRequest;
 use App\Models\AppraisalRequest;
 use App\Services\Admin\AppraisalContractNumberService;
+use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -77,7 +78,8 @@ class AppraisalRequestController extends Controller
 
     public function appraisalRequestsShow(
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestWorkflowService $workflowService
+        AppraisalRequestWorkflowService $workflowService,
+        AppraisalRequestRevisionService $revisionService
     ): Response {
         $appraisalRequest->load([
             'guidelineSet',
@@ -86,6 +88,16 @@ class AppraisalRequestController extends Controller
             'assets.files',
             'payments' => fn ($query) => $query->latest('id'),
             'offerNegotiations' => fn ($query) => $query->with('user')->latest('id'),
+            'revisionBatches' => fn ($query) => $query
+                ->with([
+                    'creator',
+                    'items.appraisalAsset',
+                    'items.originalRequestFile',
+                    'items.originalAssetFile',
+                    'items.replacementRequestFile',
+                    'items.replacementAssetFile',
+                ])
+                ->latest('id'),
         ]);
 
         $locationMaps = $this->buildLocationMaps($appraisalRequest);
@@ -159,6 +171,14 @@ class AppraisalRequestController extends Controller
             ])->values(),
             'negotiationActionOptions' => $this->negotiationActionOptions($appraisalRequest),
             'negotiationSummary' => $this->negotiationSummary($appraisalRequest),
+            'revisionWorkspace' => [
+                'state' => $revisionService->creationState($appraisalRequest),
+                'create_url' => route('admin.appraisal-requests.revision-batches.store', $appraisalRequest),
+                'target_options' => $revisionService->buildTargetOptions($appraisalRequest),
+                'batches' => $appraisalRequest->revisionBatches
+                    ->map(fn ($batch) => $this->transformRevisionBatch($batch, $appraisalRequest))
+                    ->values(),
+            ],
         ]);
     }
 

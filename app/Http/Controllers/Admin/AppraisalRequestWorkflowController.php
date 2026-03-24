@@ -3,14 +3,35 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreAppraisalRequestRevisionBatchRequest;
 use App\Http\Requests\Admin\StoreAppraisalOfferRequest;
 use App\Models\AppraisalRequest;
+use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class AppraisalRequestWorkflowController extends Controller
 {
+    public function storeRevisionBatch(
+        StoreAppraisalRequestRevisionBatchRequest $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestRevisionService $revisionService
+    ): RedirectResponse {
+        try {
+            $revisionService->createBatch(
+                $appraisalRequest,
+                (int) $request->user()->id,
+                $request->resolvedItems(),
+                $request->string('admin_note')->toString()
+            );
+
+            return back()->with('success', 'Permintaan revisi dokumen berhasil dibuat dan customer perlu mengunggah ulang dokumen yang diminta.');
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+    }
+
     public function sendOffer(
         StoreAppraisalOfferRequest $request,
         AppraisalRequest $appraisalRequest,
@@ -49,10 +70,11 @@ class AppraisalRequestWorkflowController extends Controller
 
     public function verifyDocs(
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestWorkflowService $workflowService
+        AppraisalRequestWorkflowService $workflowService,
+        Request $request
     ): RedirectResponse {
         try {
-            $workflowService->verifyDocs($appraisalRequest);
+            $workflowService->verifyDocs($appraisalRequest, (int) $request->user()->id);
 
             return back()->with('success', 'Dokumen berhasil diverifikasi. Request masuk ke tahap menunggu penawaran.');
         } catch (\RuntimeException $exception) {

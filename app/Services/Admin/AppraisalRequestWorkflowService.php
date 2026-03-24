@@ -18,6 +18,10 @@ class AppraisalRequestWorkflowService
 
     public function canVerifyDocs(AppraisalRequest $record): bool
     {
+        if ($this->hasOpenRevisionBatch($record)) {
+            return false;
+        }
+
         return in_array($this->statusValue($record), [
             AppraisalStatusEnum::Submitted->value,
             AppraisalStatusEnum::DocsIncomplete->value,
@@ -26,6 +30,10 @@ class AppraisalRequestWorkflowService
 
     public function canMarkDocsIncomplete(AppraisalRequest $record): bool
     {
+        if ($this->hasOpenRevisionBatch($record)) {
+            return false;
+        }
+
         return in_array($this->statusValue($record), [
             AppraisalStatusEnum::Submitted->value,
             AppraisalStatusEnum::WaitingOffer->value,
@@ -137,16 +145,38 @@ class AppraisalRequestWorkflowService
         ];
     }
 
-    public function verifyDocs(AppraisalRequest $record): void
+    public function verifyDocs(AppraisalRequest $record, ?int $actorId = null): void
     {
         if (! $this->canVerifyDocs($record)) {
             throw new RuntimeException('Verifikasi dokumen hanya tersedia untuk request yang baru masuk atau sebelumnya ditandai dokumen kurang.');
         }
 
-        $record->update([
-            'status' => AppraisalStatusEnum::WaitingOffer,
-            'verified_at' => now(),
-        ]);
+        DB::transaction(function () use ($record, $actorId): void {
+            $record->update([
+                'status' => AppraisalStatusEnum::WaitingOffer,
+                'verified_at' => now(),
+            ]);
+
+            $submittedBatches = $record->revisionBatches()
+                ->where('status', 'submitted')
+                ->with('items')
+                ->get();
+
+            foreach ($submittedBatches as $batch) {
+                $batch->update([
+                    'status' => 'reviewed',
+                    'reviewed_by' => $actorId,
+                    'reviewed_at' => now(),
+                    'resolved_at' => now(),
+                ]);
+
+                $batch->items()
+                    ->whereIn('status', ['pending', 'reuploaded'])
+                    ->update([
+                        'status' => 'approved',
+                    ]);
+            }
+        });
     }
 
     public function markDocsIncomplete(AppraisalRequest $record): void
@@ -342,5 +372,16 @@ class AppraisalRequestWorkflowService
         return (int) $record->offerNegotiations()
             ->where('action', 'counter_request')
             ->count();
+    }
+
+    private function hasOpenRevisionBatch(AppraisalRequest $record): bool
+    {
+        if ($record->relationLoaded('revisionBatches')) {
+            return $record->revisionBatches->contains(fn ($batch) => $batch->status === 'open');
+        }
+
+        return $record->revisionBatches()
+            ->where('status', 'open')
+            ->exists();
     }
 }

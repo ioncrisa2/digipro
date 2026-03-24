@@ -1,13 +1,14 @@
 <script setup>
 import { computed, reactive, ref, toRefs } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Pencil } from 'lucide-vue-next';
+import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -79,6 +80,18 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  revisionWorkspace: {
+    type: Object,
+    default: () => ({
+      state: {
+        can_create: false,
+        message: null,
+      },
+      create_url: null,
+      target_options: [],
+      batches: [],
+    }),
+  },
 });
 
 const {
@@ -94,6 +107,7 @@ const {
   offerAction,
   approveLatestNegotiationAction,
   paymentVerification,
+  revisionWorkspace,
 } = toRefs(props);
 
 const activeTab = ref('ringkasan');
@@ -109,6 +123,14 @@ const offerForm = useForm({
 const negotiationFilters = reactive({
   action: 'all',
   q: '',
+});
+const createEmptyRevisionItem = () => ({
+  target_key: '',
+  issue_note: '',
+});
+const revisionForm = useForm({
+  admin_note: '',
+  items: [createEmptyRevisionItem()],
 });
 
 const statusTone = (value) => {
@@ -126,6 +148,21 @@ const statusTone = (value) => {
       return 'bg-amber-100 text-amber-900 border-amber-200';
     case 'offer_sent':
       return 'bg-indigo-100 text-indigo-900 border-indigo-200';
+    default:
+  return 'bg-slate-100 text-slate-800 border-slate-200';
+  }
+};
+
+const revisionStatusTone = (value) => {
+  switch (value) {
+    case 'open':
+      return 'bg-amber-100 text-amber-900 border-amber-200';
+    case 'submitted':
+      return 'bg-sky-100 text-sky-900 border-sky-200';
+    case 'reviewed':
+      return 'bg-emerald-100 text-emerald-900 border-emerald-200';
+    case 'cancelled':
+      return 'bg-slate-100 text-slate-800 border-slate-200';
     default:
       return 'bg-slate-100 text-slate-800 border-slate-200';
   }
@@ -225,6 +262,12 @@ const verifyPayment = () => {
 };
 
 const contractFiles = computed(() => (requestFiles.value ?? []).filter((file) => file.type === 'contract_signed_pdf'));
+const revisionState = computed(() => revisionWorkspace.value?.state ?? {
+  can_create: false,
+  message: null,
+});
+const revisionTargetOptions = computed(() => revisionWorkspace.value?.target_options ?? []);
+const revisionBatches = computed(() => revisionWorkspace.value?.batches ?? []);
 const showContractTab = computed(() => {
   return record.value?.contract_status_value === 'signed'
     || contractFiles.value.length > 0
@@ -255,6 +298,38 @@ const filteredNegotiations = computed(() => {
     return haystacks.some((value) => value.includes(query));
   });
 });
+
+const addRevisionItem = () => {
+  revisionForm.items.push(createEmptyRevisionItem());
+};
+
+const removeRevisionItem = (index) => {
+  if (revisionForm.items.length === 1) {
+    revisionForm.items.splice(0, revisionForm.items.length, createEmptyRevisionItem());
+    return;
+  }
+
+  revisionForm.items.splice(index, 1);
+};
+
+const resetRevisionForm = () => {
+  revisionForm.clearErrors();
+  revisionForm.admin_note = '';
+  revisionForm.items.splice(0, revisionForm.items.length, createEmptyRevisionItem());
+};
+
+const submitRevisionBatch = () => {
+  if (!revisionWorkspace.value?.create_url || !revisionState.value.can_create) {
+    return;
+  }
+
+  revisionForm.post(revisionWorkspace.value.create_url, {
+    preserveScroll: true,
+    onSuccess: () => {
+      resetRevisionForm();
+    },
+  });
+};
 </script>
 
 <template>
@@ -372,6 +447,168 @@ const filteredNegotiations = computed(() => {
               <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Catatan Negosiasi Terakhir</p>
                 <p class="mt-2 text-sm text-slate-900">{{ record.latest_negotiation_reason || '-' }}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card v-if="activeTab === 'dokumen'">
+            <CardHeader>
+              <CardTitle>Permintaan Revisi Dokumen</CardTitle>
+              <CardDescription>Admin menentukan dokumen atau foto mana yang harus customer unggah ulang beserta catatannya.</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-5">
+              <div
+                :class="[
+                  'rounded-2xl border px-4 py-3 text-sm',
+                  revisionState.can_create
+                    ? 'border-sky-200 bg-sky-50 text-sky-900'
+                    : 'border-amber-200 bg-amber-50 text-amber-900',
+                ]"
+              >
+                {{ revisionState.message || 'Pilih item yang harus direvisi customer.' }}
+              </div>
+
+              <form v-if="revisionState.can_create" class="space-y-5" @submit.prevent="submitRevisionBatch">
+                <div class="space-y-4">
+                  <div v-for="(item, index) in revisionForm.items" :key="index" class="rounded-2xl border p-4">
+                    <div class="grid gap-4 xl:grid-cols-[1.2fr_1fr_auto]">
+                      <div class="space-y-2">
+                        <Label :for="`revision_target_${index}`">Target Revisi</Label>
+                        <Select v-model="item.target_key">
+                          <SelectTrigger :id="`revision_target_${index}`">
+                            <SelectValue placeholder="Pilih dokumen atau foto yang perlu diperbaiki" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem
+                              v-for="option in revisionTargetOptions"
+                              :key="option.key"
+                              :value="option.key"
+                            >
+                              {{ option.label }}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p v-if="revisionForm.errors[`items.${index}.target_key`]" class="text-xs text-rose-600">
+                          {{ revisionForm.errors[`items.${index}.target_key`] }}
+                        </p>
+                      </div>
+
+                      <div class="space-y-2">
+                        <Label :for="`revision_issue_${index}`">Catatan Revisi</Label>
+                        <Textarea
+                          :id="`revision_issue_${index}`"
+                          v-model="item.issue_note"
+                          rows="3"
+                          placeholder="Jelaskan dokumen apa yang salah, kurang jelas, atau perlu diunggah ulang."
+                        />
+                        <p v-if="revisionForm.errors[`items.${index}.issue_note`]" class="text-xs text-rose-600">
+                          {{ revisionForm.errors[`items.${index}.issue_note`] }}
+                        </p>
+                      </div>
+
+                      <div class="flex items-end justify-end">
+                        <Button type="button" variant="destructive" size="icon" @click="removeRevisionItem(index)">
+                          <Trash2 class="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <Label for="revision_admin_note">Catatan Umum untuk Customer</Label>
+                  <Textarea
+                    id="revision_admin_note"
+                    v-model="revisionForm.admin_note"
+                    rows="4"
+                    placeholder="Catatan umum revisi dokumen, misalnya customer diminta memeriksa kembali kesesuaian semua upload."
+                  />
+                  <p v-if="revisionForm.errors.admin_note" class="text-xs text-rose-600">{{ revisionForm.errors.admin_note }}</p>
+                </div>
+
+                <div class="flex flex-wrap justify-between gap-3">
+                  <Button type="button" variant="outline" @click="addRevisionItem">
+                    <Plus class="h-4 w-4" />Tambah Item Revisi
+                  </Button>
+
+                  <Button type="submit" :disabled="revisionForm.processing">
+                    Simpan Permintaan Revisi
+                  </Button>
+                </div>
+              </form>
+
+              <div class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-semibold text-slate-950">Riwayat Batch Revisi</p>
+                    <p class="text-xs text-slate-500">Catatan revisi terdahulu tetap disimpan agar histori dokumen bisa diaudit.</p>
+                  </div>
+                  <Badge variant="outline" class="bg-slate-100 text-slate-800 border-slate-200">
+                    {{ revisionBatches.length }} batch
+                  </Badge>
+                </div>
+
+                <div v-for="batch in revisionBatches" :key="batch.id" class="rounded-2xl border p-4">
+                  <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <p class="font-medium text-slate-950">Batch #{{ batch.id }}</p>
+                        <Badge variant="outline" :class="revisionStatusTone(batch.status)">{{ batch.status_label }}</Badge>
+                      </div>
+                      <p class="mt-1 text-xs text-slate-500">
+                        Dibuat oleh {{ batch.creator_name }} • {{ formatDateTime(batch.created_at) }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div v-if="batch.admin_note" class="mt-4 rounded-2xl border bg-slate-50 p-3 text-sm text-slate-700">
+                    {{ batch.admin_note }}
+                  </div>
+
+                  <div class="mt-4 space-y-3">
+                    <div v-for="item in batch.items" :key="item.id" class="rounded-2xl border bg-slate-50 p-4">
+                      <div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <p class="font-medium text-slate-950">{{ item.target_label }}</p>
+                          <p v-if="item.asset_address" class="mt-1 text-xs text-slate-500">{{ item.asset_address }}</p>
+                        </div>
+                        <Badge variant="outline" class="bg-white text-slate-800 border-slate-200">{{ item.status_label }}</Badge>
+                      </div>
+
+                      <p class="mt-3 text-sm text-slate-700">{{ item.issue_note }}</p>
+
+                      <div class="mt-3 grid gap-3 xl:grid-cols-2">
+                        <div class="rounded-2xl border bg-white p-3">
+                          <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">File Asal</p>
+                          <div v-if="item.original_file" class="mt-2 space-y-1">
+                            <p class="text-sm font-medium text-slate-950">{{ item.original_file.original_name }}</p>
+                            <p class="text-xs text-slate-500">{{ item.original_file.type_label }}</p>
+                            <Button variant="outline" size="sm" class="mt-2" as-child>
+                              <a :href="item.original_file.url" target="_blank" rel="noreferrer">Buka File</a>
+                            </Button>
+                          </div>
+                          <p v-else class="mt-2 text-sm text-slate-500">Belum ada file asal. Customer harus mengunggah dokumen yang diminta.</p>
+                        </div>
+
+                        <div class="rounded-2xl border bg-white p-3">
+                          <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">File Pengganti</p>
+                          <div v-if="item.replacement_file" class="mt-2 space-y-1">
+                            <p class="text-sm font-medium text-slate-950">{{ item.replacement_file.original_name }}</p>
+                            <p class="text-xs text-slate-500">{{ item.replacement_file.type_label }}</p>
+                            <Button variant="outline" size="sm" class="mt-2" as-child>
+                              <a :href="item.replacement_file.url" target="_blank" rel="noreferrer">Buka File</a>
+                            </Button>
+                          </div>
+                          <p v-else class="mt-2 text-sm text-slate-500">Customer belum mengunggah file revisi.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="!revisionBatches.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
+                  Belum ada batch revisi dokumen untuk request ini.
+                </div>
               </div>
             </CardContent>
           </Card>

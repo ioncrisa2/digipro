@@ -90,4 +90,9 @@ class AppraisalAsset extends Model
     {
         return $this->hasMany(AppraisalAssetFile::class);
     }
+
+    public function revisionItems(): HasMany
+    {
+        return $this->hasMany(AppraisalRequestRevisionItem::class);
+    }
 }

@@ -14,6 +14,8 @@ Route::middleware(['auth', 'verified', 'customer.role'])
         Route::get('/buat-permohonan', [AppraisalController::class, 'create'])->name('appraisal.create');
         Route::post('/buat-permohonan', [AppraisalController::class, 'store'])->name('appraisal.store');
         Route::get('/permohonan-penilaian/{id}', [AppraisalController::class, 'show'])->name('appraisal.show');
+        Route::get('/permohonan-penilaian/{id}/revisi-dokumen', [AppraisalController::class, 'revisionPage'])->name('appraisal.revisions.page');
+        Route::post('/permohonan-penilaian/{id}/revisi-dokumen', [AppraisalController::class, 'submitRevision'])->name('appraisal.revisions.submit');
         Route::get('/permohonan-penilaian/{id}/penawaran', [AppraisalController::class, 'offerPage'])->name('appraisal.offer.page');
         Route::post('/permohonan-penilaian/{id}/offer/accept', [AppraisalController::class, 'acceptOffer'])->name('appraisal.offer.accept');
         Route::post('/permohonan-penilaian/{id}/offer/negotiate', [AppraisalController::class, 'submitOfferNegotiation'])->name('appraisal.offer.negotiate');

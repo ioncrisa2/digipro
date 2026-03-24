@@ -156,6 +156,80 @@ trait InteractsWithAppraisalRequests
         ];
     }
 
+    private function transformRevisionBatch(object $batch, AppraisalRequest $appraisalRequest): array
+    {
+        $assetOrderMap = $appraisalRequest->assets
+            ->sortBy('id')
+            ->values()
+            ->pluck('id')
+            ->flip()
+            ->map(fn ($index) => $index + 1)
+            ->all();
+
+        return [
+            'id' => $batch->id,
+            'status' => (string) $batch->status,
+            'status_label' => $this->revisionBatchStatusLabel($batch->status),
+            'created_at' => $batch->created_at?->toIso8601String(),
+            'admin_note' => $batch->admin_note,
+            'creator_name' => $batch->creator?->name ?? 'Admin',
+            'items' => $batch->items
+                ->map(fn ($item) => $this->transformRevisionItem($item, $assetOrderMap))
+                ->values(),
+        ];
+    }
+
+    private function transformRevisionItem(object $item, array $assetOrderMap): array
+    {
+        $originalFile = $item->originalRequestFile ?? $item->originalAssetFile;
+        $replacementFile = $item->replacementRequestFile ?? $item->replacementAssetFile;
+        $assetOrder = $item->appraisalAsset?->id ? ($assetOrderMap[$item->appraisalAsset->id] ?? null) : null;
+        $scopeLabel = match ((string) $item->item_type) {
+            'request_file' => 'Dokumen Request',
+            'asset_document' => 'Dokumen Aset',
+            'asset_photo' => 'Foto Aset',
+            default => Arr::headline((string) $item->item_type),
+        };
+        $targetLabel = $scopeLabel . ': ' . match ((string) $item->item_type) {
+            'request_file' => $this->requestFileTypeLabel($item->requested_file_type),
+            'asset_document', 'asset_photo' => $this->assetFileTypeLabel($item->requested_file_type),
+            default => Arr::headline((string) $item->requested_file_type),
+        };
+
+        if ($assetOrder !== null) {
+            $targetLabel = sprintf('Aset #%d - %s', $assetOrder, $targetLabel);
+        }
+
+        return [
+            'id' => $item->id,
+            'status' => (string) $item->status,
+            'status_label' => $this->revisionItemStatusLabel($item->status),
+            'item_type' => (string) $item->item_type,
+            'requested_file_type' => (string) $item->requested_file_type,
+            'target_label' => $targetLabel,
+            'asset_address' => $item->appraisalAsset?->address,
+            'issue_note' => $item->issue_note,
+            'original_file' => $originalFile ? [
+                'id' => $originalFile->id,
+                'original_name' => $originalFile->original_name ?: basename((string) $originalFile->path),
+                'url' => Storage::disk('public')->url($originalFile->path),
+                'type_label' => $item->originalRequestFile
+                    ? $this->requestFileTypeLabel($originalFile->type)
+                    : $this->assetFileTypeLabel($originalFile->type),
+                'created_at' => $originalFile->created_at?->toIso8601String(),
+            ] : null,
+            'replacement_file' => $replacementFile ? [
+                'id' => $replacementFile->id,
+                'original_name' => $replacementFile->original_name ?: basename((string) $replacementFile->path),
+                'url' => Storage::disk('public')->url($replacementFile->path),
+                'type_label' => $item->replacementRequestFile
+                    ? $this->requestFileTypeLabel($replacementFile->type)
+                    : $this->assetFileTypeLabel($replacementFile->type),
+                'created_at' => $replacementFile->created_at?->toIso8601String(),
+            ] : null,
+        ];
+    }
+
     private function assetOptionLabel(string $group, ?string $value): ?string
     {
         if (blank($value)) {
@@ -197,6 +271,28 @@ trait InteractsWithAppraisalRequests
             'photo_front' => 'Foto Depan',
             'photo_interior' => 'Foto Dalam',
             default => Arr::headline((string) $type),
+        };
+    }
+
+    private function revisionBatchStatusLabel(?string $status): string
+    {
+        return match ((string) $status) {
+            'open' => 'Terbuka',
+            'submitted' => 'Dikirim Ulang Customer',
+            'reviewed' => 'Selesai Direview',
+            'cancelled' => 'Dibatalkan',
+            default => Arr::headline((string) $status),
+        };
+    }
+
+    private function revisionItemStatusLabel(?string $status): string
+    {
+        return match ((string) $status) {
+            'pending' => 'Menunggu Upload Ulang',
+            'reuploaded' => 'Sudah Upload Ulang',
+            'approved' => 'Disetujui',
+            'rejected' => 'Perlu Revisi Lagi',
+            default => Arr::headline((string) $status),
         };
     }
 

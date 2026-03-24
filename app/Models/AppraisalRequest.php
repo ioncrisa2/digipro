@@ -182,4 +182,9 @@ class AppraisalRequest extends Model
         return $this->hasMany(Payment::class, 'appraisal_request_id', 'id');
     }
 
+    public function revisionBatches(): HasMany
+    {
+        return $this->hasMany(AppraisalRequestRevisionBatch::class);
+    }
+
 }

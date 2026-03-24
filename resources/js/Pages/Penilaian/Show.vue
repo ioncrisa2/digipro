@@ -65,6 +65,7 @@ const invoicePageUrl = computed(() => {
 const paymentSummary = computed(() => {
     return req.value?.payment_summary ?? {};
 });
+const revisionSummary = computed(() => req.value?.revision_summary ?? {});
 
 const canOpenPaymentPage = computed(() => {
     const status = String(req.value?.status ?? "").toLowerCase();
@@ -101,6 +102,11 @@ const goPaymentPage = () => {
         return;
     }
     router.visit(paymentPageUrl.value);
+};
+
+const goRevisionPage = () => {
+    if (!revisionSummary.value?.page_url) return;
+    router.visit(revisionSummary.value.page_url);
 };
 
 const downloadIfReady = () => {
@@ -184,6 +190,24 @@ const timelineDotClass = (type) => {
                             </div>
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card v-if="revisionSummary.has_open_batch">
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-base">Revisi Dokumen Dibutuhkan</CardTitle>
+                    <CardDescription>
+                        Admin meminta Anda mengunggah ulang {{ revisionSummary.items_count }} item dokumen atau foto.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="text-sm text-slate-700">
+                        Buka halaman revisi untuk melihat file mana yang harus diperbaiki, lalu unggah ulang seluruh dokumen yang diminta.
+                    </div>
+                    <Button @click="goRevisionPage">
+                        <FileText class="mr-2 h-4 w-4" />
+                        Upload Revisi Dokumen
+                    </Button>
                 </CardContent>
             </Card>
 

@@ -8,6 +8,8 @@ use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetFile;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestFile;
+use App\Models\AppraisalRequestRevisionBatch;
+use App\Models\AppraisalRequestRevisionItem;
 use App\Models\AppraisalUserConsent;
 use App\Models\Article;
 use App\Models\ArticleCategory;
@@ -1246,6 +1248,135 @@ it('renders appraisal request detail as a verification workspace without admin m
             ->missing('requestFiles.0.can_delete')
             ->where('assets.0.documents.0.original_name', 'pbb.pdf')
             ->missing('assets.0.documents.0.destroy_url'));
+});
+
+it('exposes revision workspace data in the admin appraisal request detail', function () {
+    $admin = createAdminUser();
+    $requester = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $record = AppraisalRequest::create([
+        'user_id' => $requester->id,
+        'request_number' => 'REQ-REVISION-WORKSPACE-001',
+        'purpose' => PurposeEnum::JualBeli,
+        'status' => AppraisalStatusEnum::Submitted,
+        'requested_at' => now(),
+    ]);
+
+    $asset = AppraisalAsset::create([
+        'appraisal_request_id' => $record->id,
+        'asset_type' => 'tanah_bangunan',
+        'address' => 'Jl. Revisi Dokumen No. 2',
+    ]);
+
+    AppraisalRequestFile::create([
+        'appraisal_request_id' => $record->id,
+        'type' => 'npwp',
+        'path' => 'appraisal-requests/request/revision-npwp.pdf',
+        'original_name' => 'revision-npwp.pdf',
+        'mime' => 'application/pdf',
+        'size' => 500,
+    ]);
+
+    AppraisalAssetFile::create([
+        'appraisal_asset_id' => $asset->id,
+        'type' => 'doc_pbb',
+        'path' => 'appraisal-requests/assets/revision-pbb.pdf',
+        'original_name' => 'revision-pbb.pdf',
+        'mime' => 'application/pdf',
+        'size' => 600,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.appraisal-requests.show', $record))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/AppraisalRequests/Show')
+            ->where('revisionWorkspace.state.can_create', true)
+            ->where('revisionWorkspace.target_options.0.item_type', 'request_file')
+            ->where('revisionWorkspace.target_options.0.requested_file_type', 'npwp')
+            ->where('revisionWorkspace.target_options.1.kind', 'missing'));
+});
+
+it('creates a revision batch from the admin appraisal workflow', function () {
+    $admin = createAdminUser();
+    $requester = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $record = AppraisalRequest::create([
+        'user_id' => $requester->id,
+        'request_number' => 'REQ-REVISION-BATCH-001',
+        'purpose' => PurposeEnum::JualBeli,
+        'status' => AppraisalStatusEnum::Submitted,
+        'requested_at' => now(),
+    ]);
+
+    $asset = AppraisalAsset::create([
+        'appraisal_request_id' => $record->id,
+        'asset_type' => 'tanah_bangunan',
+        'address' => 'Jl. Batch Revisi No. 7',
+    ]);
+
+    $requestFile = AppraisalRequestFile::create([
+        'appraisal_request_id' => $record->id,
+        'type' => 'npwp',
+        'path' => 'appraisal-requests/request/npwp-batch.pdf',
+        'original_name' => 'npwp-batch.pdf',
+        'mime' => 'application/pdf',
+        'size' => 1024,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.appraisal-requests.revision-batches.store', $record), [
+            'admin_note' => 'Mohon upload ulang dokumen yang tidak jelas dan lengkapi foto depan aset.',
+            'items' => [
+                [
+                    'target_key' => "request_file:existing:{$requestFile->id}",
+                    'issue_note' => 'NPWP buram, mohon unggah ulang file yang lebih jelas.',
+                ],
+                [
+                    'target_key' => "asset_photo:missing:{$asset->id}:photo_front",
+                    'issue_note' => 'Foto depan aset belum tersedia.',
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $record->refresh();
+
+    expect($record->status)->toBe(AppraisalStatusEnum::DocsIncomplete);
+
+    $batch = AppraisalRequestRevisionBatch::query()
+        ->where('appraisal_request_id', $record->id)
+        ->first();
+
+    expect($batch)->not->toBeNull();
+    expect($batch->status)->toBe('open');
+    expect($batch->admin_note)->toBe('Mohon upload ulang dokumen yang tidak jelas dan lengkapi foto depan aset.');
+
+    $items = AppraisalRequestRevisionItem::query()
+        ->where('revision_batch_id', $batch->id)
+        ->orderBy('id')
+        ->get();
+
+    expect($items)->toHaveCount(2);
+    expect($items[0]->item_type)->toBe('request_file');
+    expect($items[0]->original_request_file_id)->toBe($requestFile->id);
+    expect($items[0]->requested_file_type)->toBe('npwp');
+    expect($items[1]->item_type)->toBe('asset_photo');
+    expect($items[1]->appraisal_asset_id)->toBe($asset->id);
+    expect($items[1]->original_asset_file_id)->toBeNull();
+    expect($items[1]->requested_file_type)->toBe('photo_front');
+
+    $requester->refresh();
+
+    expect($requester->notifications()->count())->toBe(1);
+    expect($requester->notifications()->first()->data['title'])->toBe('Revisi dokumen diperlukan');
+    expect($requester->notifications()->first()->data['url'])->toContain("/permohonan-penilaian/{$record->id}/revisi-dokumen");
 });
 
 it('does not expose admin routes to mutate customer appraisal submissions', function () {

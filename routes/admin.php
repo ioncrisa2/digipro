@@ -30,6 +30,7 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::put('/{appraisalRequest}', [AppraisalRequestController::class, 'appraisalRequestsUpdate'])->name('update');
                 Route::post('/{appraisalRequest}/verify-docs', [AppraisalRequestWorkflowController::class, 'verifyDocs'])->name('actions.verify-docs');
                 Route::post('/{appraisalRequest}/docs-incomplete', [AppraisalRequestWorkflowController::class, 'markDocsIncomplete'])->name('actions.docs-incomplete');
+                Route::post('/{appraisalRequest}/revision-batches', [AppraisalRequestWorkflowController::class, 'storeRevisionBatch'])->name('revision-batches.store');
                 Route::post('/{appraisalRequest}/contract-signed', [AppraisalRequestWorkflowController::class, 'markContractSigned'])->name('actions.contract-signed');
                 Route::post('/{appraisalRequest}/verify-payment', [AppraisalRequestWorkflowController::class, 'verifyPayment'])->name('actions.verify-payment');
                 Route::post('/{appraisalRequest}/send-offer', [AppraisalRequestWorkflowController::class, 'sendOffer'])->name('actions.send-offer');

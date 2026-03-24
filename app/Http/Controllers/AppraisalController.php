@@ -9,7 +9,9 @@ use App\Models\AppraisalRequest;
 use App\Services\Admin\AdminNotificationService;
 use App\Services\AppraisalService;
 use App\Services\AppraisalRequestService;
+use App\Services\AppraisalRequestRevisionSubmissionService;
 use App\Http\Requests\StoreAppraisalRequest;
+use App\Http\Requests\SubmitAppraisalRevisionBatchRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -76,6 +78,55 @@ class AppraisalController extends Controller
         $payload = $appraisalService->buildShowPayload($userId, $id);
 
         return inertia('Penilaian/Show', $payload);
+    }
+
+    public function revisionPage(
+        Request $request,
+        int $id,
+        AppraisalRequestRevisionSubmissionService $revisionService
+    ) {
+        $record = $this->resolveUserAppraisalRequest($request, $id);
+
+        try {
+            return inertia('Penilaian/Revision', $revisionService->buildPagePayload($record));
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.show', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
+    }
+
+    public function submitRevision(
+        SubmitAppraisalRevisionBatchRequest $request,
+        int $id,
+        AppraisalRequestRevisionSubmissionService $revisionService
+    ) {
+        /** @var AppraisalRequest $record */
+        $record = $this->resolveUserAppraisalRequest($request, $id);
+
+        try {
+            $revisionService->submitOpenBatch(
+                $record,
+                (int) $request->user()->id,
+                $request->replacementFiles()
+            );
+
+            $this->notifyAdmins(
+                $request,
+                $record,
+                'Revisi dokumen dikirim user',
+                ($record->request_number ?? ('#' . $record->id)) . ' mengirim ulang dokumen revisi untuk ditinjau kembali.',
+                'heroicon-o-arrow-up-tray'
+            );
+
+            return redirect()
+                ->route('appraisal.show', ['id' => $record->id])
+                ->with('success', 'Dokumen revisi berhasil dikirim. Admin akan meninjau ulang permohonan Anda.');
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.revisions.page', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
     }
 
     public function offerPage(Request $request, int $id, AppraisalService $appraisalService)

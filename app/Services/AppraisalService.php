@@ -22,6 +22,7 @@ use App\Enums\AssetTypeEnum;
 use App\Enums\ReportTypeEnum;
 use App\Enums\ContractStatusEnum;
 use App\Enums\AppraisalStatusEnum;
+use App\Services\AppraisalRequestRevisionSubmissionService;
 
 /**
  * Builds appraisal UI payloads and handles consent flows for users.
@@ -330,6 +331,7 @@ class AppraisalService
         $contractDocument = $this->buildContractDocumentPayload($r);
         $statusTimeline = $this->buildStatusTimeline($r);
         $latestPayment = $r->payments->sortByDesc('id')->first();
+        $revisionSummary = app(AppraisalRequestRevisionSubmissionService::class)->buildSummary($r);
         $paymentStatus = $latestPayment?->status;
         $paymentStatusLabel = app(MidtransSnapService::class)->paymentStatusLabel($latestPayment);
         $invoiceNumber = data_get($latestPayment?->metadata, 'invoice_number');
@@ -379,6 +381,7 @@ class AppraisalService
                 'report_pdf_url' => $reportPdfUrl,
                 'contract_document' => $contractDocument,
                 'status_timeline' => $statusTimeline,
+                'revision_summary' => $revisionSummary,
                 'payment_summary' => [
                     'id' => $latestPayment?->id,
                     'status' => $paymentStatus,
