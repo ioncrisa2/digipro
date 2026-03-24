@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, toRefs, watch } from 'vue';
+import { computed, reactive, ref, toRefs, watch } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Pencil, Trash2 } from 'lucide-vue-next';
 import AdminLayout from '@/layouts/AdminLayout.vue';
@@ -119,6 +119,7 @@ const {
 } = toRefs(props);
 
 const { confirmDelete } = useAdminConfirmDialog();
+const activeTab = ref('ringkasan');
 
 const offerForm = useForm({
   fee_total: offerAction.value?.defaults?.fee_total ?? '',
@@ -474,9 +475,19 @@ const filteredNegotiations = computed(() => {
         </div>
       </section>
 
-      <section class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <section class="rounded-2xl border bg-slate-50/80 p-2">
+        <div class="flex flex-wrap gap-2">
+          <Button type="button" :variant="activeTab === 'ringkasan' ? 'default' : 'ghost'" @click="activeTab = 'ringkasan'">Ringkasan</Button>
+          <Button type="button" :variant="activeTab === 'aset' ? 'default' : 'ghost'" @click="activeTab = 'aset'">Aset</Button>
+          <Button type="button" :variant="activeTab === 'dokumen' ? 'default' : 'ghost'" @click="activeTab = 'dokumen'">Dokumen</Button>
+          <Button type="button" :variant="activeTab === 'negosiasi' ? 'default' : 'ghost'" @click="activeTab = 'negosiasi'">Negosiasi</Button>
+          <Button type="button" :variant="activeTab === 'pembayaran' ? 'default' : 'ghost'" @click="activeTab = 'pembayaran'">Pembayaran</Button>
+        </div>
+      </section>
+
+      <section :class="activeTab === 'ringkasan' ? 'grid gap-6 xl:grid-cols-[1.1fr_0.9fr]' : 'space-y-6'">
         <div class="space-y-6">
-          <Card>
+          <Card v-if="activeTab === 'ringkasan'">
             <CardHeader>
               <CardTitle>Ringkasan Permohonan</CardTitle>
               <CardDescription>Data inti request untuk verifikasi dan tindak lanjut admin.</CardDescription>
@@ -543,7 +554,7 @@ const filteredNegotiations = computed(() => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card v-if="activeTab === 'dokumen'">
             <CardHeader>
               <CardTitle>Dokumen Request</CardTitle>
               <CardDescription>File level request seperti kontrak bertanda tangan dan lampiran global.</CardDescription>
@@ -618,12 +629,16 @@ const filteredNegotiations = computed(() => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card v-if="activeTab === 'aset' || activeTab === 'dokumen'">
             <CardHeader>
               <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <CardTitle>Aset Terkait</CardTitle>
-                  <CardDescription>Ringkasan aset, metadata properti, dokumen, dan foto dalam satu tampilan operasional.</CardDescription>
+                  <CardDescription>
+                    {{ activeTab === 'aset'
+                      ? 'Informasi inti aset, lokasi, ukuran, dan indikator nilai properti.'
+                      : 'Kelola dokumen dan foto pendukung untuk masing-masing aset.' }}
+                  </CardDescription>
                 </div>
                 <Button v-if="assetCreateUrl" variant="outline" as-child>
                   <Link :href="assetCreateUrl">Tambah Aset</Link>
@@ -670,7 +685,7 @@ const filteredNegotiations = computed(() => {
                   </div>
                 </div>
 
-                <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div v-if="activeTab === 'aset'" class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Lokasi</p>
                     <div class="mt-2 space-y-1 text-sm text-slate-700">
@@ -726,7 +741,7 @@ const filteredNegotiations = computed(() => {
                   </div>
                 </div>
 
-                <div class="mt-5 grid gap-4 xl:grid-cols-2">
+                <div v-if="activeTab === 'dokumen'" class="mt-5 grid gap-4 xl:grid-cols-2">
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dokumen Aset</p>
                     <div class="mt-3 space-y-3">
@@ -898,7 +913,7 @@ const filteredNegotiations = computed(() => {
         </div>
 
         <div class="space-y-6">
-          <Card>
+          <Card v-if="activeTab === 'ringkasan'">
             <CardHeader>
               <CardTitle>Pemohon</CardTitle>
             </CardHeader>
@@ -914,7 +929,7 @@ const filteredNegotiations = computed(() => {
             </CardContent>
           </Card>
 
-          <Card v-if="offerAction">
+          <Card v-if="activeTab === 'negosiasi' && offerAction">
             <CardHeader>
               <CardTitle>{{ offerAction.label }}</CardTitle>
               <CardDescription>{{ offerAction.description }}</CardDescription>
@@ -989,7 +1004,7 @@ const filteredNegotiations = computed(() => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card v-if="activeTab === 'pembayaran'">
             <CardHeader>
               <CardTitle>Pembayaran</CardTitle>
             </CardHeader>
@@ -1037,7 +1052,7 @@ const filteredNegotiations = computed(() => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card v-if="activeTab === 'negosiasi'">
             <CardHeader>
               <CardTitle>Riwayat Negosiasi</CardTitle>
             </CardHeader>
@@ -1129,7 +1144,7 @@ const filteredNegotiations = computed(() => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card v-if="activeTab === 'ringkasan'">
             <CardHeader>
               <CardTitle>Catatan</CardTitle>
             </CardHeader>

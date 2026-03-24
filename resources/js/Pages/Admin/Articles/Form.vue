@@ -5,6 +5,7 @@ import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import AdminRichTextEditor from '@/components/admin/AdminRichTextEditor.vue';
+import ImageUpload from '@/components/admin/ImageUpload.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -113,15 +114,20 @@ const submit = () => {
 
             <div class="space-y-2 md:col-span-2">
               <Label for="slug">Slug</Label>
-              <Input id="slug" v-model="form.slug" placeholder="judul-artikel" />
+              <Input id="slug" v-model="form.slug" placeholder="judul-artikel" readonly class="bg-slate-50 text-slate-500" />
+              <p class="text-xs text-slate-500">Slug dibuat otomatis dari judul artikel.</p>
               <p v-if="form.errors.slug" class="text-xs text-rose-600">{{ form.errors.slug }}</p>
             </div>
 
             <div class="space-y-2 md:col-span-2">
               <Label for="cover_image">Cover</Label>
-              <Input id="cover_image" type="file" accept="image/*" @input="form.cover_image = $event.target.files?.[0] ?? null" />
-              <p v-if="record.cover_url" class="text-xs text-slate-500">Cover saat ini:</p>
-              <img v-if="record.cover_url" :src="record.cover_url" alt="Cover artikel" class="max-h-48 rounded-xl border object-cover" />
+              <ImageUpload
+                v-model="form.cover_image"
+                :multiple="false"
+                :existing="record.cover_url ? [{ url: record.cover_url, name: 'Cover saat ini' }] : []"
+                title="Upload cover artikel"
+                description="Pilih satu gambar utama untuk artikel. Preview akan tampil langsung di area ini."
+              />
               <p v-if="form.errors.cover_image" class="text-xs text-rose-600">{{ form.errors.cover_image }}</p>
             </div>
 

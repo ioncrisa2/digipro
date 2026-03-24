@@ -110,7 +110,7 @@ class ArticleController extends Controller
     public function show(string $slug)
     {
         $article = Article::query()
-            ->with(['category:id,name', 'tags:id,name'])
+            ->with(['category:id,name,slug', 'tags:id,name'])
             ->where('slug', $slug)
             ->firstOrFail();
 
@@ -127,20 +127,62 @@ class ArticleController extends Controller
             }
         }
 
+        $tagIds = $article->tags->pluck('id')->all();
+
+        $relatedArticles = Article::query()
+            ->with(['category:id,name,slug', 'tags:id,name'])
+            ->published()
+            ->whereKeyNot($article->id)
+            ->select('articles.*')
+            ->selectRaw(
+                'case when category_id = ? then 1 else 0 end as category_match',
+                [$article->category_id]
+            )
+            ->withCount([
+                'tags as matching_tags_count' => fn ($query) => $query->whereIn('tags.id', $tagIds ?: [0]),
+            ])
+            ->when($article->category_id || $tagIds !== [], function ($query) use ($article, $tagIds) {
+                $query->where(function ($nested) use ($article, $tagIds) {
+                    if ($article->category_id) {
+                        $nested->where('category_id', $article->category_id);
+                    }
+
+                    if ($tagIds !== []) {
+                        $nested->orWhereHas('tags', fn ($tagQuery) => $tagQuery->whereIn('tags.id', $tagIds));
+                    }
+                });
+            })
+            ->orderByDesc('category_match')
+            ->orderByDesc('matching_tags_count')
+            ->orderByDesc('published_at')
+            ->limit(3)
+            ->get()
+            ->map(fn (Article $relatedArticle) => $this->transformPublicArticle($relatedArticle))
+            ->values();
+
         return inertia('Articles/Show', [
             'article' => [
-                'title' => $article->title,
-                'slug' => $article->slug,
-                'excerpt' => $article->excerpt,
+                ...$this->transformPublicArticle($article),
                 'content_html' => $article->content_html,
-                'cover_image_path' => $article->cover_image_path,
-                'published_at' => $article->published_at?->toDateString(),
                 'meta_title' => $article->meta_title,
                 'meta_description' => $article->meta_description,
-                'category' => $article->category?->name,
-                'tags' => $article->tags->pluck('name'),
                 'views' => $article->views ?? 0,
             ],
+            'relatedArticles' => $relatedArticles,
         ]);
+    }
+
+    private function transformPublicArticle(Article $article): array
+    {
+        return [
+            'title' => $article->title,
+            'slug' => $article->slug,
+            'excerpt' => $article->excerpt,
+            'cover_image_path' => $article->cover_image_path,
+            'published_at' => $article->published_at?->toDateString(),
+            'category' => $article->category?->name,
+            'category_slug' => $article->category?->slug,
+            'tags' => $article->tags->pluck('name')->values()->all(),
+        ];
     }
 }

@@ -7,6 +7,11 @@ import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
+import { Table } from '@tiptap/extension-table';
+import TableCell from '@tiptap/extension-table-cell';
+import TableHeader from '@tiptap/extension-table-header';
+import TableRow from '@tiptap/extension-table-row';
+import ImageUpload from '@/components/admin/ImageUpload.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -29,13 +34,18 @@ import {
   Quote,
   Minus,
   ImagePlus,
+  Heading1,
   Heading2,
   Heading3,
   Link as LinkIcon,
   Image as ImageIcon,
+  Table2,
+  Rows3,
+  Columns3,
   Undo2,
   Redo2,
   Eraser,
+  Trash2,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -76,7 +86,6 @@ const linkUrl = ref('');
 const openInNewTab = ref(false);
 const imageFile = ref(null);
 const imageAlt = ref('');
-const imagePreviewUrl = ref('');
 const imageError = ref('');
 const isUploadingImage = ref(false);
 const hasImageUpload = computed(() => Boolean(props.imageUploadUrl));
@@ -131,9 +140,18 @@ const editor = new Editor({
   extensions: [
     StarterKit.configure({
       heading: {
-        levels: [2, 3],
+        levels: [1, 2, 3],
       },
     }),
+    Table.configure({
+      resizable: true,
+      HTMLAttributes: {
+        class: 'admin-richtext-table',
+      },
+    }),
+    TableRow,
+    TableHeader,
+    TableCell,
     RichImage.configure({
       HTMLAttributes: {
         class: 'rounded-xl my-6 h-auto',
@@ -235,10 +253,6 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  if (imagePreviewUrl.value && imagePreviewUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(imagePreviewUrl.value);
-  }
-
   editor.destroy();
 });
 
@@ -274,6 +288,14 @@ const toolbarButtons = computed(() => [
     action: () => editor.chain().focus().toggleStrike().run(),
     active: () => editor.isActive('strike'),
     disabled: () => !editor.can().chain().focus().toggleStrike().run(),
+  },
+  {
+    key: 'heading1',
+    label: 'H1',
+    icon: Heading1,
+    action: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+    active: () => editor.isActive('heading', { level: 1 }),
+    disabled: () => !editor.can().chain().focus().toggleHeading({ level: 1 }).run(),
   },
   {
     key: 'heading2',
@@ -323,6 +345,14 @@ const toolbarButtons = computed(() => [
     active: () => false,
     disabled: () => !editor.can().chain().focus().setHorizontalRule().run(),
   },
+  {
+    key: 'insertTable',
+    label: 'Table',
+    icon: Table2,
+    action: () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    active: () => editor.isActive('table'),
+    disabled: () => !editor.can().chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+  },
 ]);
 
 const applyLink = () => {
@@ -364,21 +394,13 @@ const removeLink = () => {
   closeLinkDialog();
 };
 
-const revokeImagePreview = () => {
-  if (imagePreviewUrl.value && imagePreviewUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(imagePreviewUrl.value);
-  }
-};
-
 const openImageDialog = () => {
   if (!hasImageUpload.value) {
     return;
   }
 
-  revokeImagePreview();
   imageFile.value = null;
   imageAlt.value = '';
-  imagePreviewUrl.value = '';
   imageError.value = '';
   isImageDialogOpen.value = true;
 };
@@ -388,17 +410,6 @@ const closeImageDialog = () => {
   imageFile.value = null;
   imageAlt.value = '';
   imageError.value = '';
-  revokeImagePreview();
-  imagePreviewUrl.value = '';
-};
-
-const onImageSelected = (event) => {
-  const file = event.target.files?.[0] ?? null;
-
-  revokeImagePreview();
-  imageFile.value = file;
-  imageError.value = '';
-  imagePreviewUrl.value = file ? URL.createObjectURL(file) : '';
 };
 
 const uploadImage = async () => {
@@ -440,6 +451,45 @@ const selectedImageWidth = computed(() => {
 const setSelectedImageWidth = (width) => {
   editor.chain().focus().updateAttributes('image', { width }).run();
 };
+
+const tableActions = [
+  {
+    key: 'addColumn',
+    label: 'Kolom',
+    icon: Columns3,
+    action: () => editor.chain().focus().addColumnAfter().run(),
+  },
+  {
+    key: 'addRow',
+    label: 'Baris',
+    icon: Rows3,
+    action: () => editor.chain().focus().addRowAfter().run(),
+  },
+  {
+    key: 'toggleHeader',
+    label: 'Header',
+    icon: Table2,
+    action: () => editor.chain().focus().toggleHeaderRow().run(),
+  },
+  {
+    key: 'deleteColumn',
+    label: 'Hapus Kolom',
+    icon: Columns3,
+    action: () => editor.chain().focus().deleteColumn().run(),
+  },
+  {
+    key: 'deleteRow',
+    label: 'Hapus Baris',
+    icon: Rows3,
+    action: () => editor.chain().focus().deleteRow().run(),
+  },
+  {
+    key: 'deleteTable',
+    label: 'Hapus Tabel',
+    icon: Trash2,
+    action: () => editor.chain().focus().deleteTable().run(),
+  },
+];
 </script>
 
 <template>
@@ -497,6 +547,21 @@ const setSelectedImageWidth = (width) => {
           >
             <ImageIcon class="mr-2 h-4 w-4" />
             <span class="hidden sm:inline">{{ option.label }}</span>
+          </Button>
+        </div>
+
+        <div v-if="editor.isActive('table')" class="flex flex-wrap gap-2">
+          <Button
+            v-for="action in tableActions"
+            :key="action.key"
+            type="button"
+            size="sm"
+            variant="outline"
+            class="h-9 px-3"
+            @click="action.action()"
+          >
+            <component :is="action.icon" class="mr-2 h-4 w-4" />
+            <span class="hidden sm:inline">{{ action.label }}</span>
           </Button>
         </div>
 
@@ -587,16 +652,6 @@ const setSelectedImageWidth = (width) => {
 
         <div class="space-y-4">
           <div class="space-y-2">
-            <Label :for="`${id}_image_file`">File Gambar</Label>
-            <Input
-              :id="`${id}_image_file`"
-              type="file"
-              accept="image/*"
-              @change="onImageSelected"
-            />
-          </div>
-
-          <div class="space-y-2">
             <Label :for="`${id}_image_alt`">Alt Text</Label>
             <Input
               :id="`${id}_image_alt`"
@@ -605,12 +660,13 @@ const setSelectedImageWidth = (width) => {
             />
           </div>
 
-          <div v-if="imagePreviewUrl" class="space-y-2">
-            <Label>Preview</Label>
-            <div class="overflow-hidden rounded-2xl border bg-slate-50 p-2">
-              <img :src="imagePreviewUrl" alt="Preview gambar artikel" class="max-h-72 w-full rounded-xl object-contain" />
-            </div>
-          </div>
+          <ImageUpload
+            v-model="imageFile"
+            :multiple="false"
+            :loading="isUploadingImage"
+            title="Upload gambar"
+            description="Pilih satu gambar, drag-and-drop, atau paste file gambar ke editor."
+          />
 
           <p v-if="imageError" class="text-xs text-rose-600">{{ imageError }}</p>
         </div>
@@ -635,6 +691,12 @@ const setSelectedImageWidth = (width) => {
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.3;
+}
+
+:deep(.admin-richtext h1) {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 :deep(.admin-richtext h3) {
@@ -674,6 +736,25 @@ const setSelectedImageWidth = (width) => {
   display: block;
   max-width: 100%;
   margin-inline: auto;
+}
+
+:deep(.admin-richtext table) {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 1.5rem 0;
+}
+
+:deep(.admin-richtext th),
+:deep(.admin-richtext td) {
+  border: 1px solid rgb(226 232 240);
+  padding: 0.75rem;
+  vertical-align: top;
+}
+
+:deep(.admin-richtext th) {
+  background: rgb(248 250 252);
+  font-weight: 700;
 }
 
 :deep(.admin-richtext p.is-editor-empty:first-child::before) {

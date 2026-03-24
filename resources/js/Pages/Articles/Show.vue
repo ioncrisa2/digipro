@@ -7,9 +7,62 @@ import ArticleCover from '@/components/blog/ArticleCover.vue'
 
 const page = usePage()
 const article = computed(() => page.props.article)
+const relatedArticles = computed(() => page.props.relatedArticles ?? [])
 
 const metaTitle = computed(() => article.value?.meta_title || article.value?.title || 'Artikel')
 const metaDescription = computed(() => article.value?.meta_description || article.value?.excerpt || '')
+
+const slugify = (value) => String(value ?? '')
+  .toLowerCase()
+  .trim()
+  .replace(/<[^>]+>/g, '')
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '')
+
+const contentDocument = computed(() => {
+  const raw = article.value?.content_html || ''
+
+  if (typeof window === 'undefined' || raw.trim() === '') {
+    return {
+      html: raw,
+      toc: [],
+    }
+  }
+
+  const parser = new DOMParser()
+  const document = parser.parseFromString(raw, 'text/html')
+  const seenIds = new Map()
+
+  const toc = Array.from(document.body.querySelectorAll('h1, h2, h3'))
+    .map((heading, index) => {
+      const text = heading.textContent?.trim() || `Section ${index + 1}`
+      const level = heading.tagName.toLowerCase()
+      const baseId = slugify(text) || `section-${index + 1}`
+      const usedCount = seenIds.get(baseId) ?? 0
+      seenIds.set(baseId, usedCount + 1)
+      const id = usedCount === 0 ? baseId : `${baseId}-${usedCount + 1}`
+
+      heading.id = id
+
+      return {
+        id,
+        text,
+        level,
+      }
+    })
+
+  Array.from(document.body.querySelectorAll('table')).forEach((table) => {
+    const wrapper = document.createElement('div')
+    wrapper.className = 'article-table-wrap'
+    table.parentNode?.insertBefore(wrapper, table)
+    wrapper.appendChild(table)
+  })
+
+  return {
+    html: document.body.innerHTML,
+    toc,
+  }
+})
 </script>
 
 <template>
@@ -77,8 +130,122 @@ const metaDescription = computed(() => article.value?.meta_description || articl
 
       <!-- Article Content -->
       <div class="bg-white">
-        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div class="article-content prose prose-lg max-w-none" v-html="article.content_html"></div>
+        <div class="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+          <div class="grid gap-10 xl:grid-cols-[minmax(0,1fr)_280px]">
+            <div class="min-w-0 xl:max-w-3xl">
+              <div v-if="contentDocument.toc.length" class="mb-10 rounded-2xl border border-slate-200 bg-slate-50/80 p-5 xl:hidden">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Daftar Isi</p>
+                <nav class="mt-4">
+                  <ul class="space-y-2">
+                    <li
+                      v-for="item in contentDocument.toc"
+                      :key="item.id"
+                      :class="[
+                        item.level === 'h2' ? 'pl-4' : '',
+                        item.level === 'h3' ? 'pl-8' : '',
+                      ]"
+                    >
+                      <a
+                        :href="`#${item.id}`"
+                        class="text-sm text-slate-700 transition-colors hover:text-slate-950 hover:underline"
+                      >
+                        {{ item.text }}
+                      </a>
+                    </li>
+                  </ul>
+                </nav>
+              </div>
+
+              <div class="article-content prose prose-lg max-w-none" v-html="contentDocument.html"></div>
+            </div>
+
+            <aside v-if="contentDocument.toc.length" class="hidden xl:block">
+              <div class="sticky top-24 rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Daftar Isi</p>
+                <nav class="mt-4">
+                  <ul class="space-y-2.5">
+                    <li
+                      v-for="item in contentDocument.toc"
+                      :key="item.id"
+                      :class="[
+                        item.level === 'h2' ? 'pl-4' : '',
+                        item.level === 'h3' ? 'pl-8' : '',
+                      ]"
+                    >
+                      <a
+                        :href="`#${item.id}`"
+                        class="block text-sm leading-6 text-slate-700 transition-colors hover:text-slate-950 hover:underline"
+                      >
+                        {{ item.text }}
+                      </a>
+                    </li>
+                  </ul>
+                </nav>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="relatedArticles.length" class="border-t border-slate-100 bg-slate-50/70">
+        <div class="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Artikel Terkait</p>
+              <h2 class="mt-3 text-2xl font-bold tracking-tight text-slate-950">Lanjutkan membaca topik serupa</h2>
+            </div>
+            <Link
+              href="/artikel"
+              class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition-colors hover:text-slate-950"
+            >
+              Lihat semua artikel
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </Link>
+          </div>
+
+          <div class="mt-8 grid gap-6 lg:grid-cols-3">
+            <Link
+              v-for="related in relatedArticles"
+              :key="related.slug"
+              :href="route('articles.show', related.slug)"
+              class="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg"
+            >
+              <div v-if="related.cover_image_path" class="aspect-[16/10] overflow-hidden bg-slate-100">
+                <ArticleCover
+                  :cover-path="related.cover_image_path"
+                  :alt="related.title"
+                  wrapper-class="h-full w-full"
+                  image-class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                />
+              </div>
+              <div class="p-6">
+                <ArticleMeta
+                  :published-at="related.published_at"
+                  :read-source="related.excerpt"
+                  :category="related.category"
+                  container-class="flex flex-wrap items-center gap-3 text-sm text-slate-500"
+                  category-class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                />
+                <h3 class="mt-4 text-xl font-semibold leading-tight text-slate-950 transition-colors group-hover:text-slate-700">
+                  {{ related.title }}
+                </h3>
+                <p v-if="related.excerpt" class="mt-3 line-clamp-3 text-sm leading-7 text-slate-600">
+                  {{ related.excerpt }}
+                </p>
+                <div v-if="related.tags?.length" class="mt-4 flex flex-wrap gap-2">
+                  <span
+                    v-for="tag in related.tags.slice(0, 3)"
+                    :key="tag"
+                    class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600"
+                  >
+                    #{{ tag }}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -122,6 +289,16 @@ const metaDescription = computed(() => article.value?.meta_description || articl
   margin-bottom: 1.25rem;
   line-height: 1.2;
   letter-spacing: -0.02em;
+}
+
+.article-content :deep(h1) {
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 3rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
 }
 
 .article-content :deep(h3) {
@@ -236,7 +413,7 @@ const metaDescription = computed(() => article.value?.meta_description || articl
 .article-content :deep(table) {
   width: 100%;
   border-collapse: collapse;
-  margin: 2rem 0;
+  min-width: 640px;
 }
 
 .article-content :deep(th) {
@@ -250,6 +427,13 @@ const metaDescription = computed(() => article.value?.meta_description || articl
 .article-content :deep(td) {
   padding: 0.75rem 1rem;
   border: 1px solid #e2e8f0;
+}
+
+.article-content :deep(.article-table-wrap) {
+  overflow-x: auto;
+  margin: 2rem 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
 }
 
 /* Selection */

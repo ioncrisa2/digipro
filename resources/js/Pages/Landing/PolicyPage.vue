@@ -73,6 +73,20 @@ const contentHtml = computed(() => {
   margin-top: 14px;
 }
 
+.terms-content :deep(h1) {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 20px;
+}
+
+.terms-content :deep(h2) {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 18px;
+}
+
 .terms-content :deep(p) {
   line-height: 1.65;
   margin-top: 6px;
@@ -87,5 +101,23 @@ const contentHtml = computed(() => {
 
 .terms-content :deep(li) {
   list-style: disc;
+}
+
+.terms-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.terms-content :deep(th),
+.terms-content :deep(td) {
+  border: 1px solid #e2e8f0;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.terms-content :deep(th) {
+  background: #f8fafc;
+  font-weight: 700;
 }
 </style>
