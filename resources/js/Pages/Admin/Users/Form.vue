@@ -66,7 +66,7 @@ const submit = () => {
         <Card>
           <CardHeader>
             <CardTitle>Data User</CardTitle>
-            <CardDescription>Field inti sama seperti resource legacy.</CardDescription>
+            <CardDescription>Field inti pengguna dan pengaturan role.</CardDescription>
           </CardHeader>
           <CardContent class="grid gap-6 md:grid-cols-2">
             <div class="space-y-2">

@@ -336,7 +336,7 @@ class ContentLegalController extends Controller
         return $this->legalDocumentFormResponse(
             'Admin/LegalDocuments/Form',
             'edit',
-            $this->legalDocumentFormPayload($termsDocument, $this->legacyTermsDocumentUrl($termsDocument)),
+            $this->legalDocumentFormPayload($termsDocument),
             route('admin.content.legal.terms.index'),
             route('admin.content.legal.terms.update', $termsDocument)
         );
@@ -390,7 +390,7 @@ class ContentLegalController extends Controller
         return $this->legalDocumentFormResponse(
             'Admin/LegalDocuments/Form',
             'edit',
-            $this->legalDocumentFormPayload($privacyPolicy, $this->legacyPrivacyPolicyUrl($privacyPolicy)),
+            $this->legalDocumentFormPayload($privacyPolicy),
             route('admin.content.legal.privacy.index'),
             route('admin.content.legal.privacy.update', $privacyPolicy)
         );
@@ -662,7 +662,7 @@ class ContentLegalController extends Controller
         string $modelClass,
         string $component,
         string $routePrefix,
-        string $legacyType
+        string $documentType
     ): Response {
         $filters = [
             'q' => trim((string) $request->query('q', '')),
@@ -675,7 +675,7 @@ class ContentLegalController extends Controller
             ->when($filters['status'] === 'inactive', fn ($query) => $query->where('is_active', false))
             ->latest('updated_at')
             ->get()
-            ->map(function ($document) use ($routePrefix, $legacyType) {
+            ->map(function ($document) use ($routePrefix) {
                 return [
                     'id' => $document->id,
                     'title' => $document->title,
@@ -692,9 +692,9 @@ class ContentLegalController extends Controller
 
         return inertia($component, [
             'resource' => [
-                'key' => $legacyType,
-                'title' => $legacyType === 'terms' ? 'Terms' : 'Privacy Policy',
-                'create_label' => $legacyType === 'terms' ? 'Tambah Terms' : 'Tambah Privacy Policy',
+                'key' => $documentType,
+                'title' => $documentType === 'terms' ? 'Terms' : 'Privacy Policy',
+                'create_label' => $documentType === 'terms' ? 'Tambah Terms' : 'Tambah Privacy Policy',
             ],
             'filters' => $filters,
             'statusOptions' => $this->simpleStatusOptions(),
@@ -708,7 +708,7 @@ class ContentLegalController extends Controller
         ]);
     }
 
-    private function legalDocumentFormPayload(object $document, ?string $legacyUrl = null): array
+    private function legalDocumentFormPayload(object $document): array
     {
         return [
             'id' => $document->id ?? null,
@@ -825,40 +825,5 @@ class ContentLegalController extends Controller
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];
-    }
-
-    private function legacyFaqUrl(Faq $faq): ?string
-    {
-        return null;
-    }
-
-    private function legacyFeatureUrl(Feature $feature): ?string
-    {
-        return null;
-    }
-
-    private function legacyTestimonialUrl(Testimonial $testimonial): ?string
-    {
-        return null;
-    }
-
-    private function legacyTermsDocumentUrl(TermsDocument $document): ?string
-    {
-        return null;
-    }
-
-    private function legacyPrivacyPolicyUrl(PrivacyPolicy $policy): ?string
-    {
-        return null;
-    }
-
-    private function legacyConsentDocumentUrl(ConsentDocument $document): ?string
-    {
-        return null;
-    }
-
-    private function legacyAppraisalUserConsentUrl(AppraisalUserConsent $consent): ?string
-    {
-        return null;
     }
 }

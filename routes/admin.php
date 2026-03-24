@@ -12,7 +12,6 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\IkkByProvinceController;
 use App\Http\Controllers\Admin\MasterDataController;
-use App\Http\Controllers\Admin\ModuleController;
 use App\Http\Controllers\Admin\ReferenceGuideDataController;
 use App\Http\Controllers\Admin\ReferenceGuideSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -67,6 +66,7 @@ Route::middleware(['auth', 'verified', 'admin.role'])
             ->group(function (): void {
                 Route::get('/artikel', [ContentController::class, 'articlesIndex'])->name('articles.index');
                 Route::get('/artikel/buat', [ContentController::class, 'articlesCreate'])->name('articles.create');
+                Route::post('/artikel/upload-image', [ContentController::class, 'articlesUploadImage'])->name('articles.images.store');
                 Route::post('/artikel', [ContentController::class, 'articlesStore'])->name('articles.store');
                 Route::get('/artikel/{article}/edit', [ContentController::class, 'articlesEdit'])->name('articles.edit');
                 Route::put('/artikel/{article}', [ContentController::class, 'articlesUpdate'])->name('articles.update');
@@ -256,6 +256,4 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::post('/contact-messages/{contactMessage}/archive', [CommunicationController::class, 'contactMessagesArchive'])->name('contact-messages.archive');
                 Route::delete('/contact-messages/{contactMessage}', [CommunicationController::class, 'contactMessagesDestroy'])->name('contact-messages.destroy');
             });
-
-        Route::get('/modul/{module}', [ModuleController::class, 'moduleShow'])->name('modules.show');
     });

@@ -179,12 +179,6 @@ class CommunicationController extends Controller
             ],
         ];
     }
-
-    private function legacyContactMessageUrl(ContactMessage $message): ?string
-    {
-        return null;
-    }
-
     private function contactMessageStatusOptions(bool $withAll = false): array
     {
         $options = [

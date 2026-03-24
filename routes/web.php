@@ -19,8 +19,6 @@ Route::get('/contact', [LandingController::class, 'contact'])->name('contact')->
 Route::post('/contact', [LandingController::class, 'storeContact'])->name('contact.store');
 Route::get('/artikel', [ArticleController::class, 'index'])->name('articles.index');
 Route::get('/artikel/{slug}', [ArticleController::class, 'show'])->name('articles.show');
-Route::redirect('/legacy-admin', '/admin');
-Route::redirect('/legacy-admin/{any}', '/admin')->where('any', '.*');
 Route::post('/payments/midtrans/notification', [PaymentController::class, 'midtransNotification'])
     ->name('payments.midtrans.notification');
 

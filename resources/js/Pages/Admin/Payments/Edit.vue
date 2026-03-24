@@ -116,7 +116,7 @@ const submit = () => {
         <Card>
           <CardHeader>
             <CardTitle>Update Pembayaran</CardTitle>
-            <CardDescription>Field aktif untuk operasi admin harian tanpa membuka resource legacy.</CardDescription>
+            <CardDescription>Field aktif untuk operasi admin harian dan koreksi data pembayaran.</CardDescription>
           </CardHeader>
           <CardContent class="grid gap-6 md:grid-cols-2">
             <div class="space-y-2">

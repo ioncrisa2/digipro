@@ -24,6 +24,11 @@ const props = defineProps({
 
 const { confirmDelete } = useAdminConfirmDialog();
 
+const plainText = (value) => String(value ?? '')
+  .replace(/<[^>]*>/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 const applyFilters = (patch = {}) => {
   const routeNameMap = {
     faqs: 'admin.content.legal.faqs.index',
@@ -86,7 +91,7 @@ const destroyRecord = async (item) => {
         <template #item="{ item }">
           <AdminEntityCard
             :title="item.title || item.question || item.name"
-            :description="item.description || item.answer || item.quote"
+            :description="plainText(item.description || item.answer || item.quote)"
           >
             <template #badges>
               <Badge variant="outline" :class="item.is_active ? 'bg-emerald-100 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-800 border-slate-200'">{{ item.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>

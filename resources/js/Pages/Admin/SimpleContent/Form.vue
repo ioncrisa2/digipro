@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import AdminRichTextEditor from '@/components/admin/AdminRichTextEditor.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -43,7 +44,15 @@ const submit = () => form.post(props.submitUrl, { preserveScroll: true });
   <AdminLayout :title="`${isEditMode ? 'Edit' : 'Tambah'} ${resource.singular}`">
     <div class="mx-auto max-w-4xl space-y-6">
       <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div><h1 class="text-3xl font-semibold tracking-tight text-slate-950">{{ isEditMode ? `Edit ${resource.singular}` : `Tambah ${resource.singular}` }}</h1></div>
+        <div>
+          <h1 class="text-3xl font-semibold tracking-tight text-slate-950">{{ isEditMode ? `Edit ${resource.singular}` : `Tambah ${resource.singular}` }}</h1>
+          <p v-if="resource.key === 'faqs'" class="mt-2 text-sm text-slate-600">
+            Gunakan rich text editor untuk menyusun jawaban FAQ yang lebih rapi, terstruktur, dan mudah dibaca.
+          </p>
+          <p v-else-if="resource.key === 'testimonials'" class="mt-2 text-sm text-slate-600">
+            Gunakan rich text editor untuk menulis kutipan testimoni dengan struktur yang rapi dan mudah dibaca.
+          </p>
+        </div>
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
         </div>
@@ -55,7 +64,16 @@ const submit = () => form.post(props.submitUrl, { preserveScroll: true });
           <CardContent class="grid gap-6 md:grid-cols-2">
             <template v-if="resource.key === 'faqs'">
               <div class="space-y-2 md:col-span-2"><Label for="question">Pertanyaan</Label><Input id="question" v-model="form.question" /><p v-if="form.errors.question" class="text-xs text-rose-600">{{ form.errors.question }}</p></div>
-              <div class="space-y-2 md:col-span-2"><Label for="answer">Jawaban</Label><Textarea id="answer" v-model="form.answer" rows="6" /><p v-if="form.errors.answer" class="text-xs text-rose-600">{{ form.errors.answer }}</p></div>
+              <div class="md:col-span-2">
+                <AdminRichTextEditor
+                  id="answer"
+                  v-model="form.answer"
+                  label="Jawaban"
+                  placeholder="Tulis jawaban FAQ di sini..."
+                  help="Gunakan rich text untuk list, heading, divider, dan link bila perlu."
+                  :error="form.errors.answer"
+                />
+              </div>
             </template>
 
             <template v-else-if="resource.key === 'features'">
@@ -74,7 +92,16 @@ const submit = () => form.post(props.submitUrl, { preserveScroll: true });
             <template v-else>
               <div class="space-y-2"><Label for="name">Nama</Label><Input id="name" v-model="form.name" /><p v-if="form.errors.name" class="text-xs text-rose-600">{{ form.errors.name }}</p></div>
               <div class="space-y-2"><Label for="role">Peran</Label><Input id="role" v-model="form.role" /><p v-if="form.errors.role" class="text-xs text-rose-600">{{ form.errors.role }}</p></div>
-              <div class="space-y-2 md:col-span-2"><Label for="quote">Testimoni</Label><Textarea id="quote" v-model="form.quote" rows="5" /><p v-if="form.errors.quote" class="text-xs text-rose-600">{{ form.errors.quote }}</p></div>
+              <div class="md:col-span-2">
+                <AdminRichTextEditor
+                  id="quote"
+                  v-model="form.quote"
+                  label="Testimoni"
+                  placeholder="Tulis kutipan testimoni di sini..."
+                  help="Gunakan rich text bila perlu untuk penekanan, divider, atau tautan pendukung."
+                  :error="form.errors.quote"
+                />
+              </div>
             </template>
 
             <div class="space-y-2"><Label for="sort_order">Urutan</Label><Input id="sort_order" v-model="form.sort_order" type="number" min="0" /><p v-if="form.errors.sort_order" class="text-xs text-rose-600">{{ form.errors.sort_order }}</p></div>

@@ -83,7 +83,7 @@ it('redirects reviewer away from customer dashboard and profile', function (): v
     $this
         ->actingAs($user)
         ->get(route('profile.edit'))
-        ->assertRedirect(route('reviewer.dashboard'));
+        ->assertRedirect(route('reviewer.profile.edit'));
 
     $this
         ->actingAs($user)
@@ -91,13 +91,13 @@ it('redirects reviewer away from customer dashboard and profile', function (): v
         ->assertOk();
 });
 
-it('does not expose the legacy reviewer filament path anymore', function (): void {
+it('does not expose the old reviewer fallback path anymore', function (): void {
     $user = User::factory()->create();
     $user->assignRole('Reviewer');
 
     $this
         ->actingAs($user)
-        ->get('/reviewer-legacy')
+        ->get('/reviewer-old-panel')
         ->assertNotFound();
 });
 

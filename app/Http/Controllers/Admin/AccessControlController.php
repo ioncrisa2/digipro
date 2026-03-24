@@ -319,9 +319,4 @@ class AccessControlController extends Controller
             ],
         ];
     }
-
-    private function legacyRoleUrl(Role $role): ?string
-    {
-        return null;
-    }
 }

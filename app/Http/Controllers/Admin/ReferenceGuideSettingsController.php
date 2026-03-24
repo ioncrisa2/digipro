@@ -413,14 +413,4 @@ class ReferenceGuideSettingsController extends Controller
             ],
         ];
     }
-
-    private function legacyGuidelineSetUrl(GuidelineSet $guidelineSet): ?string
-    {
-        return null;
-    }
-
-    private function legacyValuationSettingUrl(ValuationSetting $valuationSetting): ?string
-    {
-        return null;
-    }
 }

@@ -19,6 +19,10 @@ class ProfileController extends Controller
         $isReviewer = (bool) $user?->hasRole('Reviewer');
         $isAdmin = (bool) $user?->hasAdminAccess();
 
+        if ($isReviewer && $request->routeIs('profile.edit')) {
+            return redirect()->route('reviewer.profile.edit');
+        }
+
         return inertia('Profile/Index', [
             'layoutContext' => $isReviewer ? 'reviewer' : ($isAdmin ? 'admin' : 'customer'),
             'profileRoutes' => [

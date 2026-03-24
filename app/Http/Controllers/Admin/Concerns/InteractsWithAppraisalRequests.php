@@ -36,12 +36,6 @@ trait InteractsWithAppraisalRequests
             'show_url' => route('admin.appraisal-requests.show', $record),
         ];
     }
-
-    private function legacyAppraisalRequestUrl(AppraisalRequest $record): ?string
-    {
-        return null;
-    }
-
     private function formatNegotiationAction(?string $action): string
     {
         return match ($action) {

@@ -60,7 +60,7 @@ const statusTone = (status) => {
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Detail Pembayaran</p>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ record.invoice_number }}</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Detail read-only pembayaran untuk audit transaksi Midtrans dan membaca data legacy yang masih ada.
+            Detail read-only pembayaran untuk audit transaksi Midtrans dan penelusuran data historis.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -88,7 +88,7 @@ const statusTone = (status) => {
           <Card>
             <CardHeader>
               <CardTitle>Ringkasan Pembayaran</CardTitle>
-              <CardDescription>Field utama dari resource pembayaran legacy.</CardDescription>
+              <CardDescription>Field utama pembayaran untuk audit admin.</CardDescription>
             </CardHeader>
             <CardContent class="grid gap-4 md:grid-cols-2">
               <div>

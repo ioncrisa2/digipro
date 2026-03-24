@@ -327,12 +327,6 @@ class BuildingEconomicLifeController extends Controller
     {
         return is_string($value) && trim($value) === '' ? null : $value;
     }
-
-    private function legacyUrl(BuildingEconomicLife $record): ?string
-    {
-        return null;
-    }
-
     protected function paginatedRecordsPayload(object $records): array
     {
         return [

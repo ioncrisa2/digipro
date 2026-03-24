@@ -1135,24 +1135,4 @@ class ReferenceGuideDataController extends Controller
             ->values()
             ->all();
     }
-
-    private function legacyConstructionCostIndexUrl(ConstructionCostIndex $constructionCostIndex): ?string
-    {
-        return null;
-    }
-
-    private function legacyCostElementUrl(CostElement $costElement): ?string
-    {
-        return null;
-    }
-
-    private function legacyFloorIndexUrl(FloorIndex $floorIndex): ?string
-    {
-        return null;
-    }
-
-    private function legacyMappiRcnStandardUrl(MappiRcnStandard $mappiRcnStandard): ?string
-    {
-        return null;
-    }
 }

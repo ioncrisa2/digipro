@@ -60,7 +60,7 @@ class FinanceController extends Controller
             'methodOptions' => [
                 ['value' => 'all', 'label' => 'Semua Metode'],
                 ['value' => 'gateway', 'label' => 'Gateway / Midtrans'],
-                ['value' => 'manual', 'label' => 'Legacy Manual'],
+                ['value' => 'manual', 'label' => 'Manual'],
             ],
             'summary' => [
                 'total' => Payment::query()->count(),
@@ -125,7 +125,7 @@ class FinanceController extends Controller
                 'id' => $payment->id,
                 'invoice_number' => $this->paymentInvoiceNumber($payment),
                 'method' => $payment->method,
-                'method_label' => $payment->method === 'gateway' ? 'Midtrans Gateway' : 'Legacy Manual',
+                'method_label' => $payment->method === 'gateway' ? 'Midtrans Gateway' : 'Manual',
                 'amount' => (int) $payment->amount,
                 'status' => $payment->status,
                 'gateway' => $payment->gateway,
@@ -407,17 +407,6 @@ class FinanceController extends Controller
 
         return sprintf('%s %s', number_format($value, $index === 0 ? 0 : 2), $units[$index]);
     }
-
-    private function legacyPaymentUrl(Payment $payment): ?string
-    {
-        return null;
-    }
-
-    private function legacyOfficeBankAccountUrl(OfficeBankAccount $account): ?string
-    {
-        return null;
-    }
-
     protected function paginatedRecordsPayload(object $records): array
     {
         return [

@@ -1,12 +1,12 @@
 <script setup>
 import { computed } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import AdminRichTextEditor from '@/components/admin/AdminRichTextEditor.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const props = defineProps({
@@ -38,7 +38,12 @@ const submit = () => form.post(props.submitUrl, { preserveScroll: true });
   <AdminLayout :title="`${isEditMode ? 'Edit' : 'Tambah'} ${resource.title}`">
     <div class="mx-auto max-w-5xl space-y-6">
       <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div><h1 class="text-3xl font-semibold tracking-tight text-slate-950">{{ isEditMode ? `Edit ${resource.title}` : `Tambah ${resource.title}` }}</h1></div>
+        <div>
+          <h1 class="text-3xl font-semibold tracking-tight text-slate-950">{{ isEditMode ? `Edit ${resource.title}` : `Tambah ${resource.title}` }}</h1>
+          <p class="mt-2 text-sm text-slate-600">
+            Kelola dokumen legal dengan editor rich text agar struktur konten publik lebih rapi dan mudah dibaca.
+          </p>
+        </div>
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
         </div>
@@ -54,7 +59,16 @@ const submit = () => form.post(props.submitUrl, { preserveScroll: true });
             <div class="space-y-2"><Label for="effective_since">Berlaku Sejak</Label><Input id="effective_since" v-model="form.effective_since" type="date" /><p v-if="form.errors.effective_since" class="text-xs text-rose-600">{{ form.errors.effective_since }}</p></div>
             <div class="space-y-2"><Label for="published_at">Tanggal Publikasi</Label><Input id="published_at" v-model="form.published_at" type="datetime-local" /><p v-if="form.errors.published_at" class="text-xs text-rose-600">{{ form.errors.published_at }}</p></div>
             <label class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm text-slate-700 md:col-span-2"><Checkbox v-model="form.is_active" /><span>Aktifkan dokumen ini</span></label>
-            <div class="space-y-2 md:col-span-2"><Label for="content_html">Konten HTML</Label><Textarea id="content_html" v-model="form.content_html" rows="18" /><p class="text-xs text-slate-500">Gunakan HTML valid.</p><p v-if="form.errors.content_html" class="text-xs text-rose-600">{{ form.errors.content_html }}</p></div>
+            <div class="md:col-span-2">
+              <AdminRichTextEditor
+                id="content_html"
+                v-model="form.content_html"
+                label="Konten Dokumen"
+                placeholder="Tulis isi dokumen di sini..."
+                help="Gunakan heading, list, divider, dan link agar dokumen legal lebih terstruktur."
+                :error="form.errors.content_html"
+              />
+            </div>
           </CardContent>
         </Card>
         <div class="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" as-child><Link :href="indexUrl">Batal</Link></Button><Button type="submit" :disabled="form.processing">{{ isEditMode ? 'Simpan Perubahan' : `Tambah ${resource.title}` }}</Button></div>

@@ -566,6 +566,28 @@ it('stores an article from the vue admin workspace', function () {
     Storage::disk('public')->assertExists($article->cover_image_path);
 });
 
+it('uploads an inline article image from the vue admin workspace', function () {
+    Storage::fake('public');
+
+    $admin = createAdminUser();
+
+    $response = $this
+        ->actingAs($admin)
+        ->post(route('admin.content.articles.images.store'), [
+            'image' => UploadedFile::fake()->image('inline-article.jpg', 1200, 800),
+            'alt' => 'Diagram appraisal workflow',
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('alt', 'Diagram appraisal workflow');
+
+    $path = $response->json('path');
+
+    expect($path)->not->toBeNull();
+    Storage::disk('public')->assertExists($path);
+});
+
 it('updates an article from the vue admin workspace', function () {
     $admin = createAdminUser();
     $categoryA = ArticleCategory::create([

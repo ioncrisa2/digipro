@@ -124,9 +124,4 @@ class DashboardController extends Controller
             'show_url' => route('admin.appraisal-requests.show', $record),
         ];
     }
-
-    private function legacyAppraisalRequestUrl(AppraisalRequest $record): ?string
-    {
-        return null;
-    }
 }

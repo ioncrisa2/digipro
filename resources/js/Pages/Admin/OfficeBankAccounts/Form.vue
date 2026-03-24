@@ -84,7 +84,7 @@ const submit = () => {
         <Card>
           <CardHeader>
             <CardTitle>Informasi Rekening</CardTitle>
-            <CardDescription>Field yang sama dengan resource legacy, dipindah ke form Inertia.</CardDescription>
+            <CardDescription>Field rekening kantor untuk kebutuhan operasional pembayaran admin.</CardDescription>
           </CardHeader>
           <CardContent class="grid gap-6 md:grid-cols-2">
             <div class="space-y-2">

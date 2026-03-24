@@ -105,7 +105,7 @@ const submit = () => {
             <div class="space-y-2">
               <Label for="base_region">Base Region</Label>
               <Input id="base_region" v-model="form.base_region" readonly class="bg-slate-50 text-slate-500" />
-              <p class="text-xs text-slate-500">Untuk saat ini base region dikunci ke DKI Jakarta mengikuti resource legacy.</p>
+              <p class="text-xs text-slate-500">Untuk saat ini base region dikunci ke DKI Jakarta agar referensi biaya tetap konsisten.</p>
               <p v-if="form.errors.base_region" class="text-xs text-rose-600">{{ form.errors.base_region }}</p>
             </div>
 

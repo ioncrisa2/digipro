@@ -4,6 +4,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import AdminRichTextEditor from '@/components/admin/AdminRichTextEditor.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +28,7 @@ const props = defineProps({
   record: { type: Object, required: true },
   categoryOptions: { type: Array, default: () => [] },
   tagOptions: { type: Array, default: () => [] },
+  imageUploadUrl: { type: String, default: '' },
   submitUrl: { type: String, required: true },
   indexUrl: { type: String, required: true },
 });
@@ -87,7 +89,7 @@ const submit = () => {
         <div>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ isEditMode ? 'Edit Artikel' : 'Tulis Artikel' }}</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Form editorial artikel berjalan di Inertia. Editor konten memakai HTML textarea yang ringan dan fleksibel.
+            Form editorial artikel dengan editor rich text untuk penulisan dan penyuntingan konten publik.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -167,10 +169,15 @@ const submit = () => {
             </div>
 
             <div class="space-y-2 md:col-span-2">
-              <Label for="content_html">Konten</Label>
-              <Textarea id="content_html" v-model="form.content_html" rows="16" placeholder="<p>Konten HTML artikel</p>" />
-              <p class="text-xs text-slate-500">Gunakan HTML valid. Editor ini sengaja dibuat ringan agar mudah dikustomisasi.</p>
-              <p v-if="form.errors.content_html" class="text-xs text-rose-600">{{ form.errors.content_html }}</p>
+              <AdminRichTextEditor
+                id="content_html"
+                v-model="form.content_html"
+                label="Konten"
+                placeholder="Tulis isi artikel di sini..."
+                help="Gunakan heading, list, kutipan, dan link untuk menyusun artikel yang mudah dibaca."
+                :image-upload-url="imageUploadUrl"
+                :error="form.errors.content_html"
+              />
             </div>
           </CardContent>
         </Card>

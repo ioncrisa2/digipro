@@ -1136,29 +1136,4 @@ class MasterDataController extends Controller
             ->route($routeName)
             ->with('success', $label . ' berhasil dihapus.');
     }
-
-    private function legacyProvinceUrl(Province $province): ?string
-    {
-        return null;
-    }
-
-    private function legacyRegencyUrl(Regency $regency): ?string
-    {
-        return null;
-    }
-
-    private function legacyDistrictUrl(District $district): ?string
-    {
-        return null;
-    }
-
-    private function legacyVillageUrl(Village $village): ?string
-    {
-        return null;
-    }
-
-    private function legacyUserUrl(User $user): ?string
-    {
-        return null;
-    }
 }

@@ -101,7 +101,7 @@ const submit = () => {
             <div class="space-y-2">
               <Label for="reference_region">Reference Region</Label>
               <Input id="reference_region" v-model="form.reference_region" readonly class="bg-slate-50 text-slate-500" />
-              <p class="text-xs text-slate-500">Untuk saat ini dikunci ke DKI Jakarta mengikuti resource legacy.</p>
+              <p class="text-xs text-slate-500">Untuk saat ini reference region dikunci ke DKI Jakarta agar standar RCN tetap konsisten.</p>
               <p v-if="form.errors.reference_region" class="text-xs text-rose-600">{{ form.errors.reference_region }}</p>
             </div>
 

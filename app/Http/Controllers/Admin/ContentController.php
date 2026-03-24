@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreArticleCategoryRequest;
+use App\Http\Requests\Admin\StoreArticleInlineImageRequest;
 use App\Http\Requests\Admin\StoreArticleRequest;
 use App\Http\Requests\Admin\StoreTagRequest;
 use App\Models\Article;
 use App\Models\ArticleCategory;
 use App\Models\Tag;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -80,8 +82,21 @@ class ContentController extends Controller
             'record' => $this->articleFormPayload(new Article()),
             'categoryOptions' => $this->articleCategorySelectOptions(),
             'tagOptions' => $this->tagSelectOptions(),
+            'imageUploadUrl' => route('admin.content.articles.images.store'),
             'indexUrl' => route('admin.content.articles.index'),
             'submitUrl' => route('admin.content.articles.store'),
+        ]);
+    }
+
+    public function articlesUploadImage(StoreArticleInlineImageRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $path = $request->file('image')->store('articles/inline', 'public');
+
+        return response()->json([
+            'url' => Storage::disk('public')->url($path),
+            'path' => $path,
+            'alt' => $validated['alt'] ?? null,
         ]);
     }
 
@@ -106,6 +121,7 @@ class ContentController extends Controller
             'record' => $this->articleFormPayload($article),
             'categoryOptions' => $this->articleCategorySelectOptions(),
             'tagOptions' => $this->tagSelectOptions(),
+            'imageUploadUrl' => route('admin.content.articles.images.store'),
             'indexUrl' => route('admin.content.articles.index'),
             'submitUrl' => route('admin.content.articles.update', $article),
         ]);
@@ -492,20 +508,5 @@ class ContentController extends Controller
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];
-    }
-
-    private function legacyArticleUrl(Article $article): ?string
-    {
-        return null;
-    }
-
-    private function legacyArticleCategoryUrl(ArticleCategory $category): ?string
-    {
-        return null;
-    }
-
-    private function legacyTagUrl(Tag $tag): ?string
-    {
-        return null;
     }
 }
