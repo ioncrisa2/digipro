@@ -1,11 +1,12 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -27,16 +28,29 @@ const props = defineProps({
   createUrl: { type: String, required: true },
 });
 
-const applyFilters = (patch = {}) => {
+const form = reactive({
+  q: props.filters.q ?? '',
+  guard: props.filters.guard ?? 'all',
+});
+
+const submitFilters = () => {
   router.get(route('admin.access-control.roles.index'), {
-    ...props.filters,
-    ...patch,
+    q: form.q || undefined,
+    guard: form.guard === 'all' ? undefined : form.guard,
   }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.guard = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => (form.guard !== 'all' ? 1 : 0));
 
 const columns = [
   { key: 'name', label: 'Role', cellClass: 'min-w-[180px]' },
@@ -73,34 +87,31 @@ const columns = [
       </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Filter Role</CardTitle>
-          <CardDescription>Filter dasar berdasarkan nama role dan guard.</CardDescription>
-        </CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <div class="space-y-2">
-            <Label for="role_q">Cari</Label>
-            <Input id="role_q" :model-value="filters.q" placeholder="Nama role" @change="applyFilters({ q: $event.target.value })" />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar Roles</CardTitle>
           </div>
-          <div class="space-y-2">
-            <Label for="role_guard">Guard</Label>
-            <Select :model-value="filters.guard" @update:model-value="applyFilters({ guard: $event })">
-              <SelectTrigger id="role_guard"><SelectValue placeholder="Pilih guard" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Guard</SelectItem>
-                <SelectItem v-for="option in guardOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Roles</CardTitle>
-          <CardDescription>
-            Menampilkan {{ records.meta?.from ?? 0 }}-{{ records.meta?.to ?? 0 }} dari {{ records.meta?.total ?? 0 }} role.
-          </CardDescription>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari nama role"
+            filter-title="Filter role"
+            filter-description="Saring role berdasarkan guard yang dipakai."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="space-y-2">
+              <Label for="role_guard_filter">Guard</Label>
+              <Select v-model="form.guard">
+                <SelectTrigger id="role_guard_filter"><SelectValue placeholder="Pilih guard" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Guard</SelectItem>
+                  <SelectItem v-for="option in guardOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable

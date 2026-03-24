@@ -546,6 +546,7 @@ class ContentLegalController extends Controller
         $filters = [
             'q' => trim((string) $request->query('q', '')),
             'code' => (string) $request->query('code', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = AppraisalUserConsent::query()
@@ -562,7 +563,7 @@ class ContentLegalController extends Controller
             })
             ->when($filters['code'] !== 'all', fn ($query) => $query->where('code', $filters['code']))
             ->latest('accepted_at')
-            ->paginate(20)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (AppraisalUserConsent $consent) => [
@@ -810,7 +811,7 @@ class ContentLegalController extends Controller
             ->all();
     }
 
-    private function paginatedRecordsPayload(object $records): array
+    protected function paginatedRecordsPayload(object $records): array
     {
         return [
             'data' => $records->items(),
@@ -818,6 +819,9 @@ class ContentLegalController extends Controller
                 'from' => $records->firstItem(),
                 'to' => $records->lastItem(),
                 'total' => $records->total(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+                'per_page' => $records->perPage(),
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];

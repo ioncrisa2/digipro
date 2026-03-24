@@ -1,8 +1,15 @@
 <script setup>
 import { FlexRender, getCoreRowModel, getSortedRowModel, useVueTable } from '@tanstack/vue-table';
 import { router } from '@inertiajs/vue3';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-vue-next';
-import { computed, h, ref, useSlots } from 'vue';
+import { computed, h, ref, useSlots, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -21,13 +28,68 @@ const props = defineProps({
   meta: { type: Object, default: null },
   emptyText: { type: String, default: 'Tidak ada data.' },
   rowKey: { type: [String, Function], default: 'id' },
+  defaultPerPage: { type: Number, default: 10 },
 });
 
 const slots = useSlots();
 const sorting = ref([]);
+const perPageOptions = ['10', '25', '50', '100'];
+const localPerPage = ref(String(props.defaultPerPage));
+const localCurrentPage = ref(1);
 
 const paginationLinks = computed(() => props.meta?.links ?? []);
+const isServerPaginated = computed(() => Boolean(props.meta));
+const currentPerPage = computed(() => String(props.meta?.per_page ?? localPerPage.value ?? props.defaultPerPage));
 const colspan = computed(() => props.columns.length || 1);
+const summaryText = computed(() => {
+  if (isServerPaginated.value) {
+    const from = props.meta?.from ?? 0;
+    const to = props.meta?.to ?? 0;
+    const total = props.meta?.total ?? 0;
+
+    return `Menampilkan ${from}-${to} dari ${total} data`;
+  }
+
+  const total = props.rows.length;
+  if (!total) {
+    return 'Menampilkan 0-0 dari 0 data';
+  }
+
+  const perPage = Number(localPerPage.value || props.defaultPerPage);
+  const from = (localCurrentPage.value - 1) * perPage + 1;
+  const to = Math.min(total, from + displayedRows.value.length - 1);
+
+  return `Menampilkan ${from}-${to} dari ${total} data`;
+});
+
+const localLastPage = computed(() => {
+  if (!props.rows.length) {
+    return 1;
+  }
+
+  return Math.max(1, Math.ceil(props.rows.length / Number(localPerPage.value || props.defaultPerPage)));
+});
+
+const displayedRows = computed(() => {
+  if (isServerPaginated.value) {
+    return props.rows;
+  }
+
+  const perPage = Number(localPerPage.value || props.defaultPerPage);
+  const start = (localCurrentPage.value - 1) * perPage;
+
+  return props.rows.slice(start, start + perPage);
+});
+
+const localPaginationLinks = computed(() => Array.from({ length: localLastPage.value }, (_, index) => {
+  const page = index + 1;
+
+  return {
+    label: String(page),
+    page,
+    active: page === localCurrentPage.value,
+  };
+}));
 
 const resolveRowKey = (row, index) => {
   if (typeof props.rowKey === 'function') {
@@ -97,7 +159,7 @@ const columnDefs = computed(() => props.columns.map((column) => ({
 
 const table = useVueTable({
   get data() {
-    return props.rows;
+    return displayedRows.value;
   },
   get columns() {
     return columnDefs.value;
@@ -114,6 +176,16 @@ const table = useVueTable({
   getSortedRowModel: getSortedRowModel(),
 });
 
+watch(() => props.rows.length, () => {
+  if (!isServerPaginated.value && localCurrentPage.value > localLastPage.value) {
+    localCurrentPage.value = 1;
+  }
+});
+
+watch(localPerPage, () => {
+  localCurrentPage.value = 1;
+});
+
 const visit = (url) => {
   if (!url) return;
 
@@ -121,6 +193,25 @@ const visit = (url) => {
     preserveScroll: true,
     preserveState: true,
   });
+};
+
+const updatePerPage = (value) => {
+  if (!value) return;
+
+  if (!isServerPaginated.value) {
+    localPerPage.value = value;
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.set('per_page', value);
+  url.searchParams.set('page', '1');
+
+  visit(url.toString());
+};
+
+const visitLocalPage = (page) => {
+  localCurrentPage.value = page;
 };
 </script>
 
@@ -174,18 +265,55 @@ const visit = (url) => {
       </div>
     </div>
 
-    <div v-if="paginationLinks.length" class="flex flex-wrap gap-2">
-      <Button
-        v-for="link in paginationLinks"
-        :key="`${link.label}-${link.url}`"
-        type="button"
-        size="sm"
-        :variant="link.active ? 'default' : 'outline'"
-        :disabled="!link.url"
-        @click="visit(link.url)"
-      >
-        <span v-html="link.label" />
-      </Button>
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <p class="text-sm text-slate-500">
+        {{ summaryText }}
+      </p>
+
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-slate-500">Baris per halaman</span>
+          <Select :model-value="currentPerPage" @update:model-value="updatePerPage">
+            <SelectTrigger class="h-9 w-[92px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="option in perPageOptions" :key="option" :value="option">
+                {{ option }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div v-if="isServerPaginated ? paginationLinks.length : localPaginationLinks.length > 1" class="flex flex-wrap gap-2">
+          <template v-if="isServerPaginated">
+            <Button
+              v-for="link in paginationLinks"
+              :key="`${link.label}-${link.url}`"
+              type="button"
+              size="sm"
+              :variant="link.active ? 'default' : 'outline'"
+              :disabled="!link.url"
+              @click="visit(link.url)"
+            >
+              <span v-html="link.label" />
+            </Button>
+          </template>
+
+          <template v-else>
+            <Button
+              v-for="link in localPaginationLinks"
+              :key="link.page"
+              type="button"
+              size="sm"
+              :variant="link.active ? 'default' : 'outline'"
+              @click="visitLocalPage(link.page)"
+            >
+              {{ link.label }}
+            </Button>
+          </template>
+        </div>
+      </div>
     </div>
   </div>
 </template>

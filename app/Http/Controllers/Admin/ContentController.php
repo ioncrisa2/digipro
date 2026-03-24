@@ -22,6 +22,7 @@ class ContentController extends Controller
             'q' => trim((string) $request->query('q', '')),
             'status' => (string) $request->query('status', 'all'),
             'category' => (string) $request->query('category', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = Article::query()
@@ -38,7 +39,7 @@ class ContentController extends Controller
             ->when($filters['status'] === 'draft', fn ($query) => $query->where('is_published', false))
             ->when($filters['category'] !== 'all', fn ($query) => $query->where('category_id', $filters['category']))
             ->latest('created_at')
-            ->paginate(12)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (Article $article) => $this->transformArticleRow($article));
@@ -477,7 +478,7 @@ class ContentController extends Controller
         $article->tags()->sync($validated['tag_ids'] ?? []);
     }
 
-    private function paginatedRecordsPayload(object $records): array
+    protected function paginatedRecordsPayload(object $records): array
     {
         return [
             'data' => $records->items(),
@@ -485,6 +486,9 @@ class ContentController extends Controller
                 'from' => $records->firstItem(),
                 'to' => $records->lastItem(),
                 'total' => $records->total(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+                'per_page' => $records->perPage(),
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];

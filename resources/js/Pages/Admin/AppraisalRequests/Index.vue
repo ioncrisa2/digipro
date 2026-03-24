@@ -1,11 +1,12 @@
 <script setup>
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -16,7 +17,6 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -68,6 +68,14 @@ const resetFilters = () => {
   applyFilters();
 };
 
+const activeFilterCount = computed(() => {
+  let count = 0;
+
+  if (form.status !== 'all') count += 1;
+
+  return count;
+});
+
 const statusTone = (value) => {
   switch (value) {
     case 'submitted':
@@ -114,7 +122,7 @@ const columns = [
         <div>
           <h1 class="text-3xl font-semibold tracking-tight text-slate-950">Permohonan Penilaian</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Ini adalah pengganti awal `AppraisalRequestResource`. Detail request sudah bisa dibuka dari Vue, edit lanjutan tetap lewat legacy panel.
+            Workspace operasional admin untuk membaca, memfilter, dan menindaklanjuti permohonan penilaian.
           </p>
         </div>
       </section>
@@ -129,42 +137,41 @@ const columns = [
       </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Filter</CardTitle>
-          <CardDescription>Cari berdasarkan nomor request, nama klien, atau nama pemohon.</CardDescription>
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar Request</CardTitle>
+          </div>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari request atau pemohon"
+            filter-title="Filter permohonan"
+            filter-description="Saring data berdasarkan status request."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; applyFilters(); }"
+            @apply-filters="applyFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="space-y-2">
+              <Label for="request_status_filter">Status</Label>
+              <Select v-model="form.status">
+                <SelectTrigger id="request_status_filter">
+                  <SelectValue placeholder="Semua status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua status</SelectItem>
+                  <SelectItem
+                    v-for="option in statusOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
-          <form class="grid gap-3 md:grid-cols-[1.6fr_1fr_auto_auto]" @submit.prevent="applyFilters">
-            <Input v-model="form.q" placeholder="Cari request atau pemohon" />
-            <Select v-model="form.status">
-              <SelectTrigger>
-                <SelectValue placeholder="Semua status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua status</SelectItem>
-                <SelectItem
-                  v-for="option in statusOptions"
-                  :key="option.value"
-                  :value="option.value"
-                >
-                  {{ option.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Button type="submit">Terapkan</Button>
-            <Button type="button" variant="outline" @click="resetFilters">Reset</Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader class="pb-4">
-          <CardTitle>Daftar Request</CardTitle>
-          <CardDescription>
-            Menampilkan {{ records.meta.from ?? 0 }}-{{ records.meta.to ?? 0 }} dari {{ records.meta.total ?? 0 }} request.
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-4">
           <AdminDataTable
             :columns="columns"
             :rows="records.data"

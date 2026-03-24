@@ -1,11 +1,12 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -25,6 +26,11 @@ const props = defineProps({
   createUrl: { type: String, required: true },
 });
 
+const form = reactive({
+  q: props.filters.q ?? '',
+  status: props.filters.status ?? 'all',
+});
+
 const columns = [
   { key: 'name', label: 'Guideline', cellClass: 'min-w-[220px]', sortable: true },
   { key: 'year', label: 'Tahun', cellClass: 'w-[90px]', sortable: true },
@@ -34,13 +40,24 @@ const columns = [
   { key: 'actions', label: 'Aksi', cellClass: 'min-w-[200px]' },
 ];
 
-const applyFilters = (patch = {}) => {
-  router.get(route('admin.ref-guidelines.guideline-sets.index'), { ...props.filters, ...patch }, {
+const submitFilters = () => {
+  router.get(route('admin.ref-guidelines.guideline-sets.index'), {
+    q: form.q || undefined,
+    status: form.status === 'all' ? undefined : form.status,
+  }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.status = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => (form.status !== 'all' ? 1 : 0));
 
 </script>
 
@@ -70,28 +87,28 @@ const applyFilters = (patch = {}) => {
       </section>
 
       <Card>
-        <CardHeader><CardTitle>Filter</CardTitle><CardDescription>Filter guideline berdasarkan nama dan status aktif.</CardDescription></CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
-          <div class="space-y-2">
-            <Label for="guideline_q">Cari</Label>
-            <Input id="guideline_q" :model-value="filters.q" placeholder="Nama atau deskripsi guideline" @change="applyFilters({ q: $event.target.value })" />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar Guideline Set</CardTitle>
           </div>
-          <div class="space-y-2">
-            <Label for="guideline_status">Status</Label>
-            <Select :model-value="filters.status" @update:model-value="applyFilters({ status: $event })">
-              <SelectTrigger id="guideline_status"><SelectValue placeholder="Pilih status" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Guideline Set</CardTitle>
-          <CardDescription>
-            Menampilkan {{ records.meta?.from ?? 0 }}-{{ records.meta?.to ?? 0 }} dari {{ records.meta?.total ?? 0 }} data.
-          </CardDescription>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari nama atau deskripsi set pedoman"
+            filter-title="Filter set pedoman"
+            filter-description="Saring guideline set berdasarkan status aktif."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="space-y-2">
+              <Label for="guideline_status_filter">Status</Label>
+              <Select v-model="form.status">
+                <SelectTrigger id="guideline_status_filter"><SelectValue placeholder="Pilih status" /></SelectTrigger>
+                <SelectContent><SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+              </Select>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable :columns="columns" :rows="records.data" :meta="records.meta" empty-text="Belum ada guideline set.">

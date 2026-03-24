@@ -22,6 +22,7 @@ class AccessControlController extends Controller
         $filters = [
             'q' => trim((string) $request->query('q', '')),
             'guard' => (string) $request->query('guard', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = Role::query()
@@ -31,7 +32,7 @@ class AccessControlController extends Controller
             })
             ->when($filters['guard'] !== 'all', fn ($query) => $query->where('guard_name', $filters['guard']))
             ->latest('updated_at')
-            ->paginate(15)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (Role $role) => $this->transformRoleRow($role));
@@ -303,7 +304,7 @@ class AccessControlController extends Controller
             ->all();
     }
 
-    private function paginatedRecordsPayload(object $records): array
+    protected function paginatedRecordsPayload(object $records): array
     {
         return [
             'data' => $records->items(),
@@ -311,6 +312,9 @@ class AccessControlController extends Controller
                 'from' => $records->firstItem(),
                 'to' => $records->lastItem(),
                 'total' => $records->total(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+                'per_page' => $records->perPage(),
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];

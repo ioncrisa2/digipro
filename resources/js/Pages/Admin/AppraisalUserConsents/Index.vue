@@ -1,10 +1,10 @@
 <script setup>
-import { Head, Link, router } from '@inertiajs/vue3';
+import { computed, reactive } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AdminLayout from '@/layouts/AdminLayout.vue';
@@ -17,6 +17,11 @@ const props = defineProps({
   links: { type: Array, default: () => [] },
 });
 
+const form = reactive({
+  q: props.filters.q ?? '',
+  code: props.filters.code ?? 'all',
+});
+
 const columns = [
   { key: 'user_name', label: 'Pengguna', cellClass: 'min-w-[220px]', sortable: true },
   { key: 'document_title', label: 'Dokumen', cellClass: 'min-w-[220px]' },
@@ -25,13 +30,24 @@ const columns = [
   { key: 'actions', label: 'Aksi', cellClass: 'min-w-[170px]' },
 ];
 
-const applyFilters = (patch = {}) => {
-  router.get(route('admin.content.legal.user-consents.index'), { ...props.filters, ...patch }, {
+const submitFilters = () => {
+  router.get(route('admin.content.legal.user-consents.index'), {
+    q: form.q || undefined,
+    code: form.code === 'all' ? undefined : form.code,
+  }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.code = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => (form.code !== 'all' ? 1 : 0));
 </script>
 
 <template>
@@ -40,27 +56,41 @@ const applyFilters = (patch = {}) => {
   <AdminLayout title="Audit Consent">
     <div class="space-y-6">
       <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div><p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 9</p><h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Persetujuan Pengguna</h1></div>
-        <div class="flex flex-wrap gap-2">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 9</p>
+          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Persetujuan Pengguna</h1>
         </div>
       </section>
 
       <Card>
-        <CardHeader><CardTitle>Filter</CardTitle><CardDescription>Audit persetujuan pengguna ke dokumen consent.</CardDescription></CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <div class="space-y-2"><Label for="q">Cari</Label><Input id="q" :model-value="filters.q" placeholder="Nama, email, code, versi" @change="applyFilters({ q: $event.target.value })" /></div>
-          <div class="space-y-2">
-            <Label for="code">Kode</Label>
-            <Select :model-value="filters.code" @update:model-value="applyFilters({ code: $event })">
-              <SelectTrigger id="code"><SelectValue placeholder="Pilih kode" /></SelectTrigger>
-              <SelectContent><SelectItem value="all">Semua Kode</SelectItem><SelectItem v-for="option in codeOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Riwayat Persetujuan</CardTitle>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle>Riwayat Persetujuan</CardTitle></CardHeader>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari nama, email, kode, atau versi"
+            filter-title="Filter audit consent"
+            filter-description="Saring riwayat persetujuan berdasarkan kode dokumen consent."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="space-y-2">
+              <Label for="consent_code_filter">Kode</Label>
+              <Select v-model="form.code">
+                <SelectTrigger id="consent_code_filter"><SelectValue placeholder="Pilih kode" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Kode</SelectItem>
+                  <SelectItem v-for="option in codeOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </AdminTableToolbar>
+        </CardHeader>
         <CardContent>
           <AdminDataTable
             :columns="columns"
@@ -78,7 +108,7 @@ const applyFilters = (patch = {}) => {
             <template #cell-document_title="{ row }">
               <div class="space-y-1">
                 <p class="text-sm text-slate-900">{{ row.document_title }}</p>
-                <p class="text-xs text-slate-500">{{ row.version }} Â· {{ row.ip || '-' }}</p>
+                <p class="text-xs text-slate-500">{{ row.version }} · {{ row.ip || '-' }}</p>
               </div>
             </template>
 

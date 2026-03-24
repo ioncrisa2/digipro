@@ -1,11 +1,12 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -28,6 +29,14 @@ const props = defineProps({
   createUrl: { type: String, required: true },
 });
 
+const form = reactive({
+  q: props.filters.q ?? '',
+  guideline_item_id: props.filters.guideline_item_id ?? 'all',
+  year: props.filters.year ?? 'all',
+  category: props.filters.category ?? 'all',
+  building_class: props.filters.building_class ?? 'all',
+});
+
 const columns = [
   { key: 'guideline_set_name', label: 'Guideline', cellClass: 'min-w-[220px]' },
   { key: 'category', label: 'Kategori', cellClass: 'min-w-[180px]' },
@@ -39,13 +48,37 @@ const columns = [
   { key: 'actions', label: 'Aksi', cellClass: 'min-w-[200px]' },
 ];
 
-const applyFilters = (patch = {}) => {
-  router.get(route('admin.ref-guidelines.building-economic-lives.index'), { ...props.filters, ...patch }, {
+const submitFilters = () => {
+  router.get(route('admin.ref-guidelines.building-economic-lives.index'), {
+    q: form.q || undefined,
+    guideline_item_id: form.guideline_item_id === 'all' ? undefined : form.guideline_item_id,
+    year: form.year === 'all' ? undefined : form.year,
+    category: form.category === 'all' ? undefined : form.category,
+    building_class: form.building_class === 'all' ? undefined : form.building_class,
+  }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.guideline_item_id = 'all';
+  form.year = 'all';
+  form.category = 'all';
+  form.building_class = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (form.guideline_item_id !== 'all') count += 1;
+  if (form.year !== 'all') count += 1;
+  if (form.category !== 'all') count += 1;
+  if (form.building_class !== 'all') count += 1;
+  return count;
+});
 
 </script>
 
@@ -75,49 +108,51 @@ const applyFilters = (patch = {}) => {
       </section>
 
       <Card>
-        <CardHeader><CardTitle>Filter</CardTitle><CardDescription>Filter berdasarkan guideline, tahun, kategori, class, dan kata kunci.</CardDescription></CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.3fr_1fr_0.7fr_1fr_1fr]">
-          <div class="space-y-2">
-            <Label for="bel_q">Cari</Label>
-            <Input id="bel_q" :model-value="filters.q" placeholder="Kategori, sub kategori, jenis, atau class" @change="applyFilters({ q: $event.target.value })" />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar BEL</CardTitle>
           </div>
-          <div class="space-y-2">
-            <Label for="bel_guideline">Guideline</Label>
-            <Select :model-value="filters.guideline_item_id" @update:model-value="applyFilters({ guideline_item_id: $event })">
-              <SelectTrigger id="bel_guideline"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="bel_year">Tahun</Label>
-            <Select :model-value="filters.year" @update:model-value="applyFilters({ year: $event })">
-              <SelectTrigger id="bel_year"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in yearOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="bel_category">Kategori</Label>
-            <Select :model-value="filters.category" @update:model-value="applyFilters({ category: $event })">
-              <SelectTrigger id="bel_category"><SelectValue placeholder="Pilih kategori" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in categoryOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="bel_class">Class</Label>
-            <Select :model-value="filters.building_class" @update:model-value="applyFilters({ building_class: $event })">
-              <SelectTrigger id="bel_class"><SelectValue placeholder="Pilih class" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in buildingClassOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar BEL</CardTitle>
-          <CardDescription>
-            Menampilkan {{ records.meta?.from ?? 0 }}-{{ records.meta?.to ?? 0 }} dari {{ records.meta?.total ?? 0 }} data.
-          </CardDescription>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari kategori, sub kategori, jenis, atau class"
+            filter-title="Filter BEL"
+            filter-description="Saring data BEL berdasarkan guideline, tahun, kategori, dan class."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <Label for="bel_guideline_filter">Guideline</Label>
+                <Select v-model="form.guideline_item_id">
+                  <SelectTrigger id="bel_guideline_filter"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="bel_year_filter">Tahun</Label>
+                <Select v-model="form.year">
+                  <SelectTrigger id="bel_year_filter"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in yearOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="bel_category_filter">Kategori</Label>
+                <Select v-model="form.category">
+                  <SelectTrigger id="bel_category_filter"><SelectValue placeholder="Pilih kategori" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in categoryOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="bel_class_filter">Class</Label>
+                <Select v-model="form.building_class">
+                  <SelectTrigger id="bel_class_filter"><SelectValue placeholder="Pilih class" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in buildingClassOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable :columns="columns" :rows="records.data" :meta="records.meta" empty-text="Belum ada data BEL.">

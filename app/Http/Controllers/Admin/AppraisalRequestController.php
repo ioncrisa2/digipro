@@ -27,6 +27,7 @@ class AppraisalRequestController extends Controller
         $filters = [
             'q' => trim((string) $request->query('q', '')),
             'status' => (string) $request->query('status', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = AppraisalRequest::query()
@@ -45,7 +46,7 @@ class AppraisalRequestController extends Controller
             })
             ->when($filters['status'] !== 'all', fn ($query) => $query->where('status', $filters['status']))
             ->latest('requested_at')
-            ->paginate(15)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (AppraisalRequest $record) => $this->transformRequestTableRow($record));

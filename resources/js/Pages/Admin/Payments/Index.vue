@@ -1,10 +1,11 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -49,16 +50,37 @@ const props = defineProps({
   },
 });
 
-const applyFilters = (patch = {}) => {
+const form = reactive({
+  q: props.filters.q ?? '',
+  status: props.filters.status ?? 'all',
+  method: props.filters.method ?? 'all',
+});
+
+const submitFilters = () => {
   router.get(route('admin.finance.payments.index'), {
-    ...props.filters,
-    ...patch,
+    q: form.q || undefined,
+    status: form.status === 'all' ? undefined : form.status,
+    method: form.method === 'all' ? undefined : form.method,
   }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.status = 'all';
+  form.method = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (form.status !== 'all') count += 1;
+  if (form.method !== 'all') count += 1;
+  return count;
+});
 
 const statusTone = (status) => {
   switch (status) {
@@ -139,64 +161,58 @@ const columns = [
       </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Filter Pembayaran</CardTitle>
-          <CardDescription>Filter ringan untuk mengecek transaksi Midtrans atau data legacy tanpa membuka panel lama.</CardDescription>
-        </CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.8fr]">
-          <div class="space-y-2">
-            <Label for="payment_q">Cari</Label>
-            <Input
-              id="payment_q"
-              :model-value="filters.q"
-              type="text"
-              placeholder="Cari invoice, request, payment ID, atau nama klien"
-              @change="applyFilters({ q: $event.target.value })"
-            />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar Pembayaran</CardTitle>
           </div>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari invoice, request, payment ID, atau nama klien"
+            filter-title="Filter pembayaran"
+            filter-description="Saring transaksi berdasarkan status dan metode pembayaran."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <Label for="payment_status_filter">Status</Label>
+                <Select v-model="form.status">
+                  <SelectTrigger id="payment_status_filter">
+                    <SelectValue placeholder="Pilih status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem
+                      v-for="option in statusOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div class="space-y-2">
-            <Label for="payment_status">Status</Label>
-            <Select :model-value="filters.status" @update:model-value="applyFilters({ status: $event })">
-              <SelectTrigger id="payment_status">
-                <SelectValue placeholder="Pilih status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="option in statusOptions"
-                  :key="option.value"
-                  :value="option.value"
-                >
-                  {{ option.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div class="space-y-2">
-            <Label for="payment_method">Metode</Label>
-            <Select :model-value="filters.method" @update:model-value="applyFilters({ method: $event })">
-              <SelectTrigger id="payment_method">
-                <SelectValue placeholder="Pilih metode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="option in methodOptions"
-                  :key="option.value"
-                  :value="option.value"
-                >
-                  {{ option.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Pembayaran</CardTitle>
-          <CardDescription>List pembayaran utama admin. Edit transaksi Midtrans-safe sudah tersedia tanpa buka legacy.</CardDescription>
+              <div class="space-y-2">
+                <Label for="payment_method_filter">Metode</Label>
+                <Select v-model="form.method">
+                  <SelectTrigger id="payment_method_filter">
+                    <SelectValue placeholder="Pilih metode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem
+                      v-for="option in methodOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable

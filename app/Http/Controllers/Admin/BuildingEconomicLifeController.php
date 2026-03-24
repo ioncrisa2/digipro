@@ -21,6 +21,7 @@ class BuildingEconomicLifeController extends Controller
             'year' => (string) $request->query('year', 'all'),
             'category' => (string) $request->query('category', 'all'),
             'building_class' => (string) $request->query('building_class', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = BuildingEconomicLife::query()
@@ -54,7 +55,7 @@ class BuildingEconomicLifeController extends Controller
             ->orderBy('category')
             ->orderBy('building_class')
             ->orderBy('storey_min')
-            ->paginate(12)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (BuildingEconomicLife $record) => $this->transformBuildingEconomicLifeRow($record));
@@ -332,7 +333,7 @@ class BuildingEconomicLifeController extends Controller
         return null;
     }
 
-    private function paginatedRecordsPayload(object $records): array
+    protected function paginatedRecordsPayload(object $records): array
     {
         return [
             'data' => $records->items(),
@@ -340,6 +341,9 @@ class BuildingEconomicLifeController extends Controller
                 'from' => $records->firstItem(),
                 'to' => $records->lastItem(),
                 'total' => $records->total(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+                'per_page' => $records->perPage(),
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];

@@ -1,11 +1,12 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -17,7 +18,6 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -50,16 +50,29 @@ const props = defineProps({
   },
 });
 
-const applyFilters = (patch = {}) => {
+const form = reactive({
+  q: props.filters.q ?? '',
+  status: props.filters.status ?? 'all',
+});
+
+const submitFilters = () => {
   router.get(route('admin.finance.office-bank-accounts.index'), {
-    ...props.filters,
-    ...patch,
+    q: form.q || undefined,
+    status: form.status === 'all' ? undefined : form.status,
   }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.status = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => (form.status !== 'all' ? 1 : 0));
 
 const columns = [
   { key: 'bank', label: 'Bank', cellClass: 'min-w-[180px]' },
@@ -119,46 +132,38 @@ const columns = [
       </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Filter Rekening</CardTitle>
-          <CardDescription>Filter dasar untuk membaca rekening aktif/nonaktif tanpa membuka resource legacy.</CardDescription>
-        </CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <div class="space-y-2">
-            <Label for="bank_q">Cari</Label>
-            <Input
-              id="bank_q"
-              :model-value="filters.q"
-              type="text"
-              placeholder="Cari bank, nomor rekening, atau nama pemilik"
-              @change="applyFilters({ q: $event.target.value })"
-            />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar Rekening</CardTitle>
           </div>
-
-          <div class="space-y-2">
-            <Label for="bank_status">Status</Label>
-            <Select :model-value="filters.status" @update:model-value="applyFilters({ status: $event })">
-              <SelectTrigger id="bank_status">
-                <SelectValue placeholder="Pilih status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="option in statusOptions"
-                  :key="option.value"
-                  :value="option.value"
-                >
-                  {{ option.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Rekening</CardTitle>
-          <CardDescription>CRUD rekening kantor sekarang berjalan di workspace admin Vue.</CardDescription>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari bank, nomor rekening, atau nama pemilik"
+            filter-title="Filter rekening kantor"
+            filter-description="Saring rekening berdasarkan status aktif atau nonaktif."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="space-y-2">
+              <Label for="bank_status_filter">Status</Label>
+              <Select v-model="form.status">
+                <SelectTrigger id="bank_status_filter">
+                  <SelectValue placeholder="Pilih status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in statusOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable

@@ -21,6 +21,7 @@ class ReferenceGuideSettingsController extends Controller
         $filters = [
             'q' => trim((string) $request->query('q', '')),
             'status' => (string) $request->query('status', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = GuidelineSet::query()
@@ -40,7 +41,7 @@ class ReferenceGuideSettingsController extends Controller
             ->when($filters['status'] === 'active', fn ($query) => $query->where('is_active', true))
             ->when($filters['status'] === 'inactive', fn ($query) => $query->where('is_active', false))
             ->orderByDesc('year')
-            ->paginate(15)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (GuidelineSet $guidelineSet) => $this->transformGuidelineSetRow($guidelineSet));
@@ -162,6 +163,7 @@ class ReferenceGuideSettingsController extends Controller
             'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
             'year' => (string) $request->query('year', 'all'),
             'key' => (string) $request->query('key', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = ValuationSetting::query()
@@ -187,7 +189,7 @@ class ReferenceGuideSettingsController extends Controller
                 fn ($query) => $query->where('key', $filters['key'])
             )
             ->latest('updated_at')
-            ->paginate(15)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (ValuationSetting $valuationSetting) => $this->transformValuationSettingRow($valuationSetting));
@@ -396,7 +398,7 @@ class ReferenceGuideSettingsController extends Controller
             ->all();
     }
 
-    private function paginatedRecordsPayload(object $records): array
+    protected function paginatedRecordsPayload(object $records): array
     {
         return [
             'data' => $records->items(),
@@ -404,6 +406,9 @@ class ReferenceGuideSettingsController extends Controller
                 'from' => $records->firstItem(),
                 'to' => $records->lastItem(),
                 'total' => $records->total(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+                'per_page' => $records->perPage(),
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];

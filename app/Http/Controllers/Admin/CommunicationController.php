@@ -18,6 +18,7 @@ class CommunicationController extends Controller
             'status' => (string) $request->query('status', 'all'),
             'unread' => (string) $request->query('unread', 'all'),
             'source' => (string) $request->query('source', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = ContactMessage::query()
@@ -44,7 +45,7 @@ class CommunicationController extends Controller
                 fn ($query) => $query->where('source', $filters['source'])
             )
             ->latest('created_at')
-            ->paginate(20)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (ContactMessage $message) => $this->transformContactMessageRow($message));
@@ -229,7 +230,7 @@ class CommunicationController extends Controller
         };
     }
 
-    private function paginatedRecordsPayload(object $records): array
+    protected function paginatedRecordsPayload(object $records): array
     {
         return [
             'data' => $records->items(),
@@ -237,6 +238,9 @@ class CommunicationController extends Controller
                 'from' => $records->firstItem(),
                 'to' => $records->lastItem(),
                 'total' => $records->total(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+                'per_page' => $records->perPage(),
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];

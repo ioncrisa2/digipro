@@ -1,11 +1,12 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -28,6 +29,13 @@ const props = defineProps({
   ikkByProvinceUrl: { type: String, default: '' },
 });
 
+const form = reactive({
+  q: props.filters.q ?? '',
+  guideline_set_id: props.filters.guideline_set_id ?? 'all',
+  year: props.filters.year ?? 'all',
+  province_id: props.filters.province_id ?? 'all',
+});
+
 const columns = [
   { key: 'guideline_set_name', label: 'Guideline', cellClass: 'min-w-[220px]' },
   { key: 'year', label: 'Tahun', cellClass: 'w-[90px]', sortable: true },
@@ -38,13 +46,34 @@ const columns = [
   { key: 'actions', label: 'Aksi', cellClass: 'min-w-[200px]' },
 ];
 
-const applyFilters = (patch = {}) => {
-  router.get(route('admin.ref-guidelines.construction-cost-indices.index'), { ...props.filters, ...patch }, {
+const submitFilters = () => {
+  router.get(route('admin.ref-guidelines.construction-cost-indices.index'), {
+    q: form.q || undefined,
+    guideline_set_id: form.guideline_set_id === 'all' ? undefined : form.guideline_set_id,
+    year: form.year === 'all' ? undefined : form.year,
+    province_id: form.province_id === 'all' ? undefined : form.province_id,
+  }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.guideline_set_id = 'all';
+  form.year = 'all';
+  form.province_id = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (form.guideline_set_id !== 'all') count += 1;
+  if (form.year !== 'all') count += 1;
+  if (form.province_id !== 'all') count += 1;
+  return count;
+});
 
 </script>
 
@@ -75,45 +104,47 @@ const applyFilters = (patch = {}) => {
       </section>
 
       <Card>
-        <CardHeader><CardTitle>Filter</CardTitle><CardDescription>Filter berdasarkan guideline, tahun, provinsi, dan kabupaten/kota.</CardDescription></CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.2fr_1fr_0.7fr_1fr]">
-          <div class="space-y-2">
-            <Label for="ikk_q">Cari</Label>
-            <Input id="ikk_q" :model-value="filters.q" placeholder="Kode atau nama kabupaten/kota" @change="applyFilters({ q: $event.target.value })" />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar IKK</CardTitle>
           </div>
-          <div class="space-y-2">
-            <Label for="ikk_guideline">Guideline</Label>
-            <Select :model-value="filters.guideline_set_id" @update:model-value="applyFilters({ guideline_set_id: $event })">
-              <SelectTrigger id="ikk_guideline"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="ikk_year">Tahun</Label>
-            <Select :model-value="filters.year" @update:model-value="applyFilters({ year: $event })">
-              <SelectTrigger id="ikk_year"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Tahun</SelectItem>
-                <SelectItem v-for="option in yearOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="ikk_province">Provinsi</Label>
-            <Select :model-value="filters.province_id" @update:model-value="applyFilters({ province_id: $event })">
-              <SelectTrigger id="ikk_province"><SelectValue placeholder="Pilih provinsi" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in provinceOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar IKK</CardTitle>
-          <CardDescription>
-            Menampilkan {{ records.meta?.from ?? 0 }}-{{ records.meta?.to ?? 0 }} dari {{ records.meta?.total ?? 0 }} data.
-          </CardDescription>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari kode atau nama kabupaten/kota"
+            filter-title="Filter indeks kemahalan konstruksi"
+            filter-description="Saring data IKK berdasarkan guideline, tahun, dan provinsi."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <Label for="ikk_guideline_filter">Guideline</Label>
+                <Select v-model="form.guideline_set_id">
+                  <SelectTrigger id="ikk_guideline_filter"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="ikk_year_filter">Tahun</Label>
+                <Select v-model="form.year">
+                  <SelectTrigger id="ikk_year_filter"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Tahun</SelectItem>
+                    <SelectItem v-for="option in yearOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2 sm:col-span-2">
+                <Label for="ikk_province_filter">Provinsi</Label>
+                <Select v-model="form.province_id">
+                  <SelectTrigger id="ikk_province_filter"><SelectValue placeholder="Pilih provinsi" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in provinceOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable :columns="columns" :rows="records.data" :meta="records.meta" empty-text="Belum ada data IKK.">

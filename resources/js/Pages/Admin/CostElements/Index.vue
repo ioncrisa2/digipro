@@ -1,11 +1,12 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -28,6 +29,14 @@ const props = defineProps({
   createUrl: { type: String, required: true },
 });
 
+const form = reactive({
+  q: props.filters.q ?? '',
+  guideline_set_id: props.filters.guideline_set_id ?? 'all',
+  year: props.filters.year ?? 'all',
+  base_region: props.filters.base_region ?? 'all',
+  group: props.filters.group ?? 'all',
+});
+
 const columns = [
   { key: 'guideline_set_name', label: 'Guideline', cellClass: 'min-w-[200px]' },
   { key: 'year', label: 'Tahun', cellClass: 'w-[90px]', sortable: true },
@@ -38,13 +47,37 @@ const columns = [
   { key: 'actions', label: 'Aksi', cellClass: 'min-w-[200px]' },
 ];
 
-const applyFilters = (patch = {}) => {
-  router.get(route('admin.ref-guidelines.cost-elements.index'), { ...props.filters, ...patch }, {
+const submitFilters = () => {
+  router.get(route('admin.ref-guidelines.cost-elements.index'), {
+    q: form.q || undefined,
+    guideline_set_id: form.guideline_set_id === 'all' ? undefined : form.guideline_set_id,
+    year: form.year === 'all' ? undefined : form.year,
+    base_region: form.base_region === 'all' ? undefined : form.base_region,
+    group: form.group === 'all' ? undefined : form.group,
+  }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.guideline_set_id = 'all';
+  form.year = 'all';
+  form.base_region = 'all';
+  form.group = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (form.guideline_set_id !== 'all') count += 1;
+  if (form.year !== 'all') count += 1;
+  if (form.base_region !== 'all') count += 1;
+  if (form.group !== 'all') count += 1;
+  return count;
+});
 
 const formatCurrency = (value) => new Intl.NumberFormat('id-ID').format(Number(value || 0));
 </script>
@@ -75,49 +108,51 @@ const formatCurrency = (value) => new Intl.NumberFormat('id-ID').format(Number(v
       </section>
 
       <Card>
-        <CardHeader><CardTitle>Filter</CardTitle><CardDescription>Filter data berdasarkan guideline, tahun, base region, group, dan kata kunci.</CardDescription></CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.4fr_1fr_0.7fr_1fr_1fr]">
-          <div class="space-y-2">
-            <Label for="cost_q">Cari</Label>
-            <Input id="cost_q" :model-value="filters.q" placeholder="Group, kode, nama elemen, atau bangunan" @change="applyFilters({ q: $event.target.value })" />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar Cost Elements</CardTitle>
           </div>
-          <div class="space-y-2">
-            <Label for="cost_guideline">Guideline</Label>
-            <Select :model-value="filters.guideline_set_id" @update:model-value="applyFilters({ guideline_set_id: $event })">
-              <SelectTrigger id="cost_guideline"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="cost_year">Tahun</Label>
-            <Select :model-value="filters.year" @update:model-value="applyFilters({ year: $event })">
-              <SelectTrigger id="cost_year"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in yearOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="cost_base_region">Base Region</Label>
-            <Select :model-value="filters.base_region" @update:model-value="applyFilters({ base_region: $event })">
-              <SelectTrigger id="cost_base_region"><SelectValue placeholder="Pilih base region" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in baseRegionOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="cost_group">Group</Label>
-            <Select :model-value="filters.group" @update:model-value="applyFilters({ group: $event })">
-              <SelectTrigger id="cost_group"><SelectValue placeholder="Pilih group" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in groupOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Cost Elements</CardTitle>
-          <CardDescription>
-            Menampilkan {{ records.meta?.from ?? 0 }}-{{ records.meta?.to ?? 0 }} dari {{ records.meta?.total ?? 0 }} data.
-          </CardDescription>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari group, kode, nama elemen, atau bangunan"
+            filter-title="Filter biaya unit terpasang"
+            filter-description="Saring data biaya berdasarkan guideline, tahun, base region, dan group."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <Label for="cost_guideline_filter">Guideline</Label>
+                <Select v-model="form.guideline_set_id">
+                  <SelectTrigger id="cost_guideline_filter"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="cost_year_filter">Tahun</Label>
+                <Select v-model="form.year">
+                  <SelectTrigger id="cost_year_filter"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in yearOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="cost_base_region_filter">Base Region</Label>
+                <Select v-model="form.base_region">
+                  <SelectTrigger id="cost_base_region_filter"><SelectValue placeholder="Pilih base region" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in baseRegionOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="cost_group_filter">Group</Label>
+                <Select v-model="form.group">
+                  <SelectTrigger id="cost_group_filter"><SelectValue placeholder="Pilih group" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in groupOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable :columns="columns" :rows="records.data" :meta="records.meta" empty-text="Belum ada cost element.">

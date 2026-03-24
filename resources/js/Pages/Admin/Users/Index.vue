@@ -1,11 +1,12 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -27,16 +28,37 @@ const props = defineProps({
   createUrl: { type: String, required: true },
 });
 
-const applyFilters = (patch = {}) => {
+const form = reactive({
+  q: props.filters.q ?? '',
+  role: props.filters.role ?? 'all',
+  verified: props.filters.verified ?? 'all',
+});
+
+const submitFilters = () => {
   router.get(route('admin.master-data.users.index'), {
-    ...props.filters,
-    ...patch,
+    q: form.q || undefined,
+    role: form.role === 'all' ? undefined : form.role,
+    verified: form.verified === 'all' ? undefined : form.verified,
   }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.role = 'all';
+  form.verified = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (form.role !== 'all') count += 1;
+  if (form.verified !== 'all') count += 1;
+  return count;
+});
 
 const columns = [
   { key: 'user', label: 'User', cellClass: 'min-w-[220px]' },
@@ -77,43 +99,42 @@ const columns = [
       </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Filter User</CardTitle>
-          <CardDescription>Filter dasar berdasarkan nama, email, role, dan status verifikasi.</CardDescription>
-        </CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.3fr_0.8fr_0.8fr]">
-          <div class="space-y-2">
-            <Label for="user_q">Cari</Label>
-            <Input id="user_q" :model-value="filters.q" placeholder="Nama atau email" @change="applyFilters({ q: $event.target.value })" />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar User</CardTitle>
           </div>
-          <div class="space-y-2">
-            <Label for="user_role">Role</Label>
-            <Select :model-value="filters.role" @update:model-value="applyFilters({ role: $event })">
-              <SelectTrigger id="user_role"><SelectValue placeholder="Pilih role" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Role</SelectItem>
-                <SelectItem v-for="option in roleOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="user_verified">Verifikasi</Label>
-            <Select :model-value="filters.verified" @update:model-value="applyFilters({ verified: $event })">
-              <SelectTrigger id="user_verified"><SelectValue placeholder="Pilih status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="option in verifiedOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar User</CardTitle>
-          <CardDescription>
-            Menampilkan {{ records.meta?.from ?? 0 }}-{{ records.meta?.to ?? 0 }} dari {{ records.meta?.total ?? 0 }} user.
-          </CardDescription>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari nama atau email"
+            filter-title="Filter user"
+            filter-description="Saring user berdasarkan role dan status verifikasi."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <Label for="user_role_filter">Role</Label>
+                <Select v-model="form.role">
+                  <SelectTrigger id="user_role_filter"><SelectValue placeholder="Pilih role" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Role</SelectItem>
+                    <SelectItem v-for="option in roleOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="user_verified_filter">Verifikasi</Label>
+                <Select v-model="form.verified">
+                  <SelectTrigger id="user_verified_filter"><SelectValue placeholder="Pilih status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="option in verifiedOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable

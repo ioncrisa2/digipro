@@ -1,11 +1,12 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -27,6 +28,13 @@ const props = defineProps({
   createUrl: { type: String, required: true },
 });
 
+const form = reactive({
+  q: props.filters.q ?? '',
+  guideline_set_id: props.filters.guideline_set_id ?? 'all',
+  year: props.filters.year ?? 'all',
+  key: props.filters.key ?? 'all',
+});
+
 const columns = [
   { key: 'guideline_set_name', label: 'Guideline', cellClass: 'min-w-[220px]' },
   { key: 'year', label: 'Tahun', cellClass: 'w-[90px]', sortable: true },
@@ -37,13 +45,34 @@ const columns = [
   { key: 'actions', label: 'Aksi', cellClass: 'min-w-[200px]' },
 ];
 
-const applyFilters = (patch = {}) => {
-  router.get(route('admin.ref-guidelines.valuation-settings.index'), { ...props.filters, ...patch }, {
+const submitFilters = () => {
+  router.get(route('admin.ref-guidelines.valuation-settings.index'), {
+    q: form.q || undefined,
+    guideline_set_id: form.guideline_set_id === 'all' ? undefined : form.guideline_set_id,
+    year: form.year === 'all' ? undefined : form.year,
+    key: form.key === 'all' ? undefined : form.key,
+  }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.guideline_set_id = 'all';
+  form.year = 'all';
+  form.key = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (form.guideline_set_id !== 'all') count += 1;
+  if (form.year !== 'all') count += 1;
+  if (form.key !== 'all') count += 1;
+  return count;
+});
 
 </script>
 
@@ -72,45 +101,47 @@ const applyFilters = (patch = {}) => {
       </section>
 
       <Card>
-        <CardHeader><CardTitle>Filter</CardTitle><CardDescription>Filter berdasarkan guideline, tahun, key, dan kata kunci.</CardDescription></CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.2fr_1fr_0.7fr_0.8fr]">
-          <div class="space-y-2">
-            <Label for="setting_q">Cari</Label>
-            <Input id="setting_q" :model-value="filters.q" placeholder="Label, key, atau notes" @change="applyFilters({ q: $event.target.value })" />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar Setting</CardTitle>
           </div>
-          <div class="space-y-2">
-            <Label for="setting_guideline">Guideline</Label>
-            <Select :model-value="filters.guideline_set_id" @update:model-value="applyFilters({ guideline_set_id: $event })">
-              <SelectTrigger id="setting_guideline"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="setting_year">Tahun</Label>
-            <Select :model-value="filters.year" @update:model-value="applyFilters({ year: $event })">
-              <SelectTrigger id="setting_year"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Tahun</SelectItem>
-                <SelectItem v-for="option in yearOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="setting_key">Key</Label>
-            <Select :model-value="filters.key" @update:model-value="applyFilters({ key: $event })">
-              <SelectTrigger id="setting_key"><SelectValue placeholder="Pilih key" /></SelectTrigger>
-              <SelectContent><SelectItem v-for="option in keyOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Setting</CardTitle>
-          <CardDescription>
-            Menampilkan {{ records.meta?.from ?? 0 }}-{{ records.meta?.to ?? 0 }} dari {{ records.meta?.total ?? 0 }} data.
-          </CardDescription>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari label, key, atau notes"
+            filter-title="Filter pengaturan valuasi"
+            filter-description="Saring setting berdasarkan guideline, tahun, dan key."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <Label for="setting_guideline_filter">Guideline</Label>
+                <Select v-model="form.guideline_set_id">
+                  <SelectTrigger id="setting_guideline_filter"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="setting_year_filter">Tahun</Label>
+                <Select v-model="form.year">
+                  <SelectTrigger id="setting_year_filter"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Tahun</SelectItem>
+                    <SelectItem v-for="option in yearOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2 sm:col-span-2">
+                <Label for="setting_key_filter">Key</Label>
+                <Select v-model="form.key">
+                  <SelectTrigger id="setting_key_filter"><SelectValue placeholder="Pilih key" /></SelectTrigger>
+                  <SelectContent><SelectItem v-for="option in keyOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable :columns="columns" :rows="records.data" :meta="records.meta" empty-text="Belum ada valuation setting.">

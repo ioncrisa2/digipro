@@ -1,11 +1,12 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -36,13 +37,41 @@ const columns = [
   { key: 'actions', label: 'Aksi', cellClass: 'min-w-[160px]' },
 ];
 
-const applyFilters = (patch = {}) => {
-  router.get(route('admin.communications.contact-messages.index'), { ...props.filters, ...patch }, {
+const form = reactive({
+  q: props.filters.q ?? '',
+  status: props.filters.status ?? 'all',
+  unread: props.filters.unread ?? 'all',
+  source: props.filters.source ?? 'all',
+});
+
+const submitFilters = () => {
+  router.get(route('admin.communications.contact-messages.index'), {
+    q: form.q || undefined,
+    status: form.status === 'all' ? undefined : form.status,
+    unread: form.unread === 'all' ? undefined : form.unread,
+    source: form.source === 'all' ? undefined : form.source,
+  }, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.status = 'all';
+  form.unread = 'all';
+  form.source = 'all';
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (form.status !== 'all') count += 1;
+  if (form.unread !== 'all') count += 1;
+  if (form.source !== 'all') count += 1;
+  return count;
+});
 
 const statusTone = (status) => {
   switch (status) {
@@ -83,52 +112,51 @@ const statusTone = (status) => {
       </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Filter Pesan</CardTitle>
-          <CardDescription>Filter berdasarkan pengirim, status, unread, dan source.</CardDescription>
-        </CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-[1.3fr_0.8fr_0.7fr_0.8fr]">
-          <div class="space-y-2">
-            <Label for="contact_q">Cari</Label>
-            <Input id="contact_q" :model-value="filters.q" placeholder="Nama, email, subject, atau isi pesan" @change="applyFilters({ q: $event.target.value })" />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar Pesan</CardTitle>
           </div>
-          <div class="space-y-2">
-            <Label for="contact_status">Status</Label>
-            <Select :model-value="filters.status" @update:model-value="applyFilters({ status: $event })">
-              <SelectTrigger id="contact_status"><SelectValue placeholder="Pilih status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="contact_unread">Unread</Label>
-            <Select :model-value="filters.unread" @update:model-value="applyFilters({ unread: $event })">
-              <SelectTrigger id="contact_unread"><SelectValue placeholder="Pilih unread" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="option in unreadOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="space-y-2">
-            <Label for="contact_source">Source</Label>
-            <Select :model-value="filters.source" @update:model-value="applyFilters({ source: $event })">
-              <SelectTrigger id="contact_source"><SelectValue placeholder="Pilih source" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Source</SelectItem>
-                <SelectItem v-for="option in sourceOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Pesan</CardTitle>
-          <CardDescription>
-            Menampilkan {{ records.meta?.from ?? 0 }}-{{ records.meta?.to ?? 0 }} dari {{ records.meta?.total ?? 0 }} pesan.
-          </CardDescription>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari nama, email, subject, atau isi pesan"
+            filter-title="Filter contact message"
+            filter-description="Saring pesan berdasarkan status, unread, dan source."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="grid gap-4 sm:grid-cols-3">
+              <div class="space-y-2">
+                <Label for="contact_status_filter">Status</Label>
+                <Select v-model="form.status">
+                  <SelectTrigger id="contact_status_filter"><SelectValue placeholder="Pilih status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="contact_unread_filter">Unread</Label>
+                <Select v-model="form.unread">
+                  <SelectTrigger id="contact_unread_filter"><SelectValue placeholder="Pilih unread" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="option in unreadOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="space-y-2">
+                <Label for="contact_source_filter">Source</Label>
+                <Select v-model="form.source">
+                  <SelectTrigger id="contact_source_filter"><SelectValue placeholder="Pilih source" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Source</SelectItem>
+                    <SelectItem v-for="option in sourceOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable

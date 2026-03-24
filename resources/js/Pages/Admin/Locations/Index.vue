@@ -1,11 +1,12 @@
 <script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -17,7 +18,6 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -32,16 +32,45 @@ const props = defineProps({
   createUrl: { type: String, required: true },
 });
 
-const applyFilters = (patch = {}) => {
-  router.get(props.indexUrl, {
-    ...props.filters,
-    ...patch,
-  }, {
+const form = reactive({
+  q: props.filters.q ?? '',
+});
+
+for (const option of props.filterOptions ?? []) {
+  form[option.key] = props.filters[option.key] ?? option.defaultValue ?? 'all';
+}
+
+const submitFilters = () => {
+  const payload = {
+    q: form.q || undefined,
+  };
+
+  for (const option of props.filterOptions ?? []) {
+    const value = form[option.key];
+    const defaultValue = option.defaultValue ?? 'all';
+    payload[option.key] = value === defaultValue ? undefined : value;
+  }
+
+  router.get(props.indexUrl, payload, {
     preserveState: true,
     preserveScroll: true,
     replace: true,
   });
 };
+
+const resetFilters = () => {
+  form.q = '';
+  for (const option of props.filterOptions ?? []) {
+    form[option.key] = option.defaultValue ?? 'all';
+  }
+  submitFilters();
+};
+
+const activeFilterCount = computed(() => (
+  (props.filterOptions ?? []).reduce((count, option) => (
+    form[option.key] !== (option.defaultValue ?? 'all') ? count + 1 : count
+  ), 0)
+));
 
 const columns = [
   { key: 'code', label: 'Kode', cellClass: 'w-[130px]', sortable: true },
@@ -67,8 +96,6 @@ const columns = [
           <Button as-child>
             <Link :href="createUrl">{{ resource.create_label }}</Link>
           </Button>
-
-
         </div>
       </section>
 
@@ -82,55 +109,46 @@ const columns = [
       </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Filter</CardTitle>
-          <CardDescription>Cari dan sempitkan data {{ resource.title.toLowerCase() }}.</CardDescription>
-        </CardHeader>
-        <CardContent class="grid gap-4 xl:grid-cols-4">
-          <div class="space-y-2" :class="filterOptions.length ? 'xl:col-span-2' : 'xl:col-span-4'">
-            <Label :for="`${resource.key}_q`">Cari</Label>
-            <Input
-              :id="`${resource.key}_q`"
-              :model-value="filters.q"
-              :placeholder="`${resource.code_label}, nama, atau parent`"
-              @change="applyFilters({ q: $event.target.value })"
-            />
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar {{ resource.title }}</CardTitle>
           </div>
-
-          <div
-            v-for="option in filterOptions"
-            :key="option.key"
-            class="space-y-2"
+          <AdminTableToolbar
+            :search-value="form.q"
+            :search-placeholder="`${resource.code_label}, nama, atau parent`"
+            :filter-title="`Filter ${resource.title.toLowerCase()}`"
+            :filter-description="`Saring data ${resource.title.toLowerCase()} berdasarkan relasi yang tersedia.`"
+            :active-filter-count="activeFilterCount"
+            :has-filter="filterOptions.length > 0"
+            @search="(value) => { form.q = value; submitFilters(); }"
+            @apply-filters="submitFilters"
+            @reset-filters="resetFilters"
           >
-            <Label :for="`${resource.key}_${option.key}`">{{ option.label }}</Label>
-            <Select
-              :model-value="filters[option.key] ?? option.defaultValue ?? 'all'"
-              @update:model-value="applyFilters({ [option.key]: $event })"
-            >
-              <SelectTrigger :id="`${resource.key}_${option.key}`">
-                <SelectValue :placeholder="`Pilih ${option.label.toLowerCase()}`" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem :value="option.defaultValue ?? 'all'">Semua {{ option.label }}</SelectItem>
-                <SelectItem
-                  v-for="item in option.options"
-                  :key="item.value"
-                  :value="item.value"
-                >
-                  {{ item.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar {{ resource.title }}</CardTitle>
-          <CardDescription>
-            Menampilkan {{ records.meta?.from ?? 0 }}-{{ records.meta?.to ?? 0 }} dari {{ records.meta?.total ?? 0 }} data.
-          </CardDescription>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div
+                v-for="option in filterOptions"
+                :key="option.key"
+                class="space-y-2"
+              >
+                <Label :for="`${resource.key}_${option.key}_filter`">{{ option.label }}</Label>
+                <Select v-model="form[option.key]">
+                  <SelectTrigger :id="`${resource.key}_${option.key}_filter`">
+                    <SelectValue :placeholder="`Pilih ${option.label.toLowerCase()}`" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem :value="option.defaultValue ?? 'all'">Semua {{ option.label }}</SelectItem>
+                    <SelectItem
+                      v-for="item in option.options"
+                      :key="item.value"
+                      :value="item.value"
+                    >
+                      {{ item.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
           <AdminDataTable

@@ -31,6 +31,7 @@ class MasterDataController extends Controller
             'q' => trim((string) $request->query('q', '')),
             'role' => (string) $request->query('role', 'all'),
             'verified' => (string) $request->query('verified', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = User::query()
@@ -46,7 +47,7 @@ class MasterDataController extends Controller
             ->when($filters['verified'] === 'verified', fn ($query) => $query->whereNotNull('email_verified_at'))
             ->when($filters['verified'] === 'unverified', fn ($query) => $query->whereNull('email_verified_at'))
             ->latest('created_at')
-            ->paginate(15)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (User $user) => $this->transformUserRow($user));
@@ -215,6 +216,7 @@ class MasterDataController extends Controller
     {
         $filters = [
             'q' => trim((string) $request->query('q', '')),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = Province::query()
@@ -227,7 +229,7 @@ class MasterDataController extends Controller
                 });
             })
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (Province $province) => $this->transformProvinceRow($province));
@@ -318,6 +320,7 @@ class MasterDataController extends Controller
         $filters = [
             'q' => trim((string) $request->query('q', '')),
             'province_id' => (string) $request->query('province_id', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = Regency::query()
@@ -332,7 +335,7 @@ class MasterDataController extends Controller
             })
             ->when($filters['province_id'] !== 'all', fn ($query) => $query->where('province_id', $filters['province_id']))
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (Regency $regency) => $this->transformRegencyRow($regency));
@@ -448,6 +451,7 @@ class MasterDataController extends Controller
             'q' => trim((string) $request->query('q', '')),
             'province_id' => (string) $request->query('province_id', 'all'),
             'regency_id' => (string) $request->query('regency_id', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = District::query()
@@ -465,7 +469,7 @@ class MasterDataController extends Controller
                 $query->whereHas('regency', fn ($regencyQuery) => $regencyQuery->where('province_id', $filters['province_id']));
             })
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (District $district) => $this->transformDistrictRow($district));
@@ -622,6 +626,7 @@ class MasterDataController extends Controller
             'province_id' => (string) $request->query('province_id', 'all'),
             'regency_id' => (string) $request->query('regency_id', 'all'),
             'district_id' => (string) $request->query('district_id', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = Village::query()
@@ -641,7 +646,7 @@ class MasterDataController extends Controller
                 $query->whereHas('district.regency', fn ($regencyQuery) => $regencyQuery->where('province_id', $filters['province_id']));
             })
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (Village $village) => $this->transformVillageRow($village));
@@ -875,7 +880,7 @@ class MasterDataController extends Controller
         ];
     }
 
-    private function paginatedRecordsPayload(object $records): array
+    protected function paginatedRecordsPayload(object $records): array
     {
         return [
             'data' => $records->items(),
@@ -883,6 +888,9 @@ class MasterDataController extends Controller
                 'from' => $records->firstItem(),
                 'to' => $records->lastItem(),
                 'total' => $records->total(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+                'per_page' => $records->perPage(),
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];

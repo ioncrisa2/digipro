@@ -21,6 +21,7 @@ class FinanceController extends Controller
             'q' => trim((string) $request->query('q', '')),
             'status' => (string) $request->query('status', 'all'),
             'method' => (string) $request->query('method', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = Payment::query()
@@ -40,7 +41,7 @@ class FinanceController extends Controller
             ->when($filters['status'] !== 'all', fn ($query) => $query->where('status', $filters['status']))
             ->when($filters['method'] !== 'all', fn ($query) => $query->where('method', $filters['method']))
             ->latest('created_at')
-            ->paginate(15)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (Payment $payment) => $this->transformPaymentRow($payment, $midtrans));
@@ -417,7 +418,7 @@ class FinanceController extends Controller
         return null;
     }
 
-    private function paginatedRecordsPayload(object $records): array
+    protected function paginatedRecordsPayload(object $records): array
     {
         return [
             'data' => $records->items(),
@@ -425,6 +426,9 @@ class FinanceController extends Controller
                 'from' => $records->firstItem(),
                 'to' => $records->lastItem(),
                 'total' => $records->total(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+                'per_page' => $records->perPage(),
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];

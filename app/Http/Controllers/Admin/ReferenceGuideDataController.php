@@ -28,6 +28,7 @@ class ReferenceGuideDataController extends Controller
             'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
             'year' => (string) $request->query('year', 'all'),
             'province_id' => (string) $request->query('province_id', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = ConstructionCostIndex::query()
@@ -57,7 +58,7 @@ class ReferenceGuideDataController extends Controller
             )
             ->orderByDesc('year')
             ->orderBy('region_code')
-            ->paginate(12)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (ConstructionCostIndex $record) => $this->transformConstructionCostIndexRow($record));
@@ -188,6 +189,7 @@ class ReferenceGuideDataController extends Controller
             'year' => (string) $request->query('year', 'all'),
             'base_region' => (string) $request->query('base_region', 'all'),
             'group' => (string) $request->query('group', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = CostElement::query()
@@ -222,7 +224,7 @@ class ReferenceGuideDataController extends Controller
             ->orderByDesc('year')
             ->orderBy('group')
             ->orderBy('element_code')
-            ->paginate(12)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (CostElement $record) => $this->transformCostElementRow($record));
@@ -371,6 +373,7 @@ class ReferenceGuideDataController extends Controller
             'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
             'year' => (string) $request->query('year', 'all'),
             'building_class' => (string) $request->query('building_class', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = FloorIndex::query()
@@ -397,7 +400,7 @@ class ReferenceGuideDataController extends Controller
             ->orderByDesc('year')
             ->orderBy('building_class')
             ->orderBy('floor_count')
-            ->paginate(12)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (FloorIndex $record) => $this->transformFloorIndexRow($record));
@@ -516,6 +519,7 @@ class ReferenceGuideDataController extends Controller
             'year' => (string) $request->query('year', 'all'),
             'building_type' => (string) $request->query('building_type', 'all'),
             'building_class' => (string) $request->query('building_class', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
         ];
 
         $records = MappiRcnStandard::query()
@@ -548,7 +552,7 @@ class ReferenceGuideDataController extends Controller
             ->orderByDesc('year')
             ->orderBy('building_type')
             ->orderBy('building_class')
-            ->paginate(12)
+            ->paginate($this->adminPerPage($request))
             ->withQueryString();
 
         $records->through(fn (MappiRcnStandard $record) => $this->transformMappiRcnStandardRow($record));
@@ -1071,7 +1075,7 @@ class ReferenceGuideDataController extends Controller
         ];
     }
 
-    private function paginatedRecordsPayload(object $records): array
+    protected function paginatedRecordsPayload(object $records): array
     {
         return [
             'data' => $records->items(),
@@ -1079,6 +1083,9 @@ class ReferenceGuideDataController extends Controller
                 'from' => $records->firstItem(),
                 'to' => $records->lastItem(),
                 'total' => $records->total(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+                'per_page' => $records->perPage(),
                 'links' => $records->linkCollection()->toArray(),
             ],
         ];
