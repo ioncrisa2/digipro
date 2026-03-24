@@ -56,7 +56,6 @@ const destroyRecord = async (item) => {
     <div class="space-y-6">
       <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 9</p>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ resource.title }}</h1>
         </div>
         <div class="flex flex-wrap gap-2">

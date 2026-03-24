@@ -81,7 +81,7 @@ const submit = () => {
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Edit Request</p>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ record.request_number }}</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Batch ini memindahkan field informasi dasar, kontrak, dan fee. Workflow penawaran dan pembayaran tetap dipisah.
+            Perbarui informasi dasar, kontrak, dan fee permohonan penilaian dari workspace admin.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">

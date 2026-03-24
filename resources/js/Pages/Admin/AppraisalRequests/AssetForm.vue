@@ -248,7 +248,7 @@ const submit = () => {
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Aset Request</p>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ heading }}</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Batch ini memindahkan CRUD data dasar aset ke Vue. Dokumen dan foto aset masih tetap dikelola terpisah.
+            Kelola data dasar aset dari workspace admin. Dokumen dan foto aset tetap dikelola melalui section terpisah.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">

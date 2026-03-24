@@ -36,7 +36,7 @@ const submit = () => form.post(props.submitUrl, { preserveScroll: true });
   <AdminLayout :title="`${isEditMode ? 'Edit' : 'Tambah'} Consent Document`">
     <div class="mx-auto max-w-5xl space-y-6">
       <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div><p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Batch 9</p><h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ isEditMode ? 'Edit Consent Document' : 'Tambah Consent Document' }}</h1></div>
+        <div><h1 class="text-3xl font-semibold tracking-tight text-slate-950">{{ isEditMode ? 'Edit Consent Document' : 'Tambah Consent Document' }}</h1></div>
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>
         </div>
