@@ -1,4 +1,5 @@
 <script setup>
+import AdminLayout from "@/layouts/AdminLayout.vue";
 import UserDashboardLayout from "@/layouts/UserDashboardLayout.vue";
 import ReviewerLayout from "@/layouts/ReviewerLayout.vue";
 import { useForm, usePage, router } from "@inertiajs/vue3";
@@ -36,7 +37,11 @@ const profileRoutes = computed(() => page.props.profileRoutes || {
   avatar: route("profile.avatar"),
   avatarRemove: route("profile.avatar.remove"),
 });
-const layoutComponent = computed(() => (layoutContext.value === "reviewer" ? ReviewerLayout : UserDashboardLayout));
+const layoutComponent = computed(() => {
+  if (layoutContext.value === "reviewer") return ReviewerLayout;
+  if (layoutContext.value === "admin") return AdminLayout;
+  return UserDashboardLayout;
+});
 const defaultAvatarUrl = "/images/avatar-default.svg";
 const avatarUrl = computed(() => user.value.avatar_url || defaultAvatarUrl);
 

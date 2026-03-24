@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserNotificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -42,6 +43,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //notification route
     Route::post('/notifications/{id}/read', [UserNotificationController::class, 'read'])->name('notifications.read');
     Route::post('/notifications/read-all', [UserNotificationController::class, 'readAll'])->name('notifications.readAll');
+
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+    Route::post('/profile/password/verify', [ProfileController::class, 'verifyCurrentPassword'])->name('profile.password.verify');
+    Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
+    Route::delete('/profile/avatar', [ProfileController::class, 'removeAvatar'])->name('profile.avatar.remove');
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });

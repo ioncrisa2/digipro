@@ -15,10 +15,12 @@ class ProfileController extends Controller
 {
     public function edit(Request $request)
     {
-        $isReviewer = (bool) $request->user()?->hasRole('Reviewer');
+        $user = $request->user();
+        $isReviewer = (bool) $user?->hasRole('Reviewer');
+        $isAdmin = (bool) $user?->hasAdminAccess();
 
         return inertia('Profile/Index', [
-            'layoutContext' => $isReviewer ? 'reviewer' : 'customer',
+            'layoutContext' => $isReviewer ? 'reviewer' : ($isAdmin ? 'admin' : 'customer'),
             'profileRoutes' => [
                 'edit' => $isReviewer ? route('reviewer.profile.edit') : route('profile.edit'),
                 'update' => $isReviewer ? route('reviewer.profile.update') : route('profile.update'),

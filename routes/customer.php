@@ -3,11 +3,10 @@
 use App\Http\Controllers\AppraisalController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'verified', 'not.reviewer'])
+Route::middleware(['auth', 'verified', 'customer.role'])
     ->group(function (): void {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -36,11 +35,4 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
 
         Route::get('/pembayaran', [PaymentController::class, 'index'])->name('payments.index');
         Route::get('/pembayaran/{id}', [PaymentController::class, 'show'])->name('payments.show');
-
-        Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-        Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
-        Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
-        Route::post('/profile/password/verify', [ProfileController::class, 'verifyCurrentPassword'])->name('profile.password.verify');
-        Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
-        Route::delete('/profile/avatar', [ProfileController::class, 'removeAvatar'])->name('profile.avatar.remove');
     });

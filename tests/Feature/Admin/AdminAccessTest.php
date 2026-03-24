@@ -107,6 +107,36 @@ it('blocks reviewer users from the admin dashboard', function () {
         ->assertForbidden();
 });
 
+it('redirects admin users away from the customer dashboard', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->get(route('dashboard'))
+        ->assertRedirect(route('admin.dashboard'));
+});
+
+it('redirects admin users away from customer appraisal creation flow', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->get(route('appraisal.create'))
+        ->assertRedirect(route('admin.dashboard'));
+});
+
+it('allows admin users to access the shared profile page with admin layout context', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->get(route('profile.edit'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Profile/Index')
+            ->where('layoutContext', 'admin'));
+});
+
 it('renders appraisal request detail in the vue admin workspace', function () {
     $admin = createAdminUser();
     $requester = User::factory()->create([
