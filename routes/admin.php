@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Admin\AccessControlController;
-use App\Http\Controllers\Admin\AppraisalAssetController;
 use App\Http\Controllers\Admin\AppraisalRequestController;
 use App\Http\Controllers\Admin\AppraisalRequestWorkflowController;
 use App\Http\Controllers\Admin\BuildingEconomicLifeController;
@@ -29,21 +28,12 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::get('/{appraisalRequest}', [AppraisalRequestController::class, 'appraisalRequestsShow'])->name('show');
                 Route::get('/{appraisalRequest}/edit', [AppraisalRequestController::class, 'appraisalRequestsEdit'])->name('edit');
                 Route::put('/{appraisalRequest}', [AppraisalRequestController::class, 'appraisalRequestsUpdate'])->name('update');
-                Route::get('/{appraisalRequest}/assets/create', [AppraisalAssetController::class, 'appraisalRequestAssetCreate'])->name('assets.create');
-                Route::post('/{appraisalRequest}/assets', [AppraisalAssetController::class, 'storeAppraisalRequestAsset'])->name('assets.store');
-                Route::get('/{appraisalRequest}/assets/{asset}/edit', [AppraisalAssetController::class, 'appraisalRequestAssetEdit'])->name('assets.edit');
-                Route::put('/{appraisalRequest}/assets/{asset}', [AppraisalAssetController::class, 'updateAppraisalRequestAsset'])->name('assets.update');
-                Route::delete('/{appraisalRequest}/assets/{asset}', [AppraisalAssetController::class, 'destroyAppraisalRequestAsset'])->name('assets.destroy');
-                Route::post('/{appraisalRequest}/assets/{asset}/files', [AppraisalAssetController::class, 'storeAppraisalAssetFile'])->name('assets.files.store');
-                Route::delete('/{appraisalRequest}/assets/{asset}/files/{file}', [AppraisalAssetController::class, 'destroyAppraisalAssetFile'])->name('assets.files.destroy');
                 Route::post('/{appraisalRequest}/verify-docs', [AppraisalRequestWorkflowController::class, 'verifyDocs'])->name('actions.verify-docs');
                 Route::post('/{appraisalRequest}/docs-incomplete', [AppraisalRequestWorkflowController::class, 'markDocsIncomplete'])->name('actions.docs-incomplete');
                 Route::post('/{appraisalRequest}/contract-signed', [AppraisalRequestWorkflowController::class, 'markContractSigned'])->name('actions.contract-signed');
                 Route::post('/{appraisalRequest}/verify-payment', [AppraisalRequestWorkflowController::class, 'verifyPayment'])->name('actions.verify-payment');
                 Route::post('/{appraisalRequest}/send-offer', [AppraisalRequestWorkflowController::class, 'sendOffer'])->name('actions.send-offer');
                 Route::post('/{appraisalRequest}/approve-latest-negotiation', [AppraisalRequestWorkflowController::class, 'approveLatestNegotiation'])->name('actions.approve-latest-negotiation');
-                Route::post('/{appraisalRequest}/files', [AppraisalRequestController::class, 'storeRequestFile'])->name('files.store');
-                Route::delete('/{appraisalRequest}/files/{file}', [AppraisalRequestController::class, 'destroyRequestFile'])->name('files.destroy');
             });
 
         Route::prefix('keuangan')

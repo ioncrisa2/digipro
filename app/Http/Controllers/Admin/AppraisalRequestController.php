@@ -7,15 +7,12 @@ use App\Enums\ContractStatusEnum;
 use App\Enums\ReportTypeEnum;
 use App\Http\Controllers\Admin\Concerns\InteractsWithAppraisalRequests;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\StoreAppraisalRequestFileRequest;
 use App\Http\Requests\Admin\UpdateAppraisalRequestBasicRequest;
 use App\Models\AppraisalRequest;
-use App\Models\AppraisalRequestFile;
 use App\Services\Admin\AppraisalContractNumberService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Response;
 
 class AppraisalRequestController extends Controller
@@ -138,9 +135,6 @@ class AppraisalRequestController extends Controller
                 ->values()
                 ->map(fn ($asset, $index) => $this->transformAsset($asset, $index + 1, $locationMaps))
                 ->values(),
-            'assetCreateUrl' => route('admin.appraisal-requests.assets.create', $appraisalRequest),
-            'assetDocumentTypeOptions' => $this->assetDocumentTypeOptions(),
-            'assetPhotoTypeOptions' => $this->assetPhotoTypeOptions(),
             'payments' => $appraisalRequest->payments->map(fn ($payment) => [
                 'id' => $payment->id,
                 'amount' => (int) $payment->amount,
@@ -165,7 +159,6 @@ class AppraisalRequestController extends Controller
             ])->values(),
             'negotiationActionOptions' => $this->negotiationActionOptions($appraisalRequest),
             'negotiationSummary' => $this->negotiationSummary($appraisalRequest),
-            'requestFileTypeOptions' => $this->requestFileTypeOptions(),
         ]);
     }
 
@@ -248,42 +241,4 @@ class AppraisalRequestController extends Controller
             ->with('success', 'Informasi dasar request berhasil diperbarui.');
     }
 
-    public function storeRequestFile(
-        StoreAppraisalRequestFileRequest $request,
-        AppraisalRequest $appraisalRequest
-    ): RedirectResponse {
-        $validated = $request->validated();
-        $file = $request->file('file');
-        $storedPath = $file->storeAs(
-            "appraisal-requests/{$appraisalRequest->id}/request-files",
-            now()->format('YmdHis') . '-' . uniqid() . '.' . $file->getClientOriginalExtension(),
-            'public'
-        );
-
-        $appraisalRequest->files()->create([
-            'type' => $validated['type'],
-            'path' => $storedPath,
-            'original_name' => $file->getClientOriginalName(),
-            'mime' => $file->getMimeType(),
-            'size' => $file->getSize(),
-        ]);
-
-        return back()->with('success', 'File request berhasil diunggah.');
-    }
-
-    public function destroyRequestFile(
-        AppraisalRequest $appraisalRequest,
-        AppraisalRequestFile $file
-    ): RedirectResponse {
-        abort_unless((int) $file->appraisal_request_id === (int) $appraisalRequest->id, 404);
-
-        if ($file->type === 'contract_signed_pdf') {
-            return back()->with('error', 'File kontrak tertandatangani tidak bisa dihapus dari workspace admin Vue.');
-        }
-
-        Storage::disk('public')->delete($file->path);
-        $file->delete();
-
-        return back()->with('success', 'File request berhasil dihapus.');
-    }
 }

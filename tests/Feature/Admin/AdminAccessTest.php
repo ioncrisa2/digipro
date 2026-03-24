@@ -1190,9 +1190,7 @@ it('includes negotiation summary and filter options in the admin request detail 
             ->where('negotiations.0.action_value', 'offer_revised'));
 });
 
-it('uploads a request-level file from the vue admin workspace', function () {
-    Storage::fake('public');
-
+it('renders appraisal request detail as a verification workspace without admin mutation affordances', function () {
     $admin = createAdminUser();
     $requester = User::factory()->create([
         'email_verified_at' => now(),
@@ -1200,227 +1198,57 @@ it('uploads a request-level file from the vue admin workspace', function () {
 
     $record = AppraisalRequest::create([
         'user_id' => $requester->id,
-        'request_number' => 'REQ-ADMIN-UPLOAD-001',
+        'request_number' => 'REQ-VERIFY-DETAIL-001',
         'purpose' => PurposeEnum::JualBeli,
         'status' => AppraisalStatusEnum::Submitted,
         'requested_at' => now(),
     ]);
 
-    $this
-        ->actingAs($admin)
-        ->post(route('admin.appraisal-requests.files.store', $record), [
-            'type' => 'npwp',
-            'file' => UploadedFile::fake()->create('npwp.pdf', 120, 'application/pdf'),
-        ])
-        ->assertRedirect();
-
-    $file = AppraisalRequestFile::query()
-        ->where('appraisal_request_id', $record->id)
-        ->where('type', 'npwp')
-        ->first();
-
-    expect($file)->not->toBeNull();
-    Storage::disk('public')->assertExists($file->path);
-});
-
-it('deletes a request-level file from the vue admin workspace', function () {
-    Storage::fake('public');
-
-    $admin = createAdminUser();
-    $requester = User::factory()->create([
-        'email_verified_at' => now(),
-    ]);
-
-    $record = AppraisalRequest::create([
-        'user_id' => $requester->id,
-        'request_number' => 'REQ-ADMIN-DELETE-FILE-001',
-        'purpose' => PurposeEnum::JualBeli,
-        'status' => AppraisalStatusEnum::Submitted,
-        'requested_at' => now(),
-    ]);
-
-    Storage::disk('public')->put('appraisal-requests/test/request-files/permission.pdf', 'dummy');
-
-    $file = AppraisalRequestFile::create([
+    $asset = AppraisalAsset::create([
         'appraisal_request_id' => $record->id,
-        'type' => 'permission',
-        'path' => 'appraisal-requests/test/request-files/permission.pdf',
-        'original_name' => 'permission.pdf',
+        'asset_code' => 'AST-001',
+        'asset_type' => 'tanah_bangunan',
+        'address' => 'Jl. Verifikasi No. 1',
+    ]);
+
+    AppraisalRequestFile::create([
+        'appraisal_request_id' => $record->id,
+        'type' => 'npwp',
+        'path' => 'appraisal-requests/request/npwp.pdf',
+        'original_name' => 'npwp.pdf',
         'mime' => 'application/pdf',
-        'size' => 5,
+        'size' => 123,
     ]);
-
-    $this
-        ->actingAs($admin)
-        ->delete(route('admin.appraisal-requests.files.destroy', [$record, $file]))
-        ->assertRedirect();
-
-    expect(AppraisalRequestFile::find($file->id))->toBeNull();
-    Storage::disk('public')->assertMissing('appraisal-requests/test/request-files/permission.pdf');
-});
-
-it('renders the asset create page in the vue admin workspace', function () {
-    $admin = createAdminUser();
-    $requester = User::factory()->create([
-        'email_verified_at' => now(),
-    ]);
-
-    $record = AppraisalRequest::create([
-        'user_id' => $requester->id,
-        'request_number' => 'REQ-ASSET-CREATE-PAGE-001',
-        'purpose' => PurposeEnum::JualBeli,
-        'status' => AppraisalStatusEnum::Submitted,
-        'requested_at' => now(),
-    ]);
-
-    $this
-        ->actingAs($admin)
-        ->get(route('admin.appraisal-requests.assets.create', $record))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/AppraisalRequests/AssetForm')
-            ->where('mode', 'create')
-            ->where('requestRecord.request_number', 'REQ-ASSET-CREATE-PAGE-001'));
-});
-
-it('stores an appraisal asset from the vue admin workspace', function () {
-    $admin = createAdminUser();
-    $requester = User::factory()->create([
-        'email_verified_at' => now(),
-    ]);
-
-    $record = AppraisalRequest::create([
-        'user_id' => $requester->id,
-        'request_number' => 'REQ-ASSET-STORE-001',
-        'purpose' => PurposeEnum::JualBeli,
-        'status' => AppraisalStatusEnum::Submitted,
-        'requested_at' => now(),
-    ]);
-
-    $this
-        ->actingAs($admin)
-        ->post(route('admin.appraisal-requests.assets.store', $record), [
-            'asset_code' => 'A-001',
-            'asset_type' => 'tanah_bangunan',
-            'peruntukan' => 'rumah_tinggal',
-            'title_document' => 'shm',
-            'land_shape' => 'persegi',
-            'land_position' => 'tengah',
-            'land_condition' => 'matang',
-            'topography' => 'datar_sama_dengan_jalan',
-            'address' => 'Jl. Batch Tujuh No. 1',
-            'maps_link' => 'https://maps.google.com/?q=-6.2,106.8',
-            'land_area' => 120,
-            'building_area' => 95,
-            'building_floors' => 2,
-            'build_year' => 2018,
-            'frontage_width' => 8,
-            'access_road_width' => 6,
-        ])
-        ->assertRedirect(route('admin.appraisal-requests.show', $record));
-
-    $asset = AppraisalAsset::query()
-        ->where('appraisal_request_id', $record->id)
-        ->latest('id')
-        ->first();
-
-    expect($asset)->not->toBeNull();
-    expect($asset->asset_code)->toBe('A-001');
-    expect($asset->asset_type)->toBe('tanah_bangunan');
-    expect($asset->peruntukan)->toBe('rumah_tinggal');
-    expect((float) $asset->land_area)->toBe(120.0);
-});
-
-it('updates an appraisal asset from the vue admin workspace', function () {
-    $admin = createAdminUser();
-    $requester = User::factory()->create([
-        'email_verified_at' => now(),
-    ]);
-
-    $record = AppraisalRequest::create([
-        'user_id' => $requester->id,
-        'request_number' => 'REQ-ASSET-UPDATE-001',
-        'purpose' => PurposeEnum::JualBeli,
-        'status' => AppraisalStatusEnum::Submitted,
-        'requested_at' => now(),
-    ]);
-
-    $asset = AppraisalAsset::create([
-        'appraisal_request_id' => $record->id,
-        'asset_code' => 'A-OLD',
-        'asset_type' => 'tanah',
-        'address' => 'Alamat lama',
-    ]);
-
-    $this
-        ->actingAs($admin)
-        ->put(route('admin.appraisal-requests.assets.update', [$record, $asset]), [
-            'asset_code' => 'A-NEW',
-            'asset_type' => 'tanah_bangunan',
-            'peruntukan' => 'ruko',
-            'title_document' => 'hgb',
-            'address' => 'Alamat baru',
-            'building_area' => 88,
-            'building_floors' => 3,
-            'renovation_year' => 2022,
-        ])
-        ->assertRedirect(route('admin.appraisal-requests.show', $record));
-
-    $asset->refresh();
-
-    expect($asset->asset_code)->toBe('A-NEW');
-    expect($asset->asset_type)->toBe('tanah_bangunan');
-    expect($asset->peruntukan)->toBe('ruko');
-    expect($asset->title_document)->toBe('hgb');
-    expect($asset->address)->toBe('Alamat baru');
-    expect((float) $asset->building_area)->toBe(88.0);
-});
-
-it('deletes an appraisal asset from the vue admin workspace', function () {
-    Storage::fake('public');
-
-    $admin = createAdminUser();
-    $requester = User::factory()->create([
-        'email_verified_at' => now(),
-    ]);
-
-    $record = AppraisalRequest::create([
-        'user_id' => $requester->id,
-        'request_number' => 'REQ-ASSET-DELETE-001',
-        'purpose' => PurposeEnum::JualBeli,
-        'status' => AppraisalStatusEnum::Submitted,
-        'requested_at' => now(),
-    ]);
-
-    $asset = AppraisalAsset::create([
-        'appraisal_request_id' => $record->id,
-        'asset_type' => 'tanah',
-        'address' => 'Aset hapus',
-    ]);
-
-    Storage::disk('public')->put('appraisal-requests/test/assets/doc.pdf', 'dummy');
 
     AppraisalAssetFile::create([
         'appraisal_asset_id' => $asset->id,
         'type' => 'doc_pbb',
-        'path' => 'appraisal-requests/test/assets/doc.pdf',
-        'original_name' => 'doc.pdf',
+        'path' => 'appraisal-requests/assets/pbb.pdf',
+        'original_name' => 'pbb.pdf',
         'mime' => 'application/pdf',
-        'size' => 5,
+        'size' => 456,
     ]);
 
     $this
         ->actingAs($admin)
-        ->delete(route('admin.appraisal-requests.assets.destroy', [$record, $asset]))
-        ->assertRedirect();
-
-    expect(AppraisalAsset::find($asset->id))->toBeNull();
-    Storage::disk('public')->assertMissing('appraisal-requests/test/assets/doc.pdf');
+        ->get(route('admin.appraisal-requests.show', $record))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/AppraisalRequests/Show')
+            ->missing('assetCreateUrl')
+            ->missing('requestFileTypeOptions')
+            ->missing('assetDocumentTypeOptions')
+            ->missing('assetPhotoTypeOptions')
+            ->where('assets.0.address', 'Jl. Verifikasi No. 1')
+            ->missing('assets.0.edit_url')
+            ->missing('assets.0.destroy_url')
+            ->where('requestFiles.0.original_name', 'npwp.pdf')
+            ->missing('requestFiles.0.can_delete')
+            ->where('assets.0.documents.0.original_name', 'pbb.pdf')
+            ->missing('assets.0.documents.0.destroy_url'));
 });
 
-it('uploads an asset document from the vue admin workspace', function () {
-    Storage::fake('public');
-
+it('does not expose admin routes to mutate customer appraisal submissions', function () {
     $admin = createAdminUser();
     $requester = User::factory()->create([
         'email_verified_at' => now(),
@@ -1428,7 +1256,7 @@ it('uploads an asset document from the vue admin workspace', function () {
 
     $record = AppraisalRequest::create([
         'user_id' => $requester->id,
-        'request_number' => 'REQ-ASSET-DOC-UPLOAD-001',
+        'request_number' => 'REQ-READONLY-001',
         'purpose' => PurposeEnum::JualBeli,
         'status' => AppraisalStatusEnum::Submitted,
         'requested_at' => now(),
@@ -1437,105 +1265,38 @@ it('uploads an asset document from the vue admin workspace', function () {
     $asset = AppraisalAsset::create([
         'appraisal_request_id' => $record->id,
         'asset_type' => 'tanah',
-        'address' => 'Aset dokumen',
+        'address' => 'Readonly asset',
     ]);
 
-    $this
-        ->actingAs($admin)
-        ->post(route('admin.appraisal-requests.assets.files.store', [$record, $asset]), [
-            'type' => 'doc_pbb',
-            'file' => UploadedFile::fake()->create('pbb.pdf', 200, 'application/pdf'),
-        ])
-        ->assertRedirect();
-
-    $file = AppraisalAssetFile::query()
-        ->where('appraisal_asset_id', $asset->id)
-        ->where('type', 'doc_pbb')
-        ->first();
-
-    expect($file)->not->toBeNull();
-    Storage::disk('public')->assertExists($file->path);
-});
-
-it('uploads an asset photo from the vue admin workspace', function () {
-    Storage::fake('public');
-
-    $admin = createAdminUser();
-    $requester = User::factory()->create([
-        'email_verified_at' => now(),
-    ]);
-
-    $record = AppraisalRequest::create([
-        'user_id' => $requester->id,
-        'request_number' => 'REQ-ASSET-PHOTO-UPLOAD-001',
-        'purpose' => PurposeEnum::JualBeli,
-        'status' => AppraisalStatusEnum::Submitted,
-        'requested_at' => now(),
-    ]);
-
-    $asset = AppraisalAsset::create([
+    $requestFile = AppraisalRequestFile::create([
         'appraisal_request_id' => $record->id,
-        'asset_type' => 'tanah_bangunan',
-        'address' => 'Aset foto',
+        'type' => 'permission',
+        'path' => 'appraisal-requests/request/permission.pdf',
+        'original_name' => 'permission.pdf',
+        'mime' => 'application/pdf',
+        'size' => 111,
     ]);
 
-    $this
-        ->actingAs($admin)
-        ->post(route('admin.appraisal-requests.assets.files.store', [$record, $asset]), [
-            'type' => 'photo_front',
-            'file' => UploadedFile::fake()->image('front.jpg'),
-        ])
-        ->assertRedirect();
-
-    $file = AppraisalAssetFile::query()
-        ->where('appraisal_asset_id', $asset->id)
-        ->where('type', 'photo_front')
-        ->first();
-
-    expect($file)->not->toBeNull();
-    Storage::disk('public')->assertExists($file->path);
-});
-
-it('deletes an asset file from the vue admin workspace', function () {
-    Storage::fake('public');
-
-    $admin = createAdminUser();
-    $requester = User::factory()->create([
-        'email_verified_at' => now(),
-    ]);
-
-    $record = AppraisalRequest::create([
-        'user_id' => $requester->id,
-        'request_number' => 'REQ-ASSET-FILE-DELETE-001',
-        'purpose' => PurposeEnum::JualBeli,
-        'status' => AppraisalStatusEnum::Submitted,
-        'requested_at' => now(),
-    ]);
-
-    $asset = AppraisalAsset::create([
-        'appraisal_request_id' => $record->id,
-        'asset_type' => 'tanah',
-        'address' => 'Aset hapus file',
-    ]);
-
-    Storage::disk('public')->put('appraisal-requests/test/assets/photo.jpg', 'dummy');
-
-    $file = AppraisalAssetFile::create([
+    $assetFile = AppraisalAssetFile::create([
         'appraisal_asset_id' => $asset->id,
         'type' => 'photo_front',
-        'path' => 'appraisal-requests/test/assets/photo.jpg',
-        'original_name' => 'photo.jpg',
+        'path' => 'appraisal-requests/assets/front.jpg',
+        'original_name' => 'front.jpg',
         'mime' => 'image/jpeg',
-        'size' => 5,
+        'size' => 222,
     ]);
 
-    $this
-        ->actingAs($admin)
-        ->delete(route('admin.appraisal-requests.assets.files.destroy', [$record, $asset, $file]))
-        ->assertRedirect();
+    $base = "/admin/permohonan-penilaian/{$record->id}";
 
-    expect(AppraisalAssetFile::find($file->id))->toBeNull();
-    Storage::disk('public')->assertMissing('appraisal-requests/test/assets/photo.jpg');
+    $this->actingAs($admin)->get("{$base}/assets/create")->assertNotFound();
+    $this->actingAs($admin)->post("{$base}/assets", [])->assertNotFound();
+    $this->actingAs($admin)->get("{$base}/assets/{$asset->id}/edit")->assertNotFound();
+    $this->actingAs($admin)->put("{$base}/assets/{$asset->id}", [])->assertNotFound();
+    $this->actingAs($admin)->delete("{$base}/assets/{$asset->id}")->assertNotFound();
+    $this->actingAs($admin)->post("{$base}/assets/{$asset->id}/files", [])->assertNotFound();
+    $this->actingAs($admin)->delete("{$base}/assets/{$asset->id}/files/{$assetFile->id}")->assertNotFound();
+    $this->actingAs($admin)->post("{$base}/files", [])->assertNotFound();
+    $this->actingAs($admin)->delete("{$base}/files/{$requestFile->id}")->assertNotFound();
 });
 
 it('verifies docs from the vue admin workflow', function () {

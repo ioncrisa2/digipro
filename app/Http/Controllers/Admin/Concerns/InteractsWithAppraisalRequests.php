@@ -84,7 +84,6 @@ trait InteractsWithAppraisalRequests
             'id' => $file->id,
             'type' => (string) $file->type,
             'type_label' => $this->requestFileTypeLabel($file->type),
-            'can_delete' => (string) $file->type !== 'contract_signed_pdf',
             'original_name' => $file->original_name ?: basename((string) $file->path),
             'mime' => $file->mime,
             'size' => (int) ($file->size ?? 0),
@@ -131,8 +130,6 @@ trait InteractsWithAppraisalRequests
             'market_value_final' => $asset->market_value_final,
             'estimated_value_low' => $asset->estimated_value_low,
             'estimated_value_high' => $asset->estimated_value_high,
-            'edit_url' => route('admin.appraisal-requests.assets.edit', [$asset->appraisal_request_id, $asset]),
-            'destroy_url' => route('admin.appraisal-requests.assets.destroy', [$asset->appraisal_request_id, $asset]),
             'documents' => $files
                 ->whereIn('type', ['doc_pbb', 'doc_imb', 'doc_certs'])
                 ->map(fn ($file) => $this->transformAssetFile($asset, $file))
@@ -150,13 +147,11 @@ trait InteractsWithAppraisalRequests
             'id' => $file->id,
             'type' => (string) $file->type,
             'type_label' => $this->assetFileTypeLabel($file->type),
-            'can_delete' => true,
             'original_name' => $file->original_name ?: basename((string) $file->path),
             'mime' => $file->mime,
             'size' => (int) ($file->size ?? 0),
             'size_label' => $this->formatBytes($file->size),
             'url' => Storage::disk('public')->url($file->path),
-            'destroy_url' => route('admin.appraisal-requests.assets.files.destroy', [$asset->appraisal_request_id, $asset, $file]),
             'created_at' => $file->created_at?->toIso8601String(),
         ];
     }
@@ -444,16 +439,6 @@ trait InteractsWithAppraisalRequests
         ];
     }
 
-    private function requestFileTypeOptions(): array
-    {
-        return [
-            ['value' => 'npwp', 'label' => 'NPWP'],
-            ['value' => 'representative', 'label' => 'Surat Kuasa'],
-            ['value' => 'permission', 'label' => 'Surat Izin'],
-            ['value' => 'other_request_document', 'label' => 'Lampiran Request'],
-        ];
-    }
-
     protected function paginatedRecordsPayload(object $records): array
     {
         return [
@@ -497,34 +482,4 @@ trait InteractsWithAppraisalRequests
         ];
     }
 
-    private function assetDocumentTypeOptions(): array
-    {
-        return [
-            ['value' => 'doc_pbb', 'label' => 'PBB'],
-            ['value' => 'doc_imb', 'label' => 'IMB / PBG'],
-            ['value' => 'doc_certs', 'label' => 'Sertifikat'],
-        ];
-    }
-
-    private function assetPhotoTypeOptions(): array
-    {
-        return [
-            ['value' => 'photo_access_road', 'label' => 'Foto Akses Jalan'],
-            ['value' => 'photo_front', 'label' => 'Foto Depan'],
-            ['value' => 'photo_interior', 'label' => 'Foto Dalam'],
-        ];
-    }
-
-    private function assetFileDirectory(string $type): string
-    {
-        return match ($type) {
-            'doc_pbb' => 'documents/pbb',
-            'doc_imb' => 'documents/imb',
-            'doc_certs' => 'documents/certificate',
-            'photo_access_road' => 'photos/access_road',
-            'photo_front' => 'photos/front',
-            'photo_interior' => 'photos/interior',
-            default => 'uploads',
-        };
-    }
 }

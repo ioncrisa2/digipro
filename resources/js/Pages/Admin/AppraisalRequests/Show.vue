@@ -1,10 +1,8 @@
 <script setup>
-import { computed, reactive, ref, toRefs, watch } from 'vue';
+import { computed, reactive, ref, toRefs } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, Pencil } from 'lucide-vue-next';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import BaseFileUpload from '@/components/base/BaseFileUpload.vue';
-import { useAdminConfirmDialog } from '@/composables/useAdminConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -43,23 +41,7 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  requestFileTypeOptions: {
-    type: Array,
-    default: () => [],
-  },
   assets: {
-    type: Array,
-    default: () => [],
-  },
-  assetCreateUrl: {
-    type: String,
-    default: null,
-  },
-  assetDocumentTypeOptions: {
-    type: Array,
-    default: () => [],
-  },
-  assetPhotoTypeOptions: {
     type: Array,
     default: () => [],
   },
@@ -104,11 +86,7 @@ const {
   requester,
   availableActions,
   requestFiles,
-  requestFileTypeOptions,
   assets,
-  assetCreateUrl,
-  assetDocumentTypeOptions,
-  assetPhotoTypeOptions,
   payments,
   negotiations,
   negotiationActionOptions,
@@ -118,7 +96,6 @@ const {
   paymentVerification,
 } = toRefs(props);
 
-const { confirmDelete } = useAdminConfirmDialog();
 const activeTab = ref('ringkasan');
 
 const offerForm = useForm({
@@ -129,52 +106,10 @@ const offerForm = useForm({
   offer_validity_days: offerAction.value?.defaults?.offer_validity_days ?? '',
 });
 
-const requestFileForm = useForm({
-  type: 'other_request_document',
-  file: null,
-});
-
 const negotiationFilters = reactive({
   action: 'all',
   q: '',
 });
-
-const assetDocumentForms = reactive({});
-const assetPhotoForms = reactive({});
-
-const ensureAssetUploadForms = (assetList = []) => {
-  assetList.forEach((asset) => {
-    if (!assetDocumentForms[asset.id]) {
-      assetDocumentForms[asset.id] = useForm({
-        type: 'doc_pbb',
-        file: null,
-      });
-    }
-
-    if (!assetPhotoForms[asset.id]) {
-      assetPhotoForms[asset.id] = useForm({
-        type: 'photo_front',
-        file: null,
-      });
-    }
-  });
-
-  Object.keys(assetDocumentForms).forEach((assetId) => {
-    if (!assetList.some((asset) => String(asset.id) === String(assetId))) {
-      delete assetDocumentForms[assetId];
-    }
-  });
-
-  Object.keys(assetPhotoForms).forEach((assetId) => {
-    if (!assetList.some((asset) => String(asset.id) === String(assetId))) {
-      delete assetPhotoForms[assetId];
-    }
-  });
-};
-
-watch(assets, (value) => {
-  ensureAssetUploadForms(value ?? []);
-}, { immediate: true, deep: true });
 
 const statusTone = (value) => {
   switch (value) {
@@ -289,126 +224,12 @@ const verifyPayment = () => {
   });
 };
 
-const setRequestFile = (file) => {
-  requestFileForm.file = Array.isArray(file) ? (file[0] ?? null) : file;
-};
-
-const submitRequestFile = () => {
-  if (!requestFileForm.file) {
-    return;
-  }
-
-  requestFileForm.post(route('admin.appraisal-requests.files.store', record.value.id), {
-    preserveScroll: true,
-    forceFormData: true,
-    onSuccess: () => {
-      requestFileForm.reset('file');
-      requestFileForm.type = 'other_request_document';
-    },
-  });
-};
-
-const deleteRequestFile = async (file) => {
-  if (!file?.can_delete) {
-    return;
-  }
-
-  const confirmed = await confirmDelete({
-    entityLabel: 'file request',
-    entityName: file.original_name,
-  });
-
-  if (!confirmed) {
-    return;
-  }
-
-  router.delete(route('admin.appraisal-requests.files.destroy', [record.value.id, file.id]), {
-    preserveScroll: true,
-  });
-};
-
-const deleteAsset = async (asset) => {
-  if (!asset?.destroy_url) {
-    return;
-  }
-
-  const confirmed = await confirmDelete({
-    entityLabel: 'aset',
-    entityName: `#${asset.order}`,
-  });
-
-  if (!confirmed) {
-    return;
-  }
-
-  router.delete(asset.destroy_url, {
-    preserveScroll: true,
-  });
-};
-
-const setAssetFile = (form, file) => {
-  if (!form) {
-    return;
-  }
-
-  form.file = Array.isArray(file) ? (file[0] ?? null) : file;
-};
-
-const assetDocumentFormFor = (assetId) => assetDocumentForms[assetId] ?? null;
-const assetPhotoFormFor = (assetId) => assetPhotoForms[assetId] ?? null;
-
-const submitAssetDocument = (asset) => {
-  const form = assetDocumentFormFor(asset.id);
-
-  if (!form?.file) {
-    return;
-  }
-
-  form.post(route('admin.appraisal-requests.assets.files.store', [record.value.id, asset.id]), {
-    preserveScroll: true,
-    forceFormData: true,
-    onSuccess: () => {
-      form.reset('file');
-      form.type = 'doc_pbb';
-    },
-  });
-};
-
-const submitAssetPhoto = (asset) => {
-  const form = assetPhotoFormFor(asset.id);
-
-  if (!form?.file) {
-    return;
-  }
-
-  form.post(route('admin.appraisal-requests.assets.files.store', [record.value.id, asset.id]), {
-    preserveScroll: true,
-    forceFormData: true,
-    onSuccess: () => {
-      form.reset('file');
-      form.type = 'photo_front';
-    },
-  });
-};
-
-const deleteAssetFile = async (asset, file) => {
-  if (!file?.destroy_url) {
-    return;
-  }
-
-  const confirmed = await confirmDelete({
-    entityLabel: `file aset #${asset.order}`,
-    entityName: file.original_name,
-  });
-
-  if (!confirmed) {
-    return;
-  }
-
-  router.delete(file.destroy_url, {
-    preserveScroll: true,
-  });
-};
+const contractFiles = computed(() => (requestFiles.value ?? []).filter((file) => file.type === 'contract_signed_pdf'));
+const showContractTab = computed(() => {
+  return record.value?.contract_status_value === 'signed'
+    || contractFiles.value.length > 0
+    || Boolean(record.value?.contract_number && record.value.contract_number !== '-');
+});
 
 const filteredNegotiations = computed(() => {
   const query = String(negotiationFilters.q || '').trim().toLowerCase();
@@ -481,6 +302,7 @@ const filteredNegotiations = computed(() => {
           <Button type="button" :variant="activeTab === 'aset' ? 'default' : 'ghost'" @click="activeTab = 'aset'">Aset</Button>
           <Button type="button" :variant="activeTab === 'dokumen' ? 'default' : 'ghost'" @click="activeTab = 'dokumen'">Dokumen</Button>
           <Button type="button" :variant="activeTab === 'negosiasi' ? 'default' : 'ghost'" @click="activeTab = 'negosiasi'">Negosiasi</Button>
+          <Button v-if="showContractTab" type="button" :variant="activeTab === 'kontrak' ? 'default' : 'ghost'" @click="activeTab = 'kontrak'">Kontrak</Button>
           <Button type="button" :variant="activeTab === 'pembayaran' ? 'default' : 'ghost'" @click="activeTab = 'pembayaran'">Pembayaran</Button>
         </div>
       </section>
@@ -557,49 +379,12 @@ const filteredNegotiations = computed(() => {
           <Card v-if="activeTab === 'dokumen'">
             <CardHeader>
               <CardTitle>Dokumen Request</CardTitle>
-              <CardDescription>File level request seperti kontrak bertanda tangan dan lampiran global.</CardDescription>
+              <CardDescription>Dokumen yang diajukan customer untuk diverifikasi admin.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-3">
-              <div class="rounded-2xl border bg-slate-50 p-4">
-                <div class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-                  <div class="space-y-2">
-                    <Label for="request_file_type">Tipe File</Label>
-                    <Select v-model="requestFileForm.type">
-                      <SelectTrigger id="request_file_type">
-                        <SelectValue placeholder="Pilih tipe file" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          v-for="option in requestFileTypeOptions"
-                          :key="option.value"
-                          :value="option.value"
-                        >
-                          {{ option.label }}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p v-if="requestFileForm.errors.type" class="text-xs text-red-500">{{ requestFileForm.errors.type }}</p>
-                  </div>
-
-                  <div class="space-y-2">
-                    <Label>Upload File</Label>
-                    <BaseFileUpload
-                      label=""
-                      :multiple="false"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      :model-value="requestFileForm.file"
-                      @update:modelValue="setRequestFile"
-                    />
-                    <p v-if="requestFileForm.errors.file" class="text-xs text-red-500">{{ requestFileForm.errors.file }}</p>
-                  </div>
-                </div>
-
-                <div class="mt-4 flex justify-end">
-                  <Button type="button" :disabled="requestFileForm.processing || !requestFileForm.file" @click="submitRequestFile">
-                    Upload File Request
-                  </Button>
-
-                </div>
+              <div class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                Admin hanya memverifikasi dokumen yang diunggah customer. Jika ada dokumen yang salah atau tidak cocok,
+                gunakan aksi status untuk meminta customer melakukan revisi.
               </div>
 
               <div v-for="file in requestFiles" :key="file.id" class="rounded-2xl border p-4">
@@ -613,13 +398,6 @@ const filteredNegotiations = computed(() => {
                     <Button variant="outline" size="sm" as-child>
                       <a :href="file.url" target="_blank" rel="noreferrer">Buka File</a>
                     </Button>
-
-
-                    <Button v-if="file.can_delete" type="button" variant="destructive" size="sm" @click="deleteRequestFile(file)">
-                      <Trash2 class="h-4 w-4" />
-                      Hapus
-                    </Button>
-
                   </div>
                 </div>
               </div>
@@ -631,21 +409,12 @@ const filteredNegotiations = computed(() => {
 
           <Card v-if="activeTab === 'aset' || activeTab === 'dokumen'">
             <CardHeader>
-              <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <CardTitle>Aset Terkait</CardTitle>
-                  <CardDescription>
-                    {{ activeTab === 'aset'
-                      ? 'Informasi inti aset, lokasi, ukuran, dan indikator nilai properti.'
-                      : 'Kelola dokumen dan foto pendukung untuk masing-masing aset.' }}
-                  </CardDescription>
-                </div>
-                <Button v-if="assetCreateUrl" variant="outline" as-child>
-                  <Link :href="assetCreateUrl">Tambah Aset</Link>
-                </Button>
-
-
-              </div>
+              <CardTitle>Aset Terkait</CardTitle>
+              <CardDescription>
+                {{ activeTab === 'aset'
+                  ? 'Informasi inti aset yang diajukan customer untuk appraisal.'
+                  : 'Dokumen dan foto aset yang diajukan customer untuk diverifikasi.' }}
+              </CardDescription>
             </CardHeader>
             <CardContent class="space-y-4">
               <div v-for="asset in assets" :key="asset.id" class="rounded-3xl border p-5">
@@ -663,24 +432,6 @@ const filteredNegotiations = computed(() => {
                     <div class="grid gap-2 text-right text-sm text-slate-600">
                       <p>Range nilai: {{ formatCurrency(asset.estimated_value_low) }} - {{ formatCurrency(asset.estimated_value_high) }}</p>
                       <p>Market value: {{ formatCurrency(asset.market_value_final) }}</p>
-                    </div>
-                    <div class="flex flex-wrap justify-end gap-2">
-                      <Button v-if="asset.edit_url" variant="outline" size="sm" as-child>
-                        <Link :href="asset.edit_url">Edit Aset</Link>
-                      </Button>
-
-
-                      <Button
-                        v-if="asset.destroy_url"
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        @click="deleteAsset(asset)"
-                      >
-                        <Trash2 class="h-4 w-4" />
-                        Hapus
-                      </Button>
-
                     </div>
                   </div>
                 </div>
@@ -745,59 +496,6 @@ const filteredNegotiations = computed(() => {
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dokumen Aset</p>
                     <div class="mt-3 space-y-3">
-                      <div class="rounded-2xl border bg-slate-50 p-4">
-                        <div class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-                          <div class="space-y-2">
-                            <Label :for="`asset_document_type_${asset.id}`">Tipe Dokumen</Label>
-                            <Select
-                              :model-value="assetDocumentFormFor(asset.id)?.type"
-                              @update:model-value="assetDocumentFormFor(asset.id).type = $event"
-                            >
-                              <SelectTrigger :id="`asset_document_type_${asset.id}`">
-                                <SelectValue placeholder="Pilih tipe dokumen" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem
-                                  v-for="option in assetDocumentTypeOptions"
-                                  :key="option.value"
-                                  :value="option.value"
-                                >
-                                  {{ option.label }}
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <p v-if="assetDocumentFormFor(asset.id)?.errors?.type" class="text-xs text-red-500">
-                              {{ assetDocumentFormFor(asset.id).errors.type }}
-                            </p>
-                          </div>
-
-                          <div class="space-y-2">
-                            <Label>Upload Dokumen</Label>
-                            <BaseFileUpload
-                              label=""
-                              :multiple="false"
-                              accept=".pdf,.jpg,.jpeg,.png"
-                              :model-value="assetDocumentFormFor(asset.id)?.file"
-                              @update:modelValue="setAssetFile(assetDocumentFormFor(asset.id), $event)"
-                            />
-                            <p v-if="assetDocumentFormFor(asset.id)?.errors?.file" class="text-xs text-red-500">
-                              {{ assetDocumentFormFor(asset.id).errors.file }}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div class="mt-4 flex justify-end">
-                          <Button
-                            type="button"
-                            :disabled="assetDocumentFormFor(asset.id)?.processing || !assetDocumentFormFor(asset.id)?.file"
-                            @click="submitAssetDocument(asset)"
-                          >
-                            Upload Dokumen Aset
-                          </Button>
-
-                        </div>
-                      </div>
-
                       <div v-for="file in asset.documents" :key="file.id" class="rounded-2xl border bg-slate-50 p-4">
                         <p class="font-medium text-slate-950">{{ file.original_name }}</p>
                         <p class="mt-1 text-xs text-slate-500">{{ file.type_label }} - {{ file.size_label }}</p>
@@ -805,13 +503,6 @@ const filteredNegotiations = computed(() => {
                           <Button variant="outline" size="sm" as-child>
                             <a :href="file.url" target="_blank" rel="noreferrer">Buka Dokumen</a>
                           </Button>
-
-
-                          <Button v-if="file.can_delete" type="button" variant="destructive" size="sm" @click="deleteAssetFile(asset, file)">
-                            <Trash2 class="h-4 w-4" />
-                            Hapus
-                          </Button>
-
                         </div>
                       </div>
                       <div v-if="!asset.documents.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
@@ -823,59 +514,6 @@ const filteredNegotiations = computed(() => {
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Foto Aset</p>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                      <div class="rounded-2xl border bg-slate-50 p-4 sm:col-span-2">
-                        <div class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-                          <div class="space-y-2">
-                            <Label :for="`asset_photo_type_${asset.id}`">Tipe Foto</Label>
-                            <Select
-                              :model-value="assetPhotoFormFor(asset.id)?.type"
-                              @update:model-value="assetPhotoFormFor(asset.id).type = $event"
-                            >
-                              <SelectTrigger :id="`asset_photo_type_${asset.id}`">
-                                <SelectValue placeholder="Pilih tipe foto" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem
-                                  v-for="option in assetPhotoTypeOptions"
-                                  :key="option.value"
-                                  :value="option.value"
-                                >
-                                  {{ option.label }}
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <p v-if="assetPhotoFormFor(asset.id)?.errors?.type" class="text-xs text-red-500">
-                              {{ assetPhotoFormFor(asset.id).errors.type }}
-                            </p>
-                          </div>
-
-                          <div class="space-y-2">
-                            <Label>Upload Foto</Label>
-                            <BaseFileUpload
-                              label=""
-                              :multiple="false"
-                              accept=".jpg,.jpeg,.png"
-                              :model-value="assetPhotoFormFor(asset.id)?.file"
-                              @update:modelValue="setAssetFile(assetPhotoFormFor(asset.id), $event)"
-                            />
-                            <p v-if="assetPhotoFormFor(asset.id)?.errors?.file" class="text-xs text-red-500">
-                              {{ assetPhotoFormFor(asset.id).errors.file }}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div class="mt-4 flex justify-end">
-                          <Button
-                            type="button"
-                            :disabled="assetPhotoFormFor(asset.id)?.processing || !assetPhotoFormFor(asset.id)?.file"
-                            @click="submitAssetPhoto(asset)"
-                          >
-                            Upload Foto Aset
-                          </Button>
-
-                        </div>
-                      </div>
-
                       <a
                         v-for="photo in asset.photos"
                         :key="photo.id"
@@ -888,13 +526,6 @@ const filteredNegotiations = computed(() => {
                         <div class="p-3">
                           <p class="text-sm font-medium text-slate-950">{{ photo.type_label }}</p>
                           <p class="mt-1 text-xs text-slate-500">{{ photo.original_name }}</p>
-                          <div class="mt-3">
-                            <Button v-if="photo.can_delete" type="button" variant="destructive" size="sm" @click.prevent="deleteAssetFile(asset, photo)">
-                              <Trash2 class="h-4 w-4" />
-                              Hapus
-                            </Button>
-
-                          </div>
                         </div>
                       </a>
                       <div v-if="!asset.photos.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500 sm:col-span-2">
@@ -1001,6 +632,54 @@ const filteredNegotiations = computed(() => {
 
                 </div>
               </form>
+            </CardContent>
+          </Card>
+
+          <Card v-if="activeTab === 'kontrak'">
+            <CardHeader>
+              <CardTitle>Kontrak</CardTitle>
+              <CardDescription>Ringkasan kontrak dan file tanda tangan yang sudah dikirim oleh customer.</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-5">
+              <div class="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nomor Kontrak</p>
+                  <p class="mt-2 text-sm text-slate-900">{{ record.contract_number }}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Status Kontrak</p>
+                  <div class="mt-2">
+                    <Badge variant="outline" :class="statusTone(record.contract_status_value)">{{ record.contract_status_label }}</Badge>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Tanggal Kontrak</p>
+                  <p class="mt-2 text-sm text-slate-900">{{ formatDateTime(record.contract_date) }}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Fee</p>
+                  <p class="mt-2 text-sm text-slate-900">{{ formatCurrency(record.fee_total) }}</p>
+                </div>
+              </div>
+
+              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">File Kontrak</p>
+                <div v-if="contractFiles.length" class="mt-4 space-y-3">
+                  <div v-for="file in contractFiles" :key="file.id" class="rounded-2xl border bg-white p-4">
+                    <p class="font-medium text-slate-950">{{ file.original_name }}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ file.type_label }} - {{ file.size_label }}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ file.mime || '-' }} - {{ formatDateTime(file.created_at) }}</p>
+                    <div class="mt-3">
+                      <Button variant="outline" size="sm" as-child>
+                        <a :href="file.url" target="_blank" rel="noreferrer">Buka File Kontrak</a>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="mt-4 rounded-2xl border border-dashed p-4 text-sm text-slate-500">
+                  Belum ada file kontrak yang diunggah customer.
+                </div>
+              </div>
             </CardContent>
           </Card>
 
