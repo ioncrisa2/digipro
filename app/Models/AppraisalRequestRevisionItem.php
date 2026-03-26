@@ -18,6 +18,13 @@ class AppraisalRequestRevisionItem extends Model
         'original_asset_file_id',
         'replacement_request_file_id',
         'replacement_asset_file_id',
+        'reviewed_by',
+        'reviewed_at',
+        'review_note',
+    ];
+
+    protected $casts = [
+        'reviewed_at' => 'datetime',
     ];
 
     public function batch(): BelongsTo
@@ -28,6 +35,11 @@ class AppraisalRequestRevisionItem extends Model
     public function appraisalAsset(): BelongsTo
     {
         return $this->belongsTo(AppraisalAsset::class);
+    }
+
+    public function revisionBatch(): BelongsTo
+    {
+        return $this->belongsTo(AppraisalRequestRevisionBatch::class, 'revision_batch_id');
     }
 
     public function originalRequestFile(): BelongsTo

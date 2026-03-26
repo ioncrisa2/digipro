@@ -169,7 +169,7 @@ class ReviewerController extends Controller
                 'latest_payment_status' => $this->workspace->paymentStatusLabel($review->payments->sortByDesc('id')->first()?->status),
                 'assets' => $review->assets->map(fn (AppraisalAsset $asset): array => $this->workspace->serializeAssetDetail($asset))->values(),
                 'files' => $review->assets
-                    ->flatMap(fn (AppraisalAsset $asset) => $asset->files->map(fn ($file): array => $this->workspace->serializeAssetFile($file, $asset)))
+                    ->flatMap(fn (AppraisalAsset $asset) => $this->workspace->serializeActiveAssetFiles($asset))
                     ->values(),
             ],
         ]);

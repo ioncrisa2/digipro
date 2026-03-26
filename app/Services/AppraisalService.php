@@ -23,6 +23,7 @@ use App\Enums\ReportTypeEnum;
 use App\Enums\ContractStatusEnum;
 use App\Enums\AppraisalStatusEnum;
 use App\Services\AppraisalRequestRevisionSubmissionService;
+use App\Services\AppraisalRevisionFileResolver;
 
 /**
  * Builds appraisal UI payloads and handles consent flows for users.
@@ -256,9 +257,13 @@ class AppraisalService
             ];
         })->values();
 
+        $fileResolver = app(AppraisalRevisionFileResolver::class);
+        $approvedRevisionItems = $fileResolver->approvedItemsForRequest($r);
+        $activeAssetFiles = $fileResolver->activeAssetFilesByRequest($r, $approvedRevisionItems);
+
         $documents = $r->assets
-            ->flatMap(function ($asset) {
-                return $asset->files->map(function ($f) use ($asset) {
+            ->flatMap(function ($asset) use ($activeAssetFiles) {
+                return collect($activeAssetFiles[$asset->id] ?? [])->map(function ($f) use ($asset) {
                     $url = null;
                     if ($f->path && Storage::disk('public')->exists($f->path)) {
                         $url = Storage::disk('public')->url($f->path);
@@ -752,6 +757,23 @@ class AppraisalService
                         "accept_offer_{$item->id}",
                         'Penawaran Disetujui',
                         $selectedFee ? "Anda menyetujui penawaran fee {$selectedFee}." : 'Anda menyetujui penawaran.',
+                        $item->created_at,
+                        'success'
+                    );
+                    return;
+                }
+
+                if ($action === 'accepted') {
+                    $selectedFee = is_numeric($item->selected_fee)
+                        ? $this->formatRupiah((int) $item->selected_fee)
+                        : $expectedFee;
+
+                    $append(
+                        "accepted_{$item->id}",
+                        'Negosiasi Disetujui Admin',
+                        $selectedFee
+                            ? "Admin menyetujui fee hasil negosiasi sebesar {$selectedFee} dan request masuk ke tahap tanda tangan kontrak."
+                            : 'Admin menyetujui hasil negosiasi dan request masuk ke tahap tanda tangan kontrak.',
                         $item->created_at,
                         'success'
                     );

@@ -5,15 +5,22 @@ namespace App\Services\Reviewer;
 use App\Enums\AppraisalStatusEnum;
 use App\Enums\AssetTypeEnum;
 use App\Services\Reviewer\AdjustmentWorkbenchService;
+use App\Services\AppraisalRevisionFileResolver;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetComparable;
 use App\Models\AppraisalRequest;
 use App\Support\ReviewerBtbCatalog;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ReviewerWorkspaceService
 {
+    public function __construct(
+        private readonly AppraisalRevisionFileResolver $fileResolver
+    ) {
+    }
+
     public function reviewerStatuses(): array
     {
         return [
@@ -147,7 +154,8 @@ class ReviewerWorkspaceService
         }
 
         if ($includeFiles) {
-            $payload['files'] = $asset->files
+            $payload['files'] = $this->fileResolver
+                ->activeAssetFiles($asset)
                 ->map(fn ($file): array => $this->serializeAssetFile($file, $asset))
                 ->values();
         }
@@ -222,6 +230,14 @@ class ReviewerWorkspaceService
             'created_at' => optional($file->created_at)?->toDateTimeString(),
             'url' => $url,
         ];
+    }
+
+    public function serializeActiveAssetFiles(AppraisalAsset $asset): Collection
+    {
+        return $this->fileResolver
+            ->activeAssetFiles($asset)
+            ->map(fn ($file): array => $this->serializeAssetFile($file, $asset))
+            ->values();
     }
 
     public function paymentStatusLabel(?string $status): string

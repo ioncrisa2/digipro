@@ -352,6 +352,7 @@ const negotiationActionLabel = (action) => {
         case "offer_revised":
             return "Penawaran Direvisi";
         case "accept_offer":
+        case "accepted":
             return "Setuju Penawaran";
         case "cancel_request":
             return "Permohonan Dibatalkan";
@@ -368,6 +369,7 @@ const negotiationActionClass = (action) => {
         case "offer_revised":
             return "border-sky-200 bg-sky-50 text-sky-700";
         case "accept_offer":
+        case "accepted":
             return "border-emerald-200 bg-emerald-50 text-emerald-700";
         case "cancel_request":
             return "border-red-200 bg-red-50 text-red-700";

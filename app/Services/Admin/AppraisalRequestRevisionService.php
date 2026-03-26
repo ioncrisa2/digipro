@@ -7,28 +7,38 @@ use App\Models\AppraisalAsset;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestRevisionBatch;
 use App\Notifications\AppraisalRevisionRequestedNotification;
+use App\Services\AppraisalRevisionFileResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 
 class AppraisalRequestRevisionService
 {
+    public function __construct(
+        private readonly AppraisalRevisionFileResolver $fileResolver
+    ) {
+    }
+
     public function canCreateBatch(AppraisalRequest $record): bool
     {
+        if ($this->hasSubmittedBatchAwaitingReview($record)) {
+            return false;
+        }
+
         return in_array($this->statusValue($record), [
             AppraisalStatusEnum::Submitted->value,
             AppraisalStatusEnum::DocsIncomplete->value,
             AppraisalStatusEnum::WaitingOffer->value,
             AppraisalStatusEnum::OfferSent->value,
-        ], true) && ! $this->hasOpenBatch($record);
+        ], true);
     }
 
     public function creationState(AppraisalRequest $record): array
     {
-        if ($this->hasOpenBatch($record)) {
+        if ($this->hasSubmittedBatchAwaitingReview($record)) {
             return [
                 'can_create' => false,
-                'message' => 'Masih ada batch revisi dokumen yang terbuka untuk request ini. Tunggu customer mengunggah ulang dokumen sebelum membuat batch baru.',
+                'message' => 'Masih ada batch revisi yang sudah diunggah ulang customer dan menunggu review admin per-item.',
             ];
         }
 
@@ -46,7 +56,9 @@ class AppraisalRequestRevisionService
 
         return [
             'can_create' => true,
-            'message' => 'Pilih dokumen atau foto yang harus diperbaiki customer, lalu beri catatan per item.',
+            'message' => $this->hasOpenBatch($record)
+                ? 'Tambahkan item revisi ke batch yang masih terbuka untuk request ini.'
+                : 'Klik tombol revisi pada dokumen atau foto yang perlu diperbaiki customer.',
         ];
     }
 
@@ -61,20 +73,28 @@ class AppraisalRequestRevisionService
             ->exists();
     }
 
+    public function hasSubmittedBatchAwaitingReview(AppraisalRequest $record): bool
+    {
+        if ($record->relationLoaded('revisionBatches')) {
+            return $record->revisionBatches->contains(
+                fn ($batch) => (string) $batch->status === 'submitted'
+            );
+        }
+
+        return $record->revisionBatches()
+            ->where('status', 'submitted')
+            ->exists();
+    }
+
     public function buildTargetOptions(AppraisalRequest $record): array
     {
         $record->loadMissing(['files', 'assets.files']);
+        $approvedItems = $this->fileResolver->approvedItemsForRequest($record);
+        $activeRequestFiles = $this->fileResolver->activeRequestFiles($record, $approvedItems);
+        $activeAssetFiles = $this->fileResolver->activeAssetFilesByRequest($record, $approvedItems);
 
         $options = [];
-        $existingRequestTypes = $record->files
-            ->pluck('type')
-            ->filter()
-            ->map(fn ($type) => (string) $type)
-            ->unique()
-            ->values()
-            ->all();
-
-        foreach ($record->files->sortByDesc('created_at')->values() as $file) {
+        foreach ($activeRequestFiles as $file) {
             $options[] = [
                 'key' => "request_file:existing:{$file->id}",
                 'item_type' => 'request_file',
@@ -88,27 +108,11 @@ class AppraisalRequestRevisionService
             ];
         }
 
-        foreach ($this->expectedRequestFileTypes() as $type) {
-            if (in_array($type, $existingRequestTypes, true)) {
-                continue;
-            }
-
-            $options[] = [
-                'key' => "request_file:missing:{$type}",
-                'item_type' => 'request_file',
-                'requested_file_type' => $type,
-                'appraisal_asset_id' => null,
-                'original_request_file_id' => null,
-                'original_asset_file_id' => null,
-                'label' => '[Request] ' . $this->requestFileTypeLabel($type),
-                'description' => 'Belum diunggah customer',
-                'kind' => 'missing',
-            ];
-        }
-
         foreach ($record->assets->sortBy('id')->values() as $index => $asset) {
             $assetLabelPrefix = sprintf('[Aset #%d] ', $index + 1);
-            $files = $asset->files->sortByDesc('created_at')->values();
+            $files = collect($activeAssetFiles[$asset->id] ?? [])
+                ->sortByDesc('created_at')
+                ->values();
             $existingAssetTypes = $files
                 ->pluck('type')
                 ->filter()
@@ -195,14 +199,46 @@ class AppraisalRequestRevisionService
         }
 
         return DB::transaction(function () use ($record, $actorId, $items, $adminNote): AppraisalRequestRevisionBatch {
-            $batch = $record->revisionBatches()->create([
-                'created_by' => $actorId,
-                'status' => 'open',
-                'admin_note' => $this->normalizeNullableString($adminNote),
-            ]);
+            $batch = $record->revisionBatches()
+                ->where('status', 'open')
+                ->latest('id')
+                ->first();
 
-            $batch->items()->createMany(array_map(function (array $item): array {
-                return [
+            if (! $batch) {
+                $batch = $record->revisionBatches()->create([
+                    'created_by' => $actorId,
+                    'status' => 'open',
+                    'admin_note' => $this->normalizeNullableString($adminNote),
+                ]);
+            } elseif ($this->normalizeNullableString($adminNote) && blank($batch->admin_note)) {
+                $batch->update([
+                    'admin_note' => $this->normalizeNullableString($adminNote),
+                ]);
+            }
+
+            $existingKeys = $batch->items()
+                ->get()
+                ->map(fn ($item) => $this->itemIdentityKey([
+                    'item_type' => $item->item_type,
+                    'requested_file_type' => $item->requested_file_type,
+                    'appraisal_asset_id' => $item->appraisal_asset_id,
+                    'original_request_file_id' => $item->original_request_file_id,
+                    'original_asset_file_id' => $item->original_asset_file_id,
+                ]))
+                ->all();
+
+            $pendingRows = [];
+
+            foreach ($items as $item) {
+                $itemKey = $this->itemIdentityKey($item);
+
+                if (in_array($itemKey, $existingKeys, true)) {
+                    throw new RuntimeException('Item revisi ini sudah ada di batch revisi yang masih terbuka.');
+                }
+
+                $existingKeys[] = $itemKey;
+
+                $pendingRows[] = [
                     'appraisal_asset_id' => $item['appraisal_asset_id'],
                     'item_type' => $item['item_type'],
                     'requested_file_type' => $item['requested_file_type'],
@@ -213,7 +249,9 @@ class AppraisalRequestRevisionService
                     'replacement_request_file_id' => null,
                     'replacement_asset_file_id' => null,
                 ];
-            }, $items));
+            }
+
+            $batch->items()->createMany($pendingRows);
 
             if ($this->statusValue($record) !== AppraisalStatusEnum::DocsIncomplete->value) {
                 $record->update([
@@ -242,11 +280,6 @@ class AppraisalRequestRevisionService
                 'items.replacementAssetFile',
             ]);
         });
-    }
-
-    private function expectedRequestFileTypes(): array
-    {
-        return ['npwp', 'representative', 'permission', 'other_request_document'];
     }
 
     private function expectedAssetDocumentTypes(): array
@@ -299,5 +332,16 @@ class AppraisalRequestRevisionService
     private function statusValue(AppraisalRequest $record): ?string
     {
         return $record->status?->value ?? $record->status;
+    }
+
+    private function itemIdentityKey(array $item): string
+    {
+        return implode(':', [
+            (string) ($item['item_type'] ?? ''),
+            (string) ($item['requested_file_type'] ?? ''),
+            (string) ($item['appraisal_asset_id'] ?? ''),
+            (string) ($item['original_request_file_id'] ?? ''),
+            (string) ($item['original_asset_file_id'] ?? ''),
+        ]);
     }
 }

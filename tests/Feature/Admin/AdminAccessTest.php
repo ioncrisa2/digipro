@@ -1297,7 +1297,8 @@ it('exposes revision workspace data in the admin appraisal request detail', func
             ->where('revisionWorkspace.state.can_create', true)
             ->where('revisionWorkspace.target_options.0.item_type', 'request_file')
             ->where('revisionWorkspace.target_options.0.requested_file_type', 'npwp')
-            ->where('revisionWorkspace.target_options.1.kind', 'missing'));
+            ->where('revisionWorkspace.target_options.1.item_type', 'asset_document')
+            ->where('revisionWorkspace.target_options.1.requested_file_type', 'doc_pbb'));
 });
 
 it('creates a revision batch from the admin appraisal workflow', function () {
@@ -1377,6 +1378,79 @@ it('creates a revision batch from the admin appraisal workflow', function () {
     expect($requester->notifications()->count())->toBe(1);
     expect($requester->notifications()->first()->data['title'])->toBe('Revisi dokumen diperlukan');
     expect($requester->notifications()->first()->data['url'])->toContain("/permohonan-penilaian/{$record->id}/revisi-dokumen");
+});
+
+it('appends additional revision items to the active batch from the admin appraisal workflow', function () {
+    $admin = createAdminUser();
+    $requester = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $record = AppraisalRequest::create([
+        'user_id' => $requester->id,
+        'request_number' => 'REQ-REVISION-BATCH-APPEND-001',
+        'purpose' => PurposeEnum::JualBeli,
+        'status' => AppraisalStatusEnum::Submitted,
+        'requested_at' => now(),
+    ]);
+
+    $asset = AppraisalAsset::create([
+        'appraisal_request_id' => $record->id,
+        'asset_type' => 'tanah_bangunan',
+        'address' => 'Jl. Append Batch No. 9',
+    ]);
+
+    $requestFile = AppraisalRequestFile::create([
+        'appraisal_request_id' => $record->id,
+        'type' => 'npwp',
+        'path' => 'appraisal-requests/request/npwp-append.pdf',
+        'original_name' => 'npwp-append.pdf',
+        'mime' => 'application/pdf',
+        'size' => 1024,
+    ]);
+
+    $assetFile = AppraisalAssetFile::create([
+        'appraisal_asset_id' => $asset->id,
+        'type' => 'doc_pbb',
+        'path' => 'appraisal-requests/assets/doc-pbb-append.pdf',
+        'original_name' => 'doc-pbb-append.pdf',
+        'mime' => 'application/pdf',
+        'size' => 1024,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.appraisal-requests.revision-batches.store', $record), [
+            'items' => [
+                [
+                    'target_key' => "request_file:existing:{$requestFile->id}",
+                    'issue_note' => 'Mohon unggah ulang NPWP yang lebih jelas.',
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.appraisal-requests.revision-batches.store', $record), [
+            'items' => [
+                [
+                    'target_key' => "asset_document:existing:{$assetFile->id}",
+                    'issue_note' => 'PBB yang diunggah belum sesuai objek aset.',
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $batches = AppraisalRequestRevisionBatch::query()
+        ->where('appraisal_request_id', $record->id)
+        ->get();
+
+    expect($batches)->toHaveCount(1);
+
+    $batch = $batches->first();
+
+    expect($batch->items()->count())->toBe(2);
 });
 
 it('does not expose admin routes to mutate customer appraisal submissions', function () {
@@ -1545,6 +1619,10 @@ it('sends an initial offer from the vue admin workflow', function () {
     expect((float) $record->fee_dp_percent)->toBe(50.0);
     expect($latestNegotiation?->action)->toBe('offer_sent');
     expect($latestNegotiation?->offered_fee)->toBe(18000000);
+    $requester->refresh();
+    expect($requester->notifications()->count())->toBe(1);
+    expect($requester->notifications()->first()->data['title'])->toBe('Penawaran baru tersedia');
+    expect($requester->notifications()->first()->data['url'])->toContain("/permohonan-penilaian/{$record->id}/penawaran");
 
     Carbon::setTestNow();
 });
@@ -1596,6 +1674,10 @@ it('sends a revised offer from the vue admin workflow when negotiation is active
     expect($latestNegotiation?->action)->toBe('offer_revised');
     expect($latestNegotiation?->round)->toBe(1);
     expect($latestNegotiation?->offered_fee)->toBe(19500000);
+    $requester->refresh();
+    expect($requester->notifications()->count())->toBe(1);
+    expect($requester->notifications()->first()->data['title'])->toBe('Revisi penawaran tersedia');
+    expect($requester->notifications()->first()->data['url'])->toContain("/permohonan-penilaian/{$record->id}/penawaran");
 
     Carbon::setTestNow();
 });
@@ -1637,13 +1719,18 @@ it('approves the latest user negotiation from the vue admin workflow', function 
     $record->refresh();
     $latestNegotiation = $record->offerNegotiations()->latest('id')->first();
 
-    expect($record->status)->toBe(AppraisalStatusEnum::OfferSent);
-    expect($record->contract_status)->toBe(ContractStatusEnum::SentToClient);
+    expect($record->status)->toBe(AppraisalStatusEnum::WaitingSignature);
+    expect($record->contract_status)->toBe(ContractStatusEnum::WaitingSignature);
     expect($record->fee_total)->toBe(23000000);
     expect($record->contract_number)->toBe('00009/AGR/DP/05/2026');
-    expect($latestNegotiation?->action)->toBe('offer_revised');
+    expect($latestNegotiation?->action)->toBe('accepted');
     expect($latestNegotiation?->expected_fee)->toBe(23000000);
+    expect($latestNegotiation?->selected_fee)->toBe(23000000);
     expect(data_get($latestNegotiation?->meta, 'counter_request_id'))->toBe($counterRequest->id);
+    $requester->refresh();
+    expect($requester->notifications()->count())->toBe(1);
+    expect($requester->notifications()->first()->data['title'])->toBe('Negosiasi disetujui admin');
+    expect($requester->notifications()->first()->data['url'])->toContain("/permohonan-penilaian/{$record->id}/kontrak");
 
     Carbon::setTestNow();
 });

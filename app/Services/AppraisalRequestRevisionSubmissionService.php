@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AppraisalStatusEnum;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestRevisionBatch;
+use App\Services\Admin\AppraisalRequestRevisionReviewService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +14,11 @@ use RuntimeException;
 
 class AppraisalRequestRevisionSubmissionService
 {
+    public function __construct(
+        private readonly AppraisalRequestRevisionReviewService $reviewService
+    ) {
+    }
+
     public function resolveOpenBatch(AppraisalRequest $record): ?AppraisalRequestRevisionBatch
     {
         return $record->revisionBatches()
@@ -60,16 +66,19 @@ class AppraisalRequestRevisionSubmissionService
                 'id' => $batch->id,
                 'admin_note' => $batch->admin_note,
                 'created_at' => $batch->created_at?->toDateTimeString(),
-                'items' => $batch->items->map(fn ($item) => [
-                    'id' => $item->id,
-                    'status' => $item->status,
-                    'target_label' => $this->targetLabel($item),
-                    'asset_address' => $item->appraisalAsset?->address,
-                    'issue_note' => $item->issue_note,
-                    'accept' => $this->acceptForItemType((string) $item->item_type),
-                    'original_file' => $this->serializeFile($item->originalRequestFile ?? $item->originalAssetFile),
-                    'replacement_file' => $this->serializeFile($item->replacementRequestFile ?? $item->replacementAssetFile),
-                ])->values(),
+                'items' => $batch->items
+                    ->filter(fn ($item) => (string) $item->status !== 'approved')
+                    ->map(fn ($item) => [
+                        'id' => $item->id,
+                        'status' => $item->status,
+                        'target_label' => $this->targetLabel($item),
+                        'asset_address' => $item->appraisalAsset?->address,
+                        'issue_note' => $item->issue_note,
+                        'review_note' => $item->review_note,
+                        'accept' => $this->acceptForItemType((string) $item->item_type),
+                        'original_file' => $this->serializeFile($item->originalRequestFile ?? $item->originalAssetFile),
+                        'replacement_file' => $this->serializeFile($item->replacementRequestFile ?? $item->replacementAssetFile),
+                    ])->values(),
             ],
             'submit_url' => route('appraisal.revisions.submit', ['id' => $record->id]),
             'back_url' => route('appraisal.show', ['id' => $record->id]),
@@ -83,14 +92,18 @@ class AppraisalRequestRevisionSubmissionService
             throw new RuntimeException('Tidak ada permintaan revisi dokumen yang aktif untuk request ini.');
         }
 
-        foreach ($batch->items as $item) {
+        $actionableItems = $batch->items
+            ->filter(fn ($item) => in_array((string) $item->status, ['pending', 'rejected'], true))
+            ->values();
+
+        foreach ($actionableItems as $item) {
             if (! array_key_exists($item->id, $replacementFiles) || ! $replacementFiles[$item->id] instanceof UploadedFile) {
                 throw new RuntimeException('Semua dokumen revisi yang diminta harus diunggah sebelum dikirim.');
             }
         }
 
-        return DB::transaction(function () use ($record, $actorId, $batch, $replacementFiles): AppraisalRequestRevisionBatch {
-            foreach ($batch->items as $item) {
+        return DB::transaction(function () use ($record, $actorId, $batch, $replacementFiles, $actionableItems): AppraisalRequestRevisionBatch {
+            foreach ($actionableItems as $item) {
                 $file = $replacementFiles[$item->id];
 
                 if ($item->item_type === 'request_file') {
@@ -140,10 +153,11 @@ class AppraisalRequestRevisionSubmissionService
             }
 
             $batch->update([
-                'status' => 'submitted',
                 'submitted_by' => $actorId,
                 'submitted_at' => now(),
             ]);
+
+            $this->reviewService->syncBatchState($batch);
 
             $record->update([
                 'status' => AppraisalStatusEnum::Submitted,
@@ -178,6 +192,7 @@ class AppraisalRequestRevisionSubmissionService
             'id' => $file->id,
             'original_name' => $file->original_name ?: basename((string) $file->path),
             'mime' => $file->mime,
+            'size' => (int) ($file->size ?? 0),
             'url' => Storage::disk('public')->url($file->path),
             'created_at' => $file->created_at?->toDateTimeString(),
         ];

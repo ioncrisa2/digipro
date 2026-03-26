@@ -13,6 +13,7 @@ use App\Models\Village;
 use App\Services\Admin\AppraisalRequestWorkflowService;
 use App\Support\AppraisalAssetFieldOptions;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 
@@ -93,9 +94,14 @@ trait InteractsWithAppraisalRequests
         ];
     }
 
-    private function transformAsset(AppraisalAsset $asset, int $order, array $locationMaps): array
+    private function transformAsset(
+        AppraisalAsset $asset,
+        int $order,
+        array $locationMaps,
+        ?Collection $activeFiles = null
+    ): array
     {
-        $files = $asset->files->sortByDesc('created_at')->values();
+        $files = ($activeFiles ?? $asset->files)->sortByDesc('created_at')->values();
 
         return [
             'id' => $asset->id,
@@ -174,12 +180,12 @@ trait InteractsWithAppraisalRequests
             'admin_note' => $batch->admin_note,
             'creator_name' => $batch->creator?->name ?? 'Admin',
             'items' => $batch->items
-                ->map(fn ($item) => $this->transformRevisionItem($item, $assetOrderMap))
+                ->map(fn ($item) => $this->transformRevisionItem($item, $assetOrderMap, (int) $appraisalRequest->id))
                 ->values(),
         ];
     }
 
-    private function transformRevisionItem(object $item, array $assetOrderMap): array
+    private function transformRevisionItem(object $item, array $assetOrderMap, int $appraisalRequestId): array
     {
         $originalFile = $item->originalRequestFile ?? $item->originalAssetFile;
         $replacementFile = $item->replacementRequestFile ?? $item->replacementAssetFile;
@@ -206,9 +212,26 @@ trait InteractsWithAppraisalRequests
             'status_label' => $this->revisionItemStatusLabel($item->status),
             'item_type' => (string) $item->item_type,
             'requested_file_type' => (string) $item->requested_file_type,
+            'target_key' => $this->revisionItemTargetKey($item),
             'target_label' => $targetLabel,
             'asset_address' => $item->appraisalAsset?->address,
             'issue_note' => $item->issue_note,
+            'review_note' => $item->review_note,
+            'reviewed_at' => $item->reviewed_at?->toIso8601String(),
+            'can_approve' => (string) $item->status === 'reuploaded',
+            'can_reject' => (string) $item->status === 'reuploaded',
+            'approve_url' => (string) $item->status === 'reuploaded'
+                ? route('admin.appraisal-requests.revision-items.approve', [
+                    'appraisalRequest' => $appraisalRequestId,
+                    'revisionItem' => $item->id,
+                ])
+                : null,
+            'reject_url' => (string) $item->status === 'reuploaded'
+                ? route('admin.appraisal-requests.revision-items.reject', [
+                    'appraisalRequest' => $appraisalRequestId,
+                    'revisionItem' => $item->id,
+                ])
+                : null,
             'original_file' => $originalFile ? [
                 'id' => $originalFile->id,
                 'original_name' => $originalFile->original_name ?: basename((string) $originalFile->path),
@@ -216,6 +239,8 @@ trait InteractsWithAppraisalRequests
                 'type_label' => $item->originalRequestFile
                     ? $this->requestFileTypeLabel($originalFile->type)
                     : $this->assetFileTypeLabel($originalFile->type),
+                'mime' => $originalFile->mime,
+                'size' => (int) ($originalFile->size ?? 0),
                 'created_at' => $originalFile->created_at?->toIso8601String(),
             ] : null,
             'replacement_file' => $replacementFile ? [
@@ -225,9 +250,28 @@ trait InteractsWithAppraisalRequests
                 'type_label' => $item->replacementRequestFile
                     ? $this->requestFileTypeLabel($replacementFile->type)
                     : $this->assetFileTypeLabel($replacementFile->type),
+                'mime' => $replacementFile->mime,
+                'size' => (int) ($replacementFile->size ?? 0),
                 'created_at' => $replacementFile->created_at?->toIso8601String(),
             ] : null,
         ];
+    }
+
+    private function revisionItemTargetKey(object $item): string
+    {
+        if ($item->original_request_file_id) {
+            return "request_file:existing:{$item->original_request_file_id}";
+        }
+
+        if ($item->original_asset_file_id) {
+            return "{$item->item_type}:existing:{$item->original_asset_file_id}";
+        }
+
+        if ($item->appraisal_asset_id) {
+            return "{$item->item_type}:missing:{$item->appraisal_asset_id}:{$item->requested_file_type}";
+        }
+
+        return "request_file:missing:{$item->requested_file_type}";
     }
 
     private function assetOptionLabel(string $group, ?string $value): ?string
@@ -426,23 +470,17 @@ trait InteractsWithAppraisalRequests
     ): array {
         $actions = [];
 
-        if ($workflowService->canVerifyDocs($appraisalRequest)) {
+        $verifyDocsState = $workflowService->verifyDocsState($appraisalRequest);
+
+        if ($verifyDocsState['show'] ?? false) {
             $actions[] = [
                 'key' => 'verify-docs',
                 'label' => 'Verifikasi Dokumen',
                 'variant' => 'default',
                 'message' => 'Lanjutkan request ini ke tahap menunggu penawaran?',
                 'url' => route('admin.appraisal-requests.actions.verify-docs', $appraisalRequest),
-            ];
-        }
-
-        if ($workflowService->canMarkDocsIncomplete($appraisalRequest)) {
-            $actions[] = [
-                'key' => 'docs-incomplete',
-                'label' => 'Tandai Dokumen Kurang',
-                'variant' => 'outline',
-                'message' => 'Tandai request ini sebagai dokumen kurang?',
-                'url' => route('admin.appraisal-requests.actions.docs-incomplete', $appraisalRequest),
+                'disabled' => ! ($verifyDocsState['ready'] ?? false),
+                'disabled_reason' => $verifyDocsState['message'] ?? null,
             ];
         }
 
@@ -453,6 +491,8 @@ trait InteractsWithAppraisalRequests
                 'variant' => 'default',
                 'message' => 'Ubah status request ini menjadi kontrak ditandatangani?',
                 'url' => route('admin.appraisal-requests.actions.contract-signed', $appraisalRequest),
+                'disabled' => false,
+                'disabled_reason' => null,
             ];
         }
 
@@ -463,6 +503,8 @@ trait InteractsWithAppraisalRequests
                 'variant' => 'default',
                 'message' => 'Pembayaran sudah valid. Lanjutkan request ini ke proses valuasi?',
                 'url' => route('admin.appraisal-requests.actions.verify-payment', $appraisalRequest),
+                'disabled' => false,
+                'disabled_reason' => null,
             ];
         }
 
@@ -508,7 +550,7 @@ trait InteractsWithAppraisalRequests
 
         return [
             'label' => 'Setujui Harapan Fee User',
-            'message' => 'Fee akan mengikuti harapan fee terbaru dari user dan counter offer langsung dikirim. Lanjutkan?',
+            'message' => 'Fee akan mengikuti harapan fee terbaru dari user dan hasilnya langsung final ke tahap tanda tangan kontrak. Lanjutkan?',
             'url' => route('admin.appraisal-requests.actions.approve-latest-negotiation', $appraisalRequest),
             'expected_fee' => $latestCounter->expected_fee,
             'round' => $latestCounter->round,

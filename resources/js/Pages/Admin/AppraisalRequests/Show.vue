@@ -1,21 +1,30 @@
 <script setup>
-import { computed, reactive, ref, toRefs } from 'vue';
+import { computed, defineAsyncComponent, reactive, ref, toRefs } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, Download, ExternalLink, Eye, FileText, Search, X } from 'lucide-vue-next';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Card,
   CardContent,
@@ -24,6 +33,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { formatArea, formatCurrency, formatDateTime, formatNumber } from '@/utils/reviewer';
+
+const ReviewerFilePreview = defineAsyncComponent(() => import('@/components/reviewer/ReviewerFilePreview.vue'));
 
 const props = defineProps({
   record: {
@@ -124,13 +135,33 @@ const negotiationFilters = reactive({
   action: 'all',
   q: '',
 });
-const createEmptyRevisionItem = () => ({
-  target_key: '',
-  issue_note: '',
+const revisionDialogOpen = ref(false);
+const revisionReviewDialogOpen = ref(false);
+const revisionFilePreviewOpen = ref(false);
+const confirmDialogOpen = ref(false);
+const selectedRevisionTarget = ref(null);
+const selectedReviewItem = ref(null);
+const selectedPreviewFile = ref(null);
+const selectedPreviewLabel = ref('');
+let confirmDialogAction = null;
+const confirmDialogState = reactive({
+  title: 'Konfirmasi Aksi',
+  description: '',
+  confirmLabel: 'Lanjutkan',
+  cancelLabel: 'Batal',
+  confirmVariant: 'default',
 });
 const revisionForm = useForm({
   admin_note: '',
-  items: [createEmptyRevisionItem()],
+  items: [
+    {
+      target_key: '',
+      issue_note: '',
+    },
+  ],
+});
+const revisionReviewForm = useForm({
+  review_note: '',
 });
 
 const statusTone = (value) => {
@@ -163,6 +194,21 @@ const revisionStatusTone = (value) => {
       return 'bg-emerald-100 text-emerald-900 border-emerald-200';
     case 'cancelled':
       return 'bg-slate-100 text-slate-800 border-slate-200';
+    default:
+      return 'bg-slate-100 text-slate-800 border-slate-200';
+  }
+};
+
+const revisionItemTone = (value) => {
+  switch (value) {
+    case 'pending':
+      return 'bg-amber-100 text-amber-900 border-amber-200';
+    case 'reuploaded':
+      return 'bg-sky-100 text-sky-900 border-sky-200';
+    case 'approved':
+      return 'bg-emerald-100 text-emerald-900 border-emerald-200';
+    case 'rejected':
+      return 'bg-rose-100 text-rose-900 border-rose-200';
     default:
       return 'bg-slate-100 text-slate-800 border-slate-200';
   }
@@ -202,13 +248,66 @@ const paymentStatusLabel = (status) => {
   }
 };
 
-const runAction = (action) => {
-  if (!window.confirm(action.message)) {
+const isImageFile = (file) => String(file?.mime || '').startsWith('image/');
+
+const openRevisionFilePreview = (file, label) => {
+  if (!file?.url) {
     return;
   }
 
-  router.post(action.url, {}, {
-    preserveScroll: true,
+  selectedPreviewFile.value = file;
+  selectedPreviewLabel.value = label || file.original_name || 'Preview File';
+  revisionFilePreviewOpen.value = true;
+};
+
+const closeRevisionFilePreview = () => {
+  revisionFilePreviewOpen.value = false;
+  selectedPreviewFile.value = null;
+  selectedPreviewLabel.value = '';
+};
+
+const openConfirmDialog = ({
+  title = 'Konfirmasi Aksi',
+  description = '',
+  confirmLabel = 'Lanjutkan',
+  cancelLabel = 'Batal',
+  confirmVariant = 'default',
+  onConfirm,
+}) => {
+  confirmDialogState.title = title;
+  confirmDialogState.description = description;
+  confirmDialogState.confirmLabel = confirmLabel;
+  confirmDialogState.cancelLabel = cancelLabel;
+  confirmDialogState.confirmVariant = confirmVariant;
+  confirmDialogAction = typeof onConfirm === 'function' ? onConfirm : null;
+  confirmDialogOpen.value = true;
+};
+
+const closeConfirmDialog = () => {
+  confirmDialogOpen.value = false;
+  confirmDialogAction = null;
+};
+
+const submitConfirmDialog = () => {
+  const callback = confirmDialogAction;
+  closeConfirmDialog();
+  callback?.();
+};
+
+const runAction = (action) => {
+  if (action.disabled) {
+    return;
+  }
+  openConfirmDialog({
+    title: action.label,
+    description: action.message,
+    confirmLabel: action.label,
+    confirmVariant: action.variant === 'destructive' ? 'destructive' : 'default',
+    onConfirm: () => {
+      router.post(action.url, {}, {
+        preserveScroll: true,
+      });
+    },
   });
 };
 
@@ -237,13 +336,15 @@ const approveLatestNegotiation = () => {
   if (!approveLatestNegotiationAction.value?.url) {
     return;
   }
-
-  if (!window.confirm(approveLatestNegotiationAction.value.message)) {
-    return;
-  }
-
-  router.post(approveLatestNegotiationAction.value.url, {}, {
-    preserveScroll: true,
+  openConfirmDialog({
+    title: approveLatestNegotiationAction.value.label || 'Setujui Negosiasi',
+    description: approveLatestNegotiationAction.value.message,
+    confirmLabel: approveLatestNegotiationAction.value.label || 'Setujui',
+    onConfirm: () => {
+      router.post(approveLatestNegotiationAction.value.url, {}, {
+        preserveScroll: true,
+      });
+    },
   });
 };
 
@@ -251,13 +352,15 @@ const verifyPayment = () => {
   if (!paymentVerification.value?.action_url) {
     return;
   }
-
-  if (!window.confirm('Pembayaran sudah valid. Lanjutkan request ini ke proses valuasi?')) {
-    return;
-  }
-
-  router.post(paymentVerification.value.action_url, {}, {
-    preserveScroll: true,
+  openConfirmDialog({
+    title: 'Verifikasi Pembayaran',
+    description: 'Pembayaran sudah valid. Lanjutkan request ini ke proses valuasi?',
+    confirmLabel: 'Verifikasi Pembayaran',
+    onConfirm: () => {
+      router.post(paymentVerification.value.action_url, {}, {
+        preserveScroll: true,
+      });
+    },
   });
 };
 
@@ -268,6 +371,18 @@ const revisionState = computed(() => revisionWorkspace.value?.state ?? {
 });
 const revisionTargetOptions = computed(() => revisionWorkspace.value?.target_options ?? []);
 const revisionBatches = computed(() => revisionWorkspace.value?.batches ?? []);
+const openRevisionBatch = computed(() => revisionBatches.value.find((batch) => batch.status === 'open') ?? null);
+const openRevisionItemMap = computed(() => Object.fromEntries(
+  (openRevisionBatch.value?.items ?? []).map((item) => [item.target_key, item]),
+));
+const requestRevisionOptions = computed(() => revisionTargetOptions.value.filter((option) => option.item_type === 'request_file'));
+const requestExistingRevisionOptions = computed(() => Object.fromEntries(
+  requestRevisionOptions.value
+    .filter((option) => option.kind === 'existing' && option.original_request_file_id)
+    .map((option) => [option.original_request_file_id, option]),
+));
+const assetDocumentRevisionOptions = computed(() => revisionTargetOptions.value.filter((option) => option.item_type === 'asset_document'));
+const assetPhotoRevisionOptions = computed(() => revisionTargetOptions.value.filter((option) => option.item_type === 'asset_photo'));
 const showContractTab = computed(() => {
   return record.value?.contract_status_value === 'signed'
     || contractFiles.value.length > 0
@@ -299,26 +414,146 @@ const filteredNegotiations = computed(() => {
   });
 });
 
-const addRevisionItem = () => {
-  revisionForm.items.push(createEmptyRevisionItem());
-};
-
-const removeRevisionItem = (index) => {
-  if (revisionForm.items.length === 1) {
-    revisionForm.items.splice(0, revisionForm.items.length, createEmptyRevisionItem());
-    return;
+const hasNegotiationHistory = computed(() => (negotiations.value ?? []).length > 0);
+const latestNegotiationEntry = computed(() => {
+  const entries = negotiations.value ?? [];
+  return entries.length ? entries[entries.length - 1] : null;
+});
+const showInitialOfferShortcut = computed(() => (
+  activeTab.value !== 'negosiasi'
+  && Boolean(offerAction.value)
+  && !hasNegotiationHistory.value
+  && offerAction.value?.label === 'Kirim Penawaran'
+));
+const negotiationStatusSummary = computed(() => {
+  if (!hasNegotiationHistory.value) {
+    return {
+      title: 'Belum Ada Penawaran',
+      description: 'Admin belum pernah mengirim penawaran harga. Kirim penawaran awal agar user bisa meninjau fee dan melanjutkan proses.',
+      tone: 'border-slate-200 bg-slate-50 text-slate-700',
+    };
   }
 
-  revisionForm.items.splice(index, 1);
+  if (approveLatestNegotiationAction.value) {
+    return {
+      title: 'Menunggu Keputusan Admin',
+      description: 'User sudah mengajukan keberatan fee. Anda bisa menyetujui harga user atau merespons dengan counter offer baru.',
+      tone: 'border-amber-200 bg-amber-50 text-amber-900',
+    };
+  }
+
+  if (record.value?.status_value === 'offer_sent') {
+    return {
+      title: 'Menunggu Respon User',
+      description: 'Penawaran aktif sudah dikirim. User dapat menyetujui penawaran atau mengajukan keberatan fee selama kuota negosiasi masih tersedia.',
+      tone: 'border-sky-200 bg-sky-50 text-sky-900',
+    };
+  }
+
+  if (record.value?.status_value === 'waiting_signature') {
+    return {
+      title: 'Negosiasi Selesai',
+      description: 'Fee sudah final dan request masuk ke tahap tanda tangan kontrak. Tab ini sekarang berfungsi sebagai histori negosiasi.',
+      tone: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+    };
+  }
+
+  return {
+    title: 'Riwayat Negosiasi Aktif',
+    description: 'Pantau event negosiasi dan gunakan panel aksi di bawah untuk merespons status terkini.',
+    tone: 'border-slate-200 bg-slate-50 text-slate-700',
+  };
+});
+
+const openNegotiationTab = () => {
+  activeTab.value = 'negosiasi';
 };
 
 const resetRevisionForm = () => {
   revisionForm.clearErrors();
   revisionForm.admin_note = '';
-  revisionForm.items.splice(0, revisionForm.items.length, createEmptyRevisionItem());
+  revisionForm.items.splice(0, revisionForm.items.length, {
+    target_key: '',
+    issue_note: '',
+  });
+  selectedRevisionTarget.value = null;
 };
 
-const submitRevisionBatch = () => {
+const targetRevisionStatus = (targetKey) => openRevisionItemMap.value[targetKey] ?? null;
+
+const assetMissingDocumentOptions = (assetId) => assetDocumentRevisionOptions.value.filter((option) => option.kind === 'missing' && option.appraisal_asset_id === assetId);
+const assetMissingPhotoOptions = (assetId) => assetPhotoRevisionOptions.value.filter((option) => option.kind === 'missing' && option.appraisal_asset_id === assetId);
+const assetExistingDocumentOption = (fileId) => assetDocumentRevisionOptions.value.find((option) => option.kind === 'existing' && option.original_asset_file_id === fileId) ?? null;
+const assetExistingPhotoOption = (fileId) => assetPhotoRevisionOptions.value.find((option) => option.kind === 'existing' && option.original_asset_file_id === fileId) ?? null;
+
+const openRevisionDialog = (target) => {
+  if (!target || !revisionState.value.can_create) {
+    return;
+  }
+
+  selectedRevisionTarget.value = target;
+  revisionForm.clearErrors();
+  revisionForm.admin_note = '';
+  revisionForm.items.splice(0, revisionForm.items.length, {
+    target_key: target.key,
+    issue_note: '',
+  });
+  revisionDialogOpen.value = true;
+};
+
+const approveRevisionItem = (item) => {
+  if (!item?.approve_url) {
+    return;
+  }
+  openConfirmDialog({
+    title: 'Setujui Revisi',
+    description: 'Setujui file revisi ini sebagai dokumen aktif?',
+    confirmLabel: 'Setujui Revisi',
+    onConfirm: () => {
+      router.post(item.approve_url, {}, {
+        preserveScroll: true,
+      });
+    },
+  });
+};
+
+const openRejectRevisionDialog = (item) => {
+  if (!item?.reject_url) {
+    return;
+  }
+
+  selectedReviewItem.value = item;
+  revisionReviewForm.clearErrors();
+  revisionReviewForm.review_note = '';
+  revisionReviewDialogOpen.value = true;
+};
+
+const closeRejectRevisionDialog = () => {
+  revisionReviewDialogOpen.value = false;
+  selectedReviewItem.value = null;
+  revisionReviewForm.reset();
+  revisionReviewForm.clearErrors();
+};
+
+const submitRejectedRevision = () => {
+  if (!selectedReviewItem.value?.reject_url) {
+    return;
+  }
+
+  revisionReviewForm.post(selectedReviewItem.value.reject_url, {
+    preserveScroll: true,
+    onSuccess: () => {
+      closeRejectRevisionDialog();
+    },
+  });
+};
+
+const closeRevisionDialog = () => {
+  revisionDialogOpen.value = false;
+  resetRevisionForm();
+};
+
+const submitRevisionItem = () => {
   if (!revisionWorkspace.value?.create_url || !revisionState.value.can_create) {
     return;
   }
@@ -326,7 +561,7 @@ const submitRevisionBatch = () => {
   revisionForm.post(revisionWorkspace.value.create_url, {
     preserveScroll: true,
     onSuccess: () => {
-      resetRevisionForm();
+      closeRevisionDialog();
     },
   });
 };
@@ -347,20 +582,20 @@ const submitRevisionBatch = () => {
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
+          <Button v-if="showInitialOfferShortcut" type="button" @click="openNegotiationTab">
+            Kirim Penawaran
+          </Button>
+
           <Button
             v-for="action in availableActions"
             :key="action.key"
             :variant="action.variant"
+            :disabled="action.disabled"
+            :title="action.disabled_reason || null"
             @click="runAction(action)"
           >
             {{ action.label }}
           </Button>
-
-          <Button variant="outline" as-child>
-            <Link :href="route('admin.appraisal-requests.edit', record.id)"><Pencil class="h-4 w-4" />Edit Dasar</Link>
-          </Button>
-
-
 
           <Button variant="outline" as-child>
             <Link :href="route('admin.appraisal-requests.index')"><ArrowLeft class="h-4 w-4" />Kembali ke daftar</Link>
@@ -454,7 +689,7 @@ const submitRevisionBatch = () => {
           <Card v-if="activeTab === 'dokumen'">
             <CardHeader>
               <CardTitle>Permintaan Revisi Dokumen</CardTitle>
-              <CardDescription>Admin menentukan dokumen atau foto mana yang harus customer unggah ulang beserta catatannya.</CardDescription>
+              <CardDescription>Gunakan tombol revisi pada setiap dokumen atau foto untuk meminta customer mengunggah ulang item yang perlu diperbaiki.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-5">
               <div
@@ -465,77 +700,8 @@ const submitRevisionBatch = () => {
                     : 'border-amber-200 bg-amber-50 text-amber-900',
                 ]"
               >
-                {{ revisionState.message || 'Pilih item yang harus direvisi customer.' }}
+                {{ revisionState.message || 'Klik tombol revisi pada item yang perlu diperbaiki customer.' }}
               </div>
-
-              <form v-if="revisionState.can_create" class="space-y-5" @submit.prevent="submitRevisionBatch">
-                <div class="space-y-4">
-                  <div v-for="(item, index) in revisionForm.items" :key="index" class="rounded-2xl border p-4">
-                    <div class="grid gap-4 xl:grid-cols-[1.2fr_1fr_auto]">
-                      <div class="space-y-2">
-                        <Label :for="`revision_target_${index}`">Target Revisi</Label>
-                        <Select v-model="item.target_key">
-                          <SelectTrigger :id="`revision_target_${index}`">
-                            <SelectValue placeholder="Pilih dokumen atau foto yang perlu diperbaiki" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem
-                              v-for="option in revisionTargetOptions"
-                              :key="option.key"
-                              :value="option.key"
-                            >
-                              {{ option.label }}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p v-if="revisionForm.errors[`items.${index}.target_key`]" class="text-xs text-rose-600">
-                          {{ revisionForm.errors[`items.${index}.target_key`] }}
-                        </p>
-                      </div>
-
-                      <div class="space-y-2">
-                        <Label :for="`revision_issue_${index}`">Catatan Revisi</Label>
-                        <Textarea
-                          :id="`revision_issue_${index}`"
-                          v-model="item.issue_note"
-                          rows="3"
-                          placeholder="Jelaskan dokumen apa yang salah, kurang jelas, atau perlu diunggah ulang."
-                        />
-                        <p v-if="revisionForm.errors[`items.${index}.issue_note`]" class="text-xs text-rose-600">
-                          {{ revisionForm.errors[`items.${index}.issue_note`] }}
-                        </p>
-                      </div>
-
-                      <div class="flex items-end justify-end">
-                        <Button type="button" variant="destructive" size="icon" @click="removeRevisionItem(index)">
-                          <Trash2 class="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="space-y-2">
-                  <Label for="revision_admin_note">Catatan Umum untuk Customer</Label>
-                  <Textarea
-                    id="revision_admin_note"
-                    v-model="revisionForm.admin_note"
-                    rows="4"
-                    placeholder="Catatan umum revisi dokumen, misalnya customer diminta memeriksa kembali kesesuaian semua upload."
-                  />
-                  <p v-if="revisionForm.errors.admin_note" class="text-xs text-rose-600">{{ revisionForm.errors.admin_note }}</p>
-                </div>
-
-                <div class="flex flex-wrap justify-between gap-3">
-                  <Button type="button" variant="outline" @click="addRevisionItem">
-                    <Plus class="h-4 w-4" />Tambah Item Revisi
-                  </Button>
-
-                  <Button type="submit" :disabled="revisionForm.processing">
-                    Simpan Permintaan Revisi
-                  </Button>
-                </div>
-              </form>
 
               <div class="space-y-3">
                 <div class="flex items-center justify-between gap-3">
@@ -551,9 +717,9 @@ const submitRevisionBatch = () => {
                 <div v-for="batch in revisionBatches" :key="batch.id" class="rounded-2xl border p-4">
                   <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <div class="flex flex-wrap items-center gap-2">
-                        <p class="font-medium text-slate-950">Batch #{{ batch.id }}</p>
-                        <Badge variant="outline" :class="revisionStatusTone(batch.status)">{{ batch.status_label }}</Badge>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <p class="font-medium text-slate-950">Batch #{{ batch.id }}</p>
+                      <Badge variant="outline" :class="revisionStatusTone(batch.status)">{{ batch.status_label }}</Badge>
                       </div>
                       <p class="mt-1 text-xs text-slate-500">
                         Dibuat oleh {{ batch.creator_name }} • {{ formatDateTime(batch.created_at) }}
@@ -572,20 +738,60 @@ const submitRevisionBatch = () => {
                           <p class="font-medium text-slate-950">{{ item.target_label }}</p>
                           <p v-if="item.asset_address" class="mt-1 text-xs text-slate-500">{{ item.asset_address }}</p>
                         </div>
-                        <Badge variant="outline" class="bg-white text-slate-800 border-slate-200">{{ item.status_label }}</Badge>
+                        <Badge variant="outline" :class="revisionItemTone(item.status)">{{ item.status_label }}</Badge>
                       </div>
 
                       <p class="mt-3 text-sm text-slate-700">{{ item.issue_note }}</p>
+                      <div v-if="item.review_note" class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+                        <p class="font-medium">Catatan Review Admin</p>
+                        <p class="mt-1">{{ item.review_note }}</p>
+                      </div>
 
                       <div class="mt-3 grid gap-3 xl:grid-cols-2">
                         <div class="rounded-2xl border bg-white p-3">
                           <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">File Asal</p>
                           <div v-if="item.original_file" class="mt-2 space-y-1">
-                            <p class="text-sm font-medium text-slate-950">{{ item.original_file.original_name }}</p>
-                            <p class="text-xs text-slate-500">{{ item.original_file.type_label }}</p>
-                            <Button variant="outline" size="sm" class="mt-2" as-child>
-                              <a :href="item.original_file.url" target="_blank" rel="noreferrer">Buka File</a>
-                            </Button>
+                            <button
+                              type="button"
+                              class="block w-full overflow-hidden rounded-2xl border bg-slate-50 text-left transition hover:border-slate-300"
+                              @click="openRevisionFilePreview(item.original_file, `${item.target_label} - File Asal`)"
+                            >
+                              <template v-if="isImageFile(item.original_file)">
+                                <div class="relative">
+                                  <img
+                                    :src="item.original_file.url"
+                                    :alt="item.original_file.original_name"
+                                    class="h-48 w-full object-cover"
+                                  />
+                                  <div class="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
+                                    Lihat Foto
+                                  </div>
+                                </div>
+                              </template>
+                              <template v-else>
+                                <div class="flex h-48 items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                                  <div class="flex flex-col items-center gap-3 text-center text-slate-600">
+                                    <FileText class="h-12 w-12" />
+                                    <p class="text-sm font-medium">Preview Dokumen Asal</p>
+                                    <p class="max-w-xs text-xs text-slate-500">
+                                      Klik untuk membuka file yang sebelumnya diunggah customer.
+                                    </p>
+                                  </div>
+                                </div>
+                              </template>
+
+                              <div class="space-y-1 p-4">
+                                <p class="text-sm font-semibold text-slate-950">{{ item.original_file.original_name }}</p>
+                                <p class="text-xs text-slate-500">{{ item.original_file.type_label }}</p>
+                                <p class="text-xs text-slate-500">{{ item.original_file.mime || '-' }} - {{ formatDateTime(item.original_file.created_at) }}</p>
+                                <div class="pt-1 text-xs font-medium text-slate-700">
+                                  <span class="inline-flex items-center gap-1">
+                                    <Eye class="h-3.5 w-3.5" />
+                                    Buka Preview
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
                           </div>
                           <p v-else class="mt-2 text-sm text-slate-500">Belum ada file asal. Customer harus mengunggah dokumen yang diminta.</p>
                         </div>
@@ -593,14 +799,68 @@ const submitRevisionBatch = () => {
                         <div class="rounded-2xl border bg-white p-3">
                           <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">File Pengganti</p>
                           <div v-if="item.replacement_file" class="mt-2 space-y-1">
-                            <p class="text-sm font-medium text-slate-950">{{ item.replacement_file.original_name }}</p>
-                            <p class="text-xs text-slate-500">{{ item.replacement_file.type_label }}</p>
-                            <Button variant="outline" size="sm" class="mt-2" as-child>
-                              <a :href="item.replacement_file.url" target="_blank" rel="noreferrer">Buka File</a>
-                            </Button>
+                            <button
+                              type="button"
+                              class="block w-full overflow-hidden rounded-2xl border bg-slate-50 text-left transition hover:border-slate-300"
+                              @click="openRevisionFilePreview(item.replacement_file, `${item.target_label} - File Revisi`)"
+                            >
+                              <template v-if="isImageFile(item.replacement_file)">
+                                <div class="relative">
+                                  <img
+                                    :src="item.replacement_file.url"
+                                    :alt="item.replacement_file.original_name"
+                                    class="h-48 w-full object-cover"
+                                  />
+                                  <div class="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
+                                    Lihat Foto
+                                  </div>
+                                </div>
+                              </template>
+                              <template v-else>
+                                <div class="flex h-48 items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                                  <div class="flex flex-col items-center gap-3 text-center text-slate-600">
+                                    <FileText class="h-12 w-12" />
+                                    <p class="text-sm font-medium">Preview Dokumen Revisi</p>
+                                    <p class="max-w-xs text-xs text-slate-500">
+                                      Klik untuk membuka file revisi yang terakhir diunggah customer.
+                                    </p>
+                                  </div>
+                                </div>
+                              </template>
+
+                              <div class="space-y-1 p-4">
+                                <p class="text-sm font-semibold text-slate-950">{{ item.replacement_file.original_name }}</p>
+                                <p class="text-xs text-slate-500">{{ item.replacement_file.type_label }}</p>
+                                <p class="text-xs text-slate-500">{{ item.replacement_file.mime || '-' }} - {{ formatDateTime(item.replacement_file.created_at) }}</p>
+                                <div class="pt-1 text-xs font-medium text-slate-700">
+                                  <span class="inline-flex items-center gap-1">
+                                    <Eye class="h-3.5 w-3.5" />
+                                    Buka Preview
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
                           </div>
                           <p v-else class="mt-2 text-sm text-slate-500">Customer belum mengunggah file revisi.</p>
                         </div>
+                      </div>
+
+                      <div v-if="item.can_approve || item.can_reject" class="mt-4 flex flex-wrap justify-end gap-2">
+                        <Button
+                          v-if="item.can_reject"
+                          type="button"
+                          variant="outline"
+                          @click="openRejectRevisionDialog(item)"
+                        >
+                          Minta Revisi Lagi
+                        </Button>
+                        <Button
+                          v-if="item.can_approve"
+                          type="button"
+                          @click="approveRevisionItem(item)"
+                        >
+                          Setujui Revisi
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -613,10 +873,10 @@ const submitRevisionBatch = () => {
             </CardContent>
           </Card>
 
-          <Card v-if="activeTab === 'dokumen'">
+          <Card v-if="activeTab === 'dokumen' && requestFiles.length">
             <CardHeader>
               <CardTitle>Dokumen Request</CardTitle>
-              <CardDescription>Dokumen yang diajukan customer untuk diverifikasi admin.</CardDescription>
+              <CardDescription>File request level umum yang memang tersimpan di permohonan ini.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-3">
               <div class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
@@ -625,21 +885,71 @@ const submitRevisionBatch = () => {
               </div>
 
               <div v-for="file in requestFiles" :key="file.id" class="rounded-2xl border p-4">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p class="font-medium text-slate-950">{{ file.original_name }}</p>
-                    <p class="mt-1 text-xs text-slate-500">{{ file.type_label }} - {{ file.size_label }}</p>
-                    <p class="mt-1 text-xs text-slate-500">{{ file.mime || '-' }} - {{ formatDateTime(file.created_at) }}</p>
+                <button
+                  type="button"
+                  class="block w-full overflow-hidden rounded-2xl border bg-slate-50 text-left transition hover:border-slate-300"
+                  @click="openRevisionFilePreview(file, `Dokumen Request - ${file.type_label}`)"
+                >
+                  <template v-if="isImageFile(file)">
+                    <div class="relative">
+                      <img
+                        :src="file.url"
+                        :alt="file.original_name"
+                        class="h-48 w-full object-cover"
+                      />
+                      <div class="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
+                        Lihat Foto
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="flex h-48 items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                      <div class="flex flex-col items-center gap-3 text-center text-slate-600">
+                        <FileText class="h-12 w-12" />
+                        <p class="text-sm font-medium">Preview Dokumen Request</p>
+                        <p class="max-w-xs text-xs text-slate-500">
+                          Klik untuk membuka dokumen yang diunggah customer pada level request.
+                        </p>
+                      </div>
+                    </div>
+                  </template>
+
+                  <div class="space-y-1 p-4">
+                    <p class="text-sm font-semibold text-slate-950">{{ file.original_name }}</p>
+                    <p class="text-xs text-slate-500">{{ file.type_label }} - {{ file.size_label }}</p>
+                    <p class="text-xs text-slate-500">{{ file.mime || '-' }} - {{ formatDateTime(file.created_at) }}</p>
+                    <div class="pt-1 text-xs font-medium text-slate-700">
+                      <span class="inline-flex items-center gap-1">
+                        <Eye class="h-3.5 w-3.5" />
+                        Buka Preview
+                      </span>
+                    </div>
                   </div>
-                  <div class="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" as-child>
-                      <a :href="file.url" target="_blank" rel="noreferrer">Buka File</a>
-                    </Button>
-                  </div>
+                </button>
+
+                <div v-if="requestExistingRevisionOptions[file.id] && targetRevisionStatus(requestExistingRevisionOptions[file.id].key)" class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  <p class="font-medium">Item sudah diminta revisi</p>
+                  <p class="mt-1">{{ targetRevisionStatus(requestExistingRevisionOptions[file.id].key).issue_note }}</p>
                 </div>
-              </div>
-              <div v-if="!requestFiles.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
-                Belum ada dokumen request.
+
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" @click="openRevisionFilePreview(file, `Dokumen Request - ${file.type_label}`)">
+                    <Eye class="h-4 w-4" />
+                    Lihat Dokumen
+                  </Button>
+                  <Button variant="outline" size="sm" as-child>
+                    <a :href="file.url" target="_blank" rel="noreferrer">Buka File</a>
+                  </Button>
+                  <Button
+                    v-if="requestExistingRevisionOptions[file.id]"
+                    variant="outline"
+                    size="sm"
+                    :disabled="Boolean(targetRevisionStatus(requestExistingRevisionOptions[file.id].key)) || !revisionState.can_create"
+                    @click="openRevisionDialog(requestExistingRevisionOptions[file.id])"
+                  >
+                    Revisi
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -729,20 +1039,107 @@ const submitRevisionBatch = () => {
                   </div>
                 </div>
 
-                <div v-if="activeTab === 'dokumen'" class="mt-5 grid gap-4 xl:grid-cols-2">
+                <div v-if="activeTab === 'dokumen'" class="mt-5 space-y-6">
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dokumen Aset</p>
                     <div class="mt-3 space-y-3">
                       <div v-for="file in asset.documents" :key="file.id" class="rounded-2xl border bg-slate-50 p-4">
-                        <p class="font-medium text-slate-950">{{ file.original_name }}</p>
-                        <p class="mt-1 text-xs text-slate-500">{{ file.type_label }} - {{ file.size_label }}</p>
+                        <button
+                          type="button"
+                          class="block w-full overflow-hidden rounded-2xl border bg-white text-left transition hover:border-slate-300"
+                          @click="openRevisionFilePreview(file, `Dokumen Aset - ${file.type_label}`)"
+                        >
+                          <template v-if="isImageFile(file)">
+                            <div class="relative">
+                              <img
+                                :src="file.url"
+                                :alt="file.original_name"
+                                class="h-48 w-full object-cover"
+                              />
+                              <div class="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
+                                Lihat Foto
+                              </div>
+                            </div>
+                          </template>
+                          <template v-else>
+                            <div class="flex h-48 items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                              <div class="flex flex-col items-center gap-3 text-center text-slate-600">
+                                <FileText class="h-12 w-12" />
+                                <p class="text-sm font-medium">Preview Dokumen Aset</p>
+                                <p class="max-w-xs text-xs text-slate-500">
+                                  Klik untuk membuka dokumen aset yang sedang diverifikasi.
+                                </p>
+                              </div>
+                            </div>
+                          </template>
+
+                          <div class="space-y-1 p-4">
+                            <p class="text-sm font-semibold text-slate-950">{{ file.original_name }}</p>
+                            <p class="text-xs text-slate-500">{{ file.type_label }} - {{ file.size_label }}</p>
+                            <p class="text-xs text-slate-500">{{ file.mime || '-' }} - {{ formatDateTime(file.created_at) }}</p>
+                            <div class="pt-1 text-xs font-medium text-slate-700">
+                              <span class="inline-flex items-center gap-1">
+                                <Eye class="h-3.5 w-3.5" />
+                                Buka Preview
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+
+                        <div
+                          v-if="assetExistingDocumentOption(file.id) && targetRevisionStatus(assetExistingDocumentOption(file.id).key)"
+                          class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                        >
+                          <p class="font-medium">Item sudah diminta revisi</p>
+                          <p class="mt-1">{{ targetRevisionStatus(assetExistingDocumentOption(file.id).key).issue_note }}</p>
+                        </div>
+
                         <div class="mt-3 flex flex-wrap gap-2">
+                          <Button variant="outline" size="sm" @click="openRevisionFilePreview(file, `Dokumen Aset - ${file.type_label}`)">
+                            <Eye class="h-4 w-4" />
+                            Lihat Dokumen
+                          </Button>
                           <Button variant="outline" size="sm" as-child>
                             <a :href="file.url" target="_blank" rel="noreferrer">Buka Dokumen</a>
                           </Button>
+                          <Button
+                            v-if="assetExistingDocumentOption(file.id)"
+                            variant="outline"
+                            size="sm"
+                            :disabled="Boolean(targetRevisionStatus(assetExistingDocumentOption(file.id).key)) || !revisionState.can_create"
+                            @click="openRevisionDialog(assetExistingDocumentOption(file.id))"
+                          >
+                            Revisi
+                          </Button>
                         </div>
                       </div>
-                      <div v-if="!asset.documents.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
+                      <div
+                        v-for="option in assetMissingDocumentOptions(asset.id)"
+                        :key="option.key"
+                        class="rounded-2xl border border-dashed p-4"
+                      >
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <p class="font-medium text-slate-950">{{ option.label }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ option.description }}</p>
+                            <div v-if="targetRevisionStatus(option.key)" class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                              <p class="font-medium">Permintaan revisi aktif</p>
+                              <p class="mt-1">{{ targetRevisionStatus(option.key).issue_note }}</p>
+                            </div>
+                          </div>
+                          <div class="flex flex-wrap gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              :disabled="Boolean(targetRevisionStatus(option.key)) || !revisionState.can_create"
+                              @click="openRevisionDialog(option)"
+                            >
+                              Revisi
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      <div v-if="!asset.documents.length && !assetMissingDocumentOptions(asset.id).length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
                         Tidak ada dokumen aset.
                       </div>
                     </div>
@@ -751,21 +1148,89 @@ const submitRevisionBatch = () => {
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Foto Aset</p>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                      <a
+                      <div
                         v-for="photo in asset.photos"
                         :key="photo.id"
-                        :href="photo.url"
-                        target="_blank"
-                        rel="noreferrer"
                         class="overflow-hidden rounded-2xl border bg-slate-50"
                       >
-                        <img :src="photo.url" :alt="photo.original_name" class="h-40 w-full object-cover" />
-                        <div class="p-3">
-                          <p class="text-sm font-medium text-slate-950">{{ photo.type_label }}</p>
-                          <p class="mt-1 text-xs text-slate-500">{{ photo.original_name }}</p>
+                        <button
+                          type="button"
+                          class="block w-full text-left"
+                          @click="openRevisionFilePreview(photo, `Foto Aset - ${photo.type_label}`)"
+                        >
+                          <div class="relative">
+                            <img :src="photo.url" :alt="photo.original_name" class="h-40 w-full object-cover" />
+                            <div class="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
+                              Lihat Foto
+                            </div>
+                          </div>
+                        </button>
+                        <div class="space-y-3 p-3">
+                          <div>
+                            <p class="text-sm font-medium text-slate-950">{{ photo.type_label }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ photo.original_name }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ photo.size_label }} - {{ formatDateTime(photo.created_at) }}</p>
+                            <div class="pt-2 text-xs font-medium text-slate-700">
+                              <span class="inline-flex items-center gap-1">
+                                <Eye class="h-3.5 w-3.5" />
+                                Buka Preview
+                              </span>
+                            </div>
+                          </div>
+                          <div
+                            v-if="assetExistingPhotoOption(photo.id) && targetRevisionStatus(assetExistingPhotoOption(photo.id).key)"
+                            class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                          >
+                            <p class="font-medium">Item sudah diminta revisi</p>
+                            <p class="mt-1">{{ targetRevisionStatus(assetExistingPhotoOption(photo.id).key).issue_note }}</p>
+                          </div>
+                          <div class="flex flex-wrap gap-2">
+                            <Button variant="outline" size="sm" @click="openRevisionFilePreview(photo, `Foto Aset - ${photo.type_label}`)">
+                              <Search class="h-4 w-4" />
+                              Lihat Foto
+                            </Button>
+                            <Button variant="outline" size="sm" as-child>
+                              <a :href="photo.url" target="_blank" rel="noreferrer">Buka File</a>
+                            </Button>
+                            <Button
+                              v-if="assetExistingPhotoOption(photo.id)"
+                              variant="outline"
+                              size="sm"
+                              :disabled="Boolean(targetRevisionStatus(assetExistingPhotoOption(photo.id).key)) || !revisionState.can_create"
+                              @click="openRevisionDialog(assetExistingPhotoOption(photo.id))"
+                            >
+                              Revisi
+                            </Button>
+                          </div>
                         </div>
-                      </a>
-                      <div v-if="!asset.photos.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500 sm:col-span-2">
+                      </div>
+                      <div
+                        v-for="option in assetMissingPhotoOptions(asset.id)"
+                        :key="option.key"
+                        class="rounded-2xl border border-dashed p-4 sm:col-span-2"
+                      >
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <p class="font-medium text-slate-950">{{ option.label }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ option.description }}</p>
+                            <div v-if="targetRevisionStatus(option.key)" class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                              <p class="font-medium">Permintaan revisi aktif</p>
+                              <p class="mt-1">{{ targetRevisionStatus(option.key).issue_note }}</p>
+                            </div>
+                          </div>
+                          <div class="flex flex-wrap gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              :disabled="Boolean(targetRevisionStatus(option.key)) || !revisionState.can_create"
+                              @click="openRevisionDialog(option)"
+                            >
+                              Revisi
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      <div v-if="!asset.photos.length && !assetMissingPhotoOptions(asset.id).length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500 sm:col-span-2">
                         Tidak ada foto aset.
                       </div>
                     </div>
@@ -797,124 +1262,147 @@ const submitRevisionBatch = () => {
             </CardContent>
           </Card>
 
-          <Card v-if="activeTab === 'negosiasi' && offerAction">
-            <CardHeader>
-              <CardTitle>{{ offerAction.label }}</CardTitle>
-              <CardDescription>{{ offerAction.description }}</CardDescription>
-            </CardHeader>
-            <CardContent class="space-y-5">
-              <div v-if="approveLatestNegotiationAction" class="rounded-2xl border bg-slate-50 p-4">
-                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Negosiasi User Terbaru</p>
-                <div class="mt-3 space-y-2 text-sm text-slate-700">
-                  <p>Harapan fee: {{ formatCurrency(approveLatestNegotiationAction.expected_fee) }}</p>
-                  <p>Putaran: {{ approveLatestNegotiationAction.round || '-' }}</p>
-                  <p>Catatan: {{ approveLatestNegotiationAction.reason || '-' }}</p>
-                </div>
-                <div class="mt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    @click="approveLatestNegotiation"
-                  >
-                    {{ approveLatestNegotiationAction.label }}
-                  </Button>
-
-                </div>
-              </div>
-
-              <form class="space-y-5" @submit.prevent="submitOffer">
-                <div class="space-y-2">
-                  <Label for="offer_fee_total">Total Fee (Rp)</Label>
-                  <Input id="offer_fee_total" v-model="offerForm.fee_total" type="number" min="1" placeholder="15000000" />
-                  <p v-if="offerForm.errors.fee_total" class="text-xs text-red-500">{{ offerForm.errors.fee_total }}</p>
-                </div>
-
-                <div class="space-y-3">
-                  <Label>Skema DP</Label>
-                  <label class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm text-slate-700">
-                    <Checkbox v-model="offerForm.fee_has_dp" />
-                    <span>Gunakan DP</span>
-                  </label>
-                </div>
-
-                <div class="space-y-2" v-if="offerForm.fee_has_dp">
-                  <Label for="offer_fee_dp_percent">Persentase DP (%)</Label>
-                  <Input id="offer_fee_dp_percent" v-model="offerForm.fee_dp_percent" type="number" min="0" max="100" step="0.01" placeholder="50" />
-                  <p v-if="offerForm.errors.fee_dp_percent" class="text-xs text-red-500">{{ offerForm.errors.fee_dp_percent }}</p>
-                </div>
-
-                <div class="space-y-2">
-                  <Label for="offer_contract_sequence">No. Penawaran</Label>
-                  <Input id="offer_contract_sequence" v-model="offerForm.contract_sequence" type="number" min="1" placeholder="1" />
-                  <p v-if="offerForm.errors.contract_sequence" class="text-xs text-red-500">{{ offerForm.errors.contract_sequence }}</p>
-                </div>
-
-                <div class="space-y-2">
-                  <Label>Preview Nomor Penawaran</Label>
-                  <div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900">
-                    {{ offerContractNumberPreview }}
-                  </div>
-                </div>
-
-                <div class="space-y-2">
-                  <Label for="offer_validity_days">Masa Berlaku Penawaran</Label>
-                  <Input id="offer_validity_days" v-model="offerForm.offer_validity_days" type="number" min="1" placeholder="14" />
-                  <p v-if="offerForm.errors.offer_validity_days" class="text-xs text-red-500">{{ offerForm.errors.offer_validity_days }}</p>
-                </div>
-
-                <div class="flex justify-end">
-                  <Button type="submit" :disabled="offerForm.processing">
-                    {{ offerAction.label }}
-                  </Button>
-
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
           <Card v-if="activeTab === 'kontrak'">
             <CardHeader>
               <CardTitle>Kontrak</CardTitle>
-              <CardDescription>Ringkasan kontrak dan file tanda tangan yang sudah dikirim oleh customer.</CardDescription>
+              <CardDescription>Ringkasan status kontrak, dokumen aktif, dan detail komersial request.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-5">
-              <div class="grid gap-4 md:grid-cols-2">
-                <div>
-                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nomor Kontrak</p>
-                  <p class="mt-2 text-sm text-slate-900">{{ record.contract_number }}</p>
-                </div>
-                <div>
+              <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div class="rounded-2xl border bg-slate-50 p-4">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Status Kontrak</p>
-                  <div class="mt-2">
+                  <div class="mt-3">
                     <Badge variant="outline" :class="statusTone(record.contract_status_value)">{{ record.contract_status_label }}</Badge>
                   </div>
+                  <p class="mt-3 text-xs text-slate-500">
+                    {{
+                      record.contract_status_value === 'signed'
+                        ? 'Customer sudah mengunggah kontrak yang ditandatangani.'
+                        : 'Kontrak masih menunggu finalisasi atau tanda tangan customer.'
+                    }}
+                  </p>
                 </div>
-                <div>
-                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Tanggal Kontrak</p>
-                  <p class="mt-2 text-sm text-slate-900">{{ formatDateTime(record.contract_date) }}</p>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nomor Kontrak</p>
+                  <p class="mt-3 text-sm font-semibold text-slate-950">{{ record.contract_number }}</p>
+                  <p class="mt-2 text-xs text-slate-500">Tanggal kontrak: {{ formatDateTime(record.contract_date) }}</p>
                 </div>
-                <div>
-                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Fee</p>
-                  <p class="mt-2 text-sm text-slate-900">{{ formatCurrency(record.fee_total) }}</p>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Penugasan</p>
+                  <p class="mt-3 text-sm font-semibold text-slate-950">{{ formatCurrency(record.fee_total) }}</p>
+                  <p class="mt-2 text-xs text-slate-500">
+                    {{ record.fee_has_dp ? `Skema DP ${record.fee_dp_percent ?? 0}%` : 'Tanpa skema DP' }}
+                  </p>
+                </div>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Masa Berlaku Offer</p>
+                  <p class="mt-3 text-sm font-semibold text-slate-950">
+                    {{ record.offer_validity_days ? `${record.offer_validity_days} hari` : '-' }}
+                  </p>
+                  <p class="mt-2 text-xs text-slate-500">Klien: {{ record.client_name || '-' }}</p>
                 </div>
               </div>
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">File Kontrak</p>
-                <div v-if="contractFiles.length" class="mt-4 space-y-3">
-                  <div v-for="file in contractFiles" :key="file.id" class="rounded-2xl border bg-white p-4">
-                    <p class="font-medium text-slate-950">{{ file.original_name }}</p>
-                    <p class="mt-1 text-xs text-slate-500">{{ file.type_label }} - {{ file.size_label }}</p>
-                    <p class="mt-1 text-xs text-slate-500">{{ file.mime || '-' }} - {{ formatDateTime(file.created_at) }}</p>
-                    <div class="mt-3">
+              <div class="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dokumen Kontrak</p>
+                      <p class="mt-2 text-sm text-slate-600">File kontrak aktif yang dikirim customer untuk proses penugasan ini.</p>
+                    </div>
+                    <Badge v-if="contractFiles.length" variant="outline" class="border-slate-200 bg-white text-slate-700">
+                      {{ contractFiles.length }} file
+                    </Badge>
+                  </div>
+
+                  <div v-if="contractFiles.length" class="mt-4 grid gap-4 xl:grid-cols-2">
+                    <button
+                      v-for="file in contractFiles"
+                      :key="file.id"
+                      type="button"
+                      class="block overflow-hidden rounded-2xl border bg-white text-left transition hover:border-slate-300"
+                      @click="openRevisionFilePreview(file, `Kontrak - ${file.type_label}`)"
+                    >
+                      <template v-if="isImageFile(file)">
+                        <div class="relative">
+                          <img
+                            :src="file.url"
+                            :alt="file.original_name"
+                            class="h-52 w-full object-cover"
+                          />
+                          <div class="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
+                            Lihat Foto
+                          </div>
+                        </div>
+                      </template>
+                      <template v-else>
+                        <div class="flex h-52 items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                          <div class="flex flex-col items-center gap-3 text-center text-slate-600">
+                            <FileText class="h-12 w-12" />
+                            <p class="text-sm font-medium">Preview Dokumen Kontrak</p>
+                            <p class="max-w-xs text-xs text-slate-500">
+                              Klik untuk membuka file kontrak yang diunggah customer.
+                            </p>
+                          </div>
+                        </div>
+                      </template>
+
+                      <div class="space-y-1 p-4">
+                        <p class="text-sm font-semibold text-slate-950">{{ file.original_name }}</p>
+                        <p class="text-xs text-slate-500">{{ file.type_label }} - {{ file.size_label }}</p>
+                        <p class="text-xs text-slate-500">{{ file.mime || '-' }} - {{ formatDateTime(file.created_at) }}</p>
+                        <div class="pt-1 text-xs font-medium text-slate-700">
+                          <span class="inline-flex items-center gap-1">
+                            <Eye class="h-3.5 w-3.5" />
+                            Buka Preview
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                  <div v-else class="mt-4 rounded-2xl border border-dashed p-4 text-sm text-slate-500">
+                    Belum ada file kontrak yang diunggah customer.
+                  </div>
+                </div>
+
+                <div class="rounded-2xl border bg-white p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Ringkasan Komersial</p>
+                  <div class="mt-4 space-y-4 text-sm text-slate-700">
+                    <div>
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Pemohon</p>
+                      <p class="mt-2 text-sm text-slate-950">{{ requester.name || '-' }}</p>
+                      <p class="mt-1 text-xs text-slate-500">{{ requester.email || '-' }}</p>
+                    </div>
+                    <div>
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Klien</p>
+                      <p class="mt-2 text-sm text-slate-950">{{ record.client_name || '-' }}</p>
+                    </div>
+                    <div>
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Skema Pembayaran</p>
+                      <p class="mt-2 text-sm text-slate-950">
+                        {{ record.fee_has_dp ? `DP ${record.fee_dp_percent ?? 0}%` : 'Pelunasan penuh' }}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Tindak Lanjut</p>
+                      <p class="mt-2 text-sm text-slate-950">
+                        {{
+                          record.contract_status_value === 'signed'
+                            ? 'Dokumen kontrak siap dipakai untuk proses berikutnya.'
+                            : 'Pantau upload kontrak customer dan pastikan file aktif sudah lengkap.'
+                        }}
+                      </p>
+                    </div>
+                    <div v-if="contractFiles.length" class="flex flex-wrap gap-2 pt-2">
+                      <Button variant="outline" size="sm" @click="openRevisionFilePreview(contractFiles[0], `Kontrak - ${contractFiles[0].type_label}`)">
+                        <Eye class="h-4 w-4" />
+                        Lihat Kontrak
+                      </Button>
                       <Button variant="outline" size="sm" as-child>
-                        <a :href="file.url" target="_blank" rel="noreferrer">Buka File Kontrak</a>
+                        <a :href="contractFiles[0].url" target="_blank" rel="noreferrer">Buka di Tab Baru</a>
                       </Button>
                     </div>
                   </div>
-                </div>
-                <div v-else class="mt-4 rounded-2xl border border-dashed p-4 text-sm text-slate-500">
-                  Belum ada file kontrak yang diunggah customer.
                 </div>
               </div>
             </CardContent>
@@ -970,9 +1458,107 @@ const submitRevisionBatch = () => {
 
           <Card v-if="activeTab === 'negosiasi'">
             <CardHeader>
-              <CardTitle>Riwayat Negosiasi</CardTitle>
+              <CardTitle>Negosiasi</CardTitle>
+              <CardDescription>Kelola penawaran awal, respons keberatan user, dan pantau histori negosiasi.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-4">
+              <div :class="['rounded-2xl border p-4', negotiationStatusSummary.tone]">
+                <p class="text-sm font-semibold">{{ negotiationStatusSummary.title }}</p>
+                <p class="mt-2 text-sm">{{ negotiationStatusSummary.description }}</p>
+                <div v-if="latestNegotiationEntry" class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                  <span>Event terakhir: {{ latestNegotiationEntry.action_label }}</span>
+                  <span>Tanggal: {{ formatDateTime(latestNegotiationEntry.created_at) }}</span>
+                  <span v-if="latestNegotiationEntry.round">Putaran: {{ latestNegotiationEntry.round }}</span>
+                </div>
+              </div>
+
+              <div v-if="offerAction" class="rounded-2xl border bg-white p-5 space-y-5">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Aksi Admin</p>
+                    <h3 class="mt-2 text-lg font-semibold text-slate-950">{{ offerAction.label }}</h3>
+                    <p class="mt-2 text-sm text-slate-600">{{ offerAction.description }}</p>
+                  </div>
+                  <Badge variant="outline" class="bg-slate-50 text-slate-700 border-slate-200">
+                    {{ record.status_label }}
+                  </Badge>
+                </div>
+
+                <div v-if="approveLatestNegotiationAction" class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Keberatan User Terbaru</p>
+                  <div class="mt-3 grid gap-2 text-sm text-slate-700">
+                    <p>Harapan fee: {{ formatCurrency(approveLatestNegotiationAction.expected_fee) }}</p>
+                    <p>Putaran: {{ approveLatestNegotiationAction.round || '-' }}</p>
+                    <p>Catatan: {{ approveLatestNegotiationAction.reason || '-' }}</p>
+                  </div>
+                  <div class="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      @click="approveLatestNegotiation"
+                    >
+                      {{ approveLatestNegotiationAction.label }}
+                    </Button>
+                    <p class="self-center text-xs text-slate-500">
+                      Atau kirim counter offer baru melalui form di bawah.
+                    </p>
+                  </div>
+                </div>
+
+                <form class="space-y-5" @submit.prevent="submitOffer">
+                  <div class="grid gap-5 xl:grid-cols-2">
+                    <div class="space-y-2">
+                      <Label for="offer_fee_total">Total Fee (Rp)</Label>
+                      <Input id="offer_fee_total" v-model="offerForm.fee_total" type="number" min="1" placeholder="15000000" />
+                      <p v-if="offerForm.errors.fee_total" class="text-xs text-red-500">{{ offerForm.errors.fee_total }}</p>
+                    </div>
+
+                    <div class="space-y-2">
+                      <Label for="offer_validity_days">Masa Berlaku Penawaran</Label>
+                      <Input id="offer_validity_days" v-model="offerForm.offer_validity_days" type="number" min="1" placeholder="14" />
+                      <p v-if="offerForm.errors.offer_validity_days" class="text-xs text-red-500">{{ offerForm.errors.offer_validity_days }}</p>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-5 xl:grid-cols-2">
+                    <div class="space-y-3">
+                      <Label>Skema DP</Label>
+                      <label class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm text-slate-700">
+                        <Checkbox v-model="offerForm.fee_has_dp" />
+                        <span>Gunakan DP</span>
+                      </label>
+                    </div>
+
+                    <div class="space-y-2" v-if="offerForm.fee_has_dp">
+                      <Label for="offer_fee_dp_percent">Persentase DP (%)</Label>
+                      <Input id="offer_fee_dp_percent" v-model="offerForm.fee_dp_percent" type="number" min="0" max="100" step="0.01" placeholder="50" />
+                      <p v-if="offerForm.errors.fee_dp_percent" class="text-xs text-red-500">{{ offerForm.errors.fee_dp_percent }}</p>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-5 xl:grid-cols-2">
+                    <div class="space-y-2">
+                      <Label for="offer_contract_sequence">No. Penawaran</Label>
+                      <Input id="offer_contract_sequence" v-model="offerForm.contract_sequence" type="number" min="1" placeholder="1" />
+                      <p v-if="offerForm.errors.contract_sequence" class="text-xs text-red-500">{{ offerForm.errors.contract_sequence }}</p>
+                    </div>
+
+                    <div class="space-y-2">
+                      <Label>Preview Nomor Penawaran</Label>
+                      <div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900">
+                        {{ offerContractNumberPreview }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex justify-end">
+                    <Button type="submit" :disabled="offerForm.processing">
+                      {{ offerAction.label }}
+                    </Button>
+                  </div>
+                </form>
+              </div>
+
               <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <div class="rounded-2xl border bg-slate-50 p-4">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Event</p>
@@ -1078,5 +1664,179 @@ const submitRevisionBatch = () => {
         </div>
       </section>
     </div>
+
+    <Dialog :open="revisionDialogOpen" @update:open="(open) => { if (!open) closeRevisionDialog(); else revisionDialogOpen = open; }">
+      <DialogContent class="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Permintaan Revisi Dokumen</DialogTitle>
+          <DialogDescription>
+            Jelaskan dengan singkat apa yang perlu customer perbaiki atau unggah ulang pada item ini.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4">
+          <div v-if="selectedRevisionTarget" class="rounded-2xl border bg-slate-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Target Revisi</p>
+            <p class="mt-2 text-sm font-medium text-slate-950">{{ selectedRevisionTarget.label }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ selectedRevisionTarget.description }}</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="revision_dialog_note">Catatan Revisi</Label>
+            <Textarea
+              id="revision_dialog_note"
+              v-model="revisionForm.items[0].issue_note"
+              rows="5"
+              placeholder="Contoh: file buram, halaman kurang lengkap, foto tidak menunjukkan fasad depan, atau dokumen perlu diunggah ulang."
+            />
+            <p v-if="revisionForm.errors['items.0.issue_note']" class="text-xs text-rose-600">
+              {{ revisionForm.errors['items.0.issue_note'] }}
+            </p>
+            <p v-if="revisionForm.errors['items.0.target_key']" class="text-xs text-rose-600">
+              {{ revisionForm.errors['items.0.target_key'] }}
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter class="gap-2 sm:justify-end">
+          <Button type="button" variant="outline" @click="closeRevisionDialog">
+            <X class="h-4 w-4" />
+            Batal
+          </Button>
+          <Button type="button" :disabled="revisionForm.processing" @click="submitRevisionItem">
+            Simpan Revisi
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog :open="revisionReviewDialogOpen" @update:open="(open) => { if (!open) closeRejectRevisionDialog(); else revisionReviewDialogOpen = open; }">
+      <DialogContent class="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Minta Revisi Lagi</DialogTitle>
+          <DialogDescription>
+            Jelaskan apa yang masih perlu diperbaiki customer pada file revisi yang baru diunggah.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4">
+          <div v-if="selectedReviewItem" class="rounded-2xl border bg-slate-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Item Revisi</p>
+            <p class="mt-2 text-sm font-medium text-slate-950">{{ selectedReviewItem.target_label }}</p>
+            <p v-if="selectedReviewItem.replacement_file" class="mt-1 text-xs text-slate-500">
+              File terakhir: {{ selectedReviewItem.replacement_file.original_name }}
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="revision_review_note">Catatan Admin</Label>
+            <Textarea
+              id="revision_review_note"
+              v-model="revisionReviewForm.review_note"
+              rows="5"
+              placeholder="Contoh: file masih buram, sudut foto belum sesuai, atau halaman dokumen belum lengkap."
+            />
+            <p v-if="revisionReviewForm.errors.review_note" class="text-xs text-rose-600">
+              {{ revisionReviewForm.errors.review_note }}
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter class="gap-2 sm:justify-end">
+          <Button type="button" variant="outline" @click="closeRejectRevisionDialog">
+            <X class="h-4 w-4" />
+            Batal
+          </Button>
+          <Button type="button" :disabled="revisionReviewForm.processing" @click="submitRejectedRevision">
+            Simpan Catatan Revisi
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog :open="revisionFilePreviewOpen" @update:open="(open) => { if (!open) closeRevisionFilePreview(); }">
+      <DialogContent class="max-h-[92vh] overflow-hidden p-0 sm:max-w-5xl">
+        <DialogHeader class="border-b px-6 py-4">
+          <DialogTitle class="truncate text-left">{{ selectedPreviewFile?.original_name || selectedPreviewLabel || 'Preview File' }}</DialogTitle>
+          <DialogDescription class="flex flex-wrap items-center gap-2 text-left">
+            <span>{{ selectedPreviewLabel || '-' }}</span>
+            <template v-if="selectedPreviewFile?.size">
+              <span>-</span>
+              <span>{{ formatNumber(selectedPreviewFile.size / 1024, 2) }} KB</span>
+            </template>
+            <template v-if="selectedPreviewFile?.created_at">
+              <span>-</span>
+              <span>{{ formatDateTime(selectedPreviewFile.created_at) }}</span>
+            </template>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="flex max-h-[calc(92vh-88px)] flex-col bg-muted/10">
+          <div class="flex-1 overflow-auto p-4">
+            <div class="flex min-h-[60vh] items-center justify-center overflow-hidden rounded-xl border bg-background">
+              <template v-if="selectedPreviewFile?.url && isImageFile(selectedPreviewFile)">
+                <div class="relative flex h-[68vh] w-full items-center justify-center overflow-hidden bg-slate-100">
+                  <img
+                    :src="selectedPreviewFile.url"
+                    :alt="selectedPreviewFile.original_name"
+                    class="max-h-[68vh] w-full object-contain"
+                  />
+                </div>
+              </template>
+
+              <div v-else-if="selectedPreviewFile?.url" class="h-[68vh] w-full overflow-auto">
+                <ReviewerFilePreview
+                  :url="selectedPreviewFile.url"
+                  :name="selectedPreviewFile.original_name"
+                />
+              </div>
+
+              <div v-else class="flex flex-col items-center gap-3 px-6 text-center text-muted-foreground">
+                <FileText class="h-10 w-10" />
+                <p class="text-sm">Preview file tidak tersedia untuk item ini.</p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter class="flex items-center justify-end gap-2 border-t bg-background px-6 py-4">
+            <Button v-if="selectedPreviewFile?.url" variant="ghost" as-child>
+              <a :href="selectedPreviewFile.url" download>
+                <Download class="mr-2 h-4 w-4" />
+                Download
+              </a>
+            </Button>
+            <Button v-if="selectedPreviewFile?.url" variant="outline" as-child>
+              <a :href="selectedPreviewFile.url" target="_blank" rel="noopener noreferrer">
+                <ExternalLink class="mr-2 h-4 w-4" />
+                Buka di Tab Baru
+              </a>
+            </Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <AlertDialog :open="confirmDialogOpen" @update:open="(open) => { if (!open) closeConfirmDialog(); else confirmDialogOpen = open; }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ confirmDialogState.title }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ confirmDialogState.description }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <Button type="button" variant="outline" @click="closeConfirmDialog">
+            {{ confirmDialogState.cancelLabel }}
+          </Button>
+          <Button
+            type="button"
+            :variant="confirmDialogState.confirmVariant"
+            @click="submitConfirmDialog"
+          >
+            {{ confirmDialogState.confirmLabel }}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </AdminLayout>
 </template>

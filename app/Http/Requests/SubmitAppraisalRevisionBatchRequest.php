@@ -39,7 +39,11 @@ class SubmitAppraisalRevisionBatchRequest extends FormRequest
 
             $replacements = (array) $this->file('replacements', []);
 
-            foreach ($batch->items as $item) {
+            $items = $batch->items
+                ->filter(fn ($item) => in_array((string) $item->status, ['pending', 'rejected'], true))
+                ->values();
+
+            foreach ($items as $item) {
                 $file = $replacements[$item->id] ?? null;
                 if (! $file instanceof UploadedFile) {
                     $validator->errors()->add("replacements.{$item->id}", 'File pengganti wajib diunggah untuk item revisi ini.');

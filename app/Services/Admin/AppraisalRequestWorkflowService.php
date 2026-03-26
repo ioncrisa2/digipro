@@ -6,6 +6,7 @@ use App\Enums\AppraisalStatusEnum;
 use App\Enums\ContractStatusEnum;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalOfferNegotiation;
+use App\Notifications\AppraisalOfferNotification;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -18,19 +19,44 @@ class AppraisalRequestWorkflowService
 
     public function canVerifyDocs(AppraisalRequest $record): bool
     {
-        if ($this->hasOpenRevisionBatch($record)) {
-            return false;
-        }
+        $state = $this->verifyDocsState($record);
 
-        return in_array($this->statusValue($record), [
+        return ($state['show'] ?? false) && ($state['ready'] ?? false);
+    }
+
+    public function verifyDocsState(AppraisalRequest $record): array
+    {
+        $statusAllowed = in_array($this->statusValue($record), [
             AppraisalStatusEnum::Submitted->value,
             AppraisalStatusEnum::DocsIncomplete->value,
         ], true);
+
+        if (! $statusAllowed) {
+            return [
+                'show' => false,
+                'ready' => false,
+                'message' => 'Verifikasi dokumen hanya tersedia untuk request yang baru masuk atau sebelumnya ditandai dokumen kurang.',
+            ];
+        }
+
+        if ($this->hasPendingRevisionWork($record)) {
+            return [
+                'show' => true,
+                'ready' => false,
+                'message' => 'Masih ada item revisi dokumen yang belum selesai ditinjau. Selesaikan review revisi per-item terlebih dahulu.',
+            ];
+        }
+
+        return [
+            'show' => true,
+            'ready' => true,
+            'message' => null,
+        ];
     }
 
     public function canMarkDocsIncomplete(AppraisalRequest $record): bool
     {
-        if ($this->hasOpenRevisionBatch($record)) {
+        if ($this->hasPendingRevisionWork($record)) {
             return false;
         }
 
@@ -148,34 +174,14 @@ class AppraisalRequestWorkflowService
     public function verifyDocs(AppraisalRequest $record, ?int $actorId = null): void
     {
         if (! $this->canVerifyDocs($record)) {
-            throw new RuntimeException('Verifikasi dokumen hanya tersedia untuk request yang baru masuk atau sebelumnya ditandai dokumen kurang.');
+            throw new RuntimeException($this->verifyDocsState($record)['message'] ?? 'Verifikasi dokumen belum tersedia untuk request ini.');
         }
 
-        DB::transaction(function () use ($record, $actorId): void {
+        DB::transaction(function () use ($record): void {
             $record->update([
                 'status' => AppraisalStatusEnum::WaitingOffer,
                 'verified_at' => now(),
             ]);
-
-            $submittedBatches = $record->revisionBatches()
-                ->where('status', 'submitted')
-                ->with('items')
-                ->get();
-
-            foreach ($submittedBatches as $batch) {
-                $batch->update([
-                    'status' => 'reviewed',
-                    'reviewed_by' => $actorId,
-                    'reviewed_at' => now(),
-                    'resolved_at' => now(),
-                ]);
-
-                $batch->items()
-                    ->whereIn('status', ['pending', 'reuploaded'])
-                    ->update([
-                        'status' => 'approved',
-                    ]);
-            }
         });
     }
 
@@ -276,6 +282,14 @@ class AppraisalRequestWorkflowService
             ]);
         });
 
+        $record->loadMissing('user');
+        $record->user?->notify(new AppraisalOfferNotification(
+            appraisalId: (int) $record->id,
+            requestNumber: (string) ($record->request_number ?? ('REQ-' . $record->id)),
+            mode: $actionType === 'offer_revised' ? 'revised' : 'sent',
+            feeTotal: $feeTotal,
+        ));
+
         return [
             'action' => $actionType,
             'fee_total' => $feeTotal,
@@ -303,12 +317,14 @@ class AppraisalRequestWorkflowService
         $contractStatusBefore = $this->contractStatusValue($record);
         $round = $this->countNegotiationRounds($record);
         $contractDate = optional($record->contract_date)->toDateString() ?: now()->toDateString();
+        $offeredFeeBefore = (int) ($record->fee_total ?? 0);
 
         DB::transaction(function () use (
             $record,
             $actorId,
             $latestCounter,
             $approvedFee,
+            $offeredFeeBefore,
             $contractMeta,
             $statusBefore,
             $contractStatusBefore,
@@ -322,28 +338,38 @@ class AppraisalRequestWorkflowService
                 'contract_year' => $contractMeta['contract_year'],
                 'contract_date' => $contractDate,
                 'contract_number' => $contractMeta['contract_number'],
-                'status' => AppraisalStatusEnum::OfferSent,
-                'contract_status' => ContractStatusEnum::SentToClient,
+                'status' => AppraisalStatusEnum::WaitingSignature,
+                'contract_status' => ContractStatusEnum::WaitingSignature,
             ]);
 
             $record->offerNegotiations()->create([
                 'user_id' => $actorId,
-                'action' => 'offer_revised',
+                'action' => 'accepted',
                 'round' => $round > 0 ? $round : null,
-                'offered_fee' => $approvedFee,
+                'offered_fee' => $offeredFeeBefore,
                 'expected_fee' => $approvedFee,
+                'selected_fee' => $approvedFee,
                 'meta' => [
                     'flow' => 'approve_latest_counter_request',
                     'counter_request_id' => $latestCounter->id,
                     'status_before' => $statusBefore,
                     'contract_status_before' => $contractStatusBefore,
-                    'status_after' => AppraisalStatusEnum::OfferSent->value,
-                    'contract_status_after' => ContractStatusEnum::SentToClient->value,
+                    'status_after' => AppraisalStatusEnum::WaitingSignature->value,
+                    'contract_status_after' => ContractStatusEnum::WaitingSignature->value,
                 ],
             ]);
         });
 
+        $record->loadMissing('user');
+        $record->user?->notify(new AppraisalOfferNotification(
+            appraisalId: (int) $record->id,
+            requestNumber: (string) ($record->request_number ?? ('REQ-' . $record->id)),
+            mode: 'finalized',
+            feeTotal: $approvedFee,
+        ));
+
         return [
+            'action' => 'accepted',
             'fee_total' => $approvedFee,
             'counter_request_id' => $latestCounter->id,
         ];
@@ -374,14 +400,17 @@ class AppraisalRequestWorkflowService
             ->count();
     }
 
-    private function hasOpenRevisionBatch(AppraisalRequest $record): bool
+    private function hasPendingRevisionWork(AppraisalRequest $record): bool
     {
         if ($record->relationLoaded('revisionBatches')) {
-            return $record->revisionBatches->contains(fn ($batch) => $batch->status === 'open');
+            return $record->revisionBatches
+                ->flatMap(fn ($batch) => $batch->items ?? collect())
+                ->contains(fn ($item) => in_array((string) $item->status, ['pending', 'reuploaded', 'rejected'], true));
         }
 
         return $record->revisionBatches()
-            ->where('status', 'open')
+            ->whereIn('status', ['open', 'submitted'])
+            ->whereHas('items', fn ($query) => $query->whereIn('status', ['pending', 'reuploaded', 'rejected']))
             ->exists();
     }
 }

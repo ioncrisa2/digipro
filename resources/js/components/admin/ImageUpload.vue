@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
-import { ImagePlus, LoaderCircle, Upload, X } from 'lucide-vue-next';
+import { FileText, ImagePlus, LoaderCircle, Upload, X } from 'lucide-vue-next';
 
 const props = defineProps({
   modelValue: {
@@ -40,6 +40,10 @@ const props = defineProps({
     type: Number,
     default: null,
   },
+  previewKind: {
+    type: String,
+    default: 'image',
+  },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -48,6 +52,7 @@ const fileInput = ref(null);
 const isDragging = ref(false);
 const objectUrls = ref([]);
 const previewItems = ref([]);
+const normalizedPreviewKind = computed(() => props.previewKind === 'document' ? 'document' : 'image');
 
 const selectedFiles = computed(() => {
   if (props.multiple) {
@@ -67,9 +72,10 @@ const displayItems = computed(() => {
   return props.existing.map((item, index) => ({
     key: `existing-${index}`,
     url: item.url,
-    name: item.name || 'Gambar tersimpan',
+    name: item.name || (normalizedPreviewKind.value === 'image' ? 'Gambar tersimpan' : 'Dokumen tersimpan'),
     sizeLabel: item.sizeLabel || '',
     existing: true,
+    mime: item.mime || '',
   }));
 });
 
@@ -89,10 +95,11 @@ watch(
 
       return {
         key: `new-${index}-${file.name}`,
-        url,
+        url: normalizedPreviewKind.value === 'image' ? url : '',
         name: file.name,
         sizeLabel: formatBytes(file.size),
         existing: false,
+        mime: file.type || '',
       };
     });
   },
@@ -126,7 +133,17 @@ function emitFiles(files) {
 }
 
 function handleFiles(fileList) {
-  const incomingFiles = Array.from(fileList ?? []).filter((file) => file.type.startsWith('image/'));
+  const incomingFiles = Array.from(fileList ?? []).filter((file) => {
+    if (!(file instanceof File)) {
+      return false;
+    }
+
+    if (normalizedPreviewKind.value === 'image') {
+      return file.type.startsWith('image/');
+    }
+
+    return true;
+  });
   if (incomingFiles.length === 0) {
     return;
   }
@@ -172,6 +189,15 @@ function removeSelected(index) {
   const nextFiles = selectedFiles.value.filter((_, fileIndex) => fileIndex !== index);
   emit('update:modelValue', nextFiles);
 }
+
+const emptyTitle = computed(() => props.title || (normalizedPreviewKind.value === 'image' ? 'Upload gambar' : 'Upload file'));
+const emptyDescription = computed(() => props.description || (
+  normalizedPreviewKind.value === 'image'
+    ? 'Pilih gambar atau drag-and-drop ke area ini.'
+    : 'Pilih file atau drag-and-drop ke area ini.'
+));
+const pickerLabel = computed(() => normalizedPreviewKind.value === 'image' ? 'Pilih Gambar' : 'Pilih File');
+const loadingLabel = computed(() => normalizedPreviewKind.value === 'image' ? 'Mengunggah gambar...' : 'Mengunggah file...');
 </script>
 
 <template>
@@ -198,15 +224,15 @@ function removeSelected(index) {
     >
       <div v-if="displayItems.length === 0" class="flex min-h-56 flex-col items-center justify-center gap-3 px-6 py-8 text-center">
         <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
-          <ImagePlus class="h-6 w-6 text-slate-600" />
+          <component :is="normalizedPreviewKind === 'image' ? ImagePlus : FileText" class="h-6 w-6 text-slate-600" />
         </div>
         <div class="space-y-1">
-          <p class="text-sm font-semibold text-slate-900">{{ title }}</p>
-          <p class="text-sm text-slate-600">{{ description }}</p>
+          <p class="text-sm font-semibold text-slate-900">{{ emptyTitle }}</p>
+          <p class="text-sm text-slate-600">{{ emptyDescription }}</p>
         </div>
         <Button type="button" variant="outline" size="sm" :disabled="disabled">
           <Upload class="mr-2 h-4 w-4" />
-          Pilih Gambar
+          {{ pickerLabel }}
         </Button>
       </div>
 
@@ -218,14 +244,41 @@ function removeSelected(index) {
         <div
           v-for="(item, index) in displayItems"
           :key="item.key"
-          class="relative overflow-hidden rounded-2xl border bg-black/90"
+          class="relative overflow-hidden rounded-2xl border"
+          :class="normalizedPreviewKind === 'image' ? 'bg-black/90' : 'bg-slate-100'"
         >
-          <img :src="item.url" :alt="item.name" class="h-56 w-full object-cover opacity-90">
+          <template v-if="normalizedPreviewKind === 'image'">
+            <img :src="item.url" :alt="item.name" class="h-56 w-full object-cover opacity-90">
+          </template>
+          <template v-else>
+            <div class="flex h-56 flex-col items-center justify-center gap-3 bg-gradient-to-br from-slate-100 to-slate-200 px-4 text-center">
+              <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
+                <FileText class="h-6 w-6 text-slate-600" />
+              </div>
+              <div class="space-y-1">
+                <p class="text-sm font-semibold text-slate-900">Preview Dokumen</p>
+                <p class="text-xs text-slate-500">
+                  File yang dipilih akan tampil di sini sebelum dikirim.
+                </p>
+              </div>
+            </div>
+          </template>
 
-          <div class="absolute inset-x-0 top-0 flex items-start justify-between gap-3 bg-gradient-to-b from-black/80 via-black/25 to-transparent p-3 text-white">
+          <div
+            class="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3"
+            :class="normalizedPreviewKind === 'image'
+              ? 'bg-gradient-to-b from-black/80 via-black/25 to-transparent text-white'
+              : 'bg-gradient-to-b from-white/95 via-white/75 to-transparent text-slate-900'"
+          >
             <div class="min-w-0">
               <p class="truncate text-xs font-semibold">{{ item.name }}</p>
-              <p v-if="item.sizeLabel" class="mt-1 text-[11px] text-white/80">{{ item.sizeLabel }}</p>
+              <p
+                v-if="item.sizeLabel"
+                class="mt-1 text-[11px]"
+                :class="normalizedPreviewKind === 'image' ? 'text-white/80' : 'text-slate-600'"
+              >
+                {{ item.sizeLabel }}
+              </p>
             </div>
 
             <Button
@@ -245,7 +298,7 @@ function removeSelected(index) {
             class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 text-white"
           >
             <LoaderCircle class="h-7 w-7 animate-spin" />
-            <p class="text-sm font-medium">Mengunggah gambar...</p>
+            <p class="text-sm font-medium">{{ loadingLabel }}</p>
           </div>
         </div>
       </div>

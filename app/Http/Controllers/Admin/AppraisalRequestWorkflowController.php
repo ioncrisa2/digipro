@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreAppraisalRequestRevisionBatchRequest;
 use App\Http\Requests\Admin\StoreAppraisalOfferRequest;
 use App\Models\AppraisalRequest;
+use App\Models\AppraisalRequestRevisionItem;
 use App\Services\Admin\AppraisalRequestRevisionService;
+use App\Services\Admin\AppraisalRequestRevisionReviewService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -62,7 +64,7 @@ class AppraisalRequestWorkflowController extends Controller
         try {
             $workflowService->approveLatestNegotiation($appraisalRequest, (int) $request->user()->id);
 
-            return back()->with('success', 'Harapan fee user disetujui dan counter offer berhasil dikirim.');
+            return back()->with('success', 'Harapan fee user disetujui. Request langsung masuk ke tahap tanda tangan kontrak.');
         } catch (\RuntimeException $exception) {
             return back()->with('error', $exception->getMessage());
         }
@@ -116,6 +118,49 @@ class AppraisalRequestWorkflowController extends Controller
             $workflowService->verifyPayment($appraisalRequest);
 
             return back()->with('success', 'Pembayaran terverifikasi. Request masuk ke proses valuasi.');
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+    }
+
+    public function approveRevisionItem(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestRevisionItem $revisionItem,
+        AppraisalRequestRevisionReviewService $reviewService,
+        Request $request
+    ): RedirectResponse {
+        try {
+            $reviewService->approveItem(
+                $appraisalRequest,
+                $revisionItem,
+                (int) $request->user()->id
+            );
+
+            return back()->with('success', 'Dokumen revisi berhasil disetujui.');
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+    }
+
+    public function rejectRevisionItem(
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestRevisionItem $revisionItem,
+        AppraisalRequestRevisionReviewService $reviewService,
+        Request $request
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'review_note' => ['required', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $reviewService->rejectItem(
+                $appraisalRequest,
+                $revisionItem,
+                (int) $request->user()->id,
+                (string) $validated['review_note']
+            );
+
+            return back()->with('success', 'Item revisi dibuka kembali dan customer diminta mengunggah ulang dokumen.');
         } catch (\RuntimeException $exception) {
             return back()->with('error', $exception->getMessage());
         }

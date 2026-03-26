@@ -12,6 +12,7 @@ use App\Models\AppraisalRequest;
 use App\Services\Admin\AppraisalContractNumberService;
 use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
+use App\Services\AppraisalRevisionFileResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Response;
@@ -79,7 +80,8 @@ class AppraisalRequestController extends Controller
     public function appraisalRequestsShow(
         AppraisalRequest $appraisalRequest,
         AppraisalRequestWorkflowService $workflowService,
-        AppraisalRequestRevisionService $revisionService
+        AppraisalRequestRevisionService $revisionService,
+        AppraisalRevisionFileResolver $fileResolver
     ): Response {
         $appraisalRequest->load([
             'guidelineSet',
@@ -99,6 +101,9 @@ class AppraisalRequestController extends Controller
                 ])
                 ->latest('id'),
         ]);
+        $approvedRevisionItems = $fileResolver->approvedItemsForRequest($appraisalRequest);
+        $activeRequestFiles = $fileResolver->activeRequestFiles($appraisalRequest, $approvedRevisionItems);
+        $activeAssetFiles = $fileResolver->activeAssetFilesByRequest($appraisalRequest, $approvedRevisionItems);
 
         $locationMaps = $this->buildLocationMaps($appraisalRequest);
         $latestCounterRequest = $appraisalRequest->offerNegotiations
@@ -139,13 +144,18 @@ class AppraisalRequestController extends Controller
             'offerAction' => $this->buildOfferAction($appraisalRequest, $workflowService),
             'approveLatestNegotiationAction' => $this->buildApproveLatestNegotiationAction($appraisalRequest, $workflowService),
             'paymentVerification' => $this->buildPaymentVerification($appraisalRequest, $workflowService),
-            'requestFiles' => $appraisalRequest->files
+            'requestFiles' => $activeRequestFiles
                 ->map(fn ($file) => $this->transformRequestFile($file))
                 ->values(),
             'assets' => $appraisalRequest->assets
                 ->sortBy('id')
                 ->values()
-                ->map(fn ($asset, $index) => $this->transformAsset($asset, $index + 1, $locationMaps))
+                ->map(fn ($asset, $index) => $this->transformAsset(
+                    $asset,
+                    $index + 1,
+                    $locationMaps,
+                    collect($activeAssetFiles[$asset->id] ?? [])
+                ))
                 ->values(),
             'payments' => $appraisalRequest->payments->map(fn ($payment) => [
                 'id' => $payment->id,
