@@ -1,12 +1,14 @@
 <script setup>
-import { computed, reactive } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { computed, reactive, ref } from 'vue';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
 import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -27,6 +29,8 @@ const props = defineProps({
   summary: { type: Object, default: () => ({ total: 0, guideline_sets: 0, categories: 0, active_guideline: 0 }) },
   records: { type: Object, required: true },
   createUrl: { type: String, required: true },
+  importUrl: { type: String, default: '' },
+  importDefaults: { type: Object, default: () => ({ guideline_item_id: '', year: '' }) },
 });
 
 const form = reactive({
@@ -35,6 +39,13 @@ const form = reactive({
   year: props.filters.year ?? 'all',
   category: props.filters.category ?? 'all',
   building_class: props.filters.building_class ?? 'all',
+});
+const importDialogOpen = ref(false);
+
+const importForm = useForm({
+  guideline_item_id: props.importDefaults.guideline_item_id ? String(props.importDefaults.guideline_item_id) : '',
+  year: props.importDefaults.year ?? '',
+  file: null,
 });
 
 const columns = [
@@ -80,6 +91,13 @@ const activeFilterCount = computed(() => {
   return count;
 });
 
+const submitImport = () => {
+  importForm.post(props.importUrl, {
+    forceFormData: true,
+    preserveScroll: true,
+  });
+};
+
 </script>
 
 <template>
@@ -96,6 +114,7 @@ const activeFilterCount = computed(() => {
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <Button v-if="importUrl" variant="outline" type="button" @click="importDialogOpen = true">Import</Button>
           <Button as-child><Link :href="createUrl">Tambah BEL</Link></Button>
         </div>
       </section>
@@ -205,5 +224,56 @@ const activeFilterCount = computed(() => {
         </CardContent>
       </Card>
     </div>
+
+    <Dialog :open="importDialogOpen" @update:open="importDialogOpen = $event">
+      <DialogContent class="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Import BEL</DialogTitle>
+          <DialogDescription>
+            Upload file `.xlsx`, `.xls`, atau `.csv` dengan header `category`, `sub_category`, `building_type`, `building_class`, `storey_min`, `storey_max`, dan `economic_life`.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form class="space-y-5" @submit.prevent="submitImport">
+          <div class="grid gap-4 md:grid-cols-2">
+            <div class="space-y-2">
+              <Label for="bel_import_guideline">Guideline Set</Label>
+              <Select v-model="importForm.guideline_item_id">
+                <SelectTrigger id="bel_import_guideline"><SelectValue placeholder="Pilih guideline set" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="option in guidelineSetOptions.filter((item) => item.value !== 'all')" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p v-if="importForm.errors.guideline_item_id" class="text-xs text-rose-600">{{ importForm.errors.guideline_item_id }}</p>
+            </div>
+
+            <div class="space-y-2">
+              <Label for="bel_import_year">Tahun</Label>
+              <Input id="bel_import_year" v-model="importForm.year" type="number" min="2000" max="2100" />
+              <p v-if="importForm.errors.year" class="text-xs text-rose-600">{{ importForm.errors.year }}</p>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="bel_import_file">File Excel</Label>
+            <Input
+              id="bel_import_file"
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              @change="importForm.file = $event.target.files?.[0] ?? null"
+            />
+            <p class="text-xs text-slate-500">File boleh menyertakan `guideline_item_id` dan `year`, tetapi jika kosong akan memakai nilai dari dialog ini.</p>
+            <p v-if="importForm.errors.file" class="text-xs text-rose-600">{{ importForm.errors.file }}</p>
+          </div>
+
+          <DialogFooter class="gap-2 sm:justify-end">
+            <Button type="button" variant="outline" @click="importDialogOpen = false">Batal</Button>
+            <Button type="submit" :disabled="importForm.processing">Import BEL</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   </AdminLayout>
 </template>

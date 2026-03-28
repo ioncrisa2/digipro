@@ -43,9 +43,38 @@ class BtbWorksheetEngine
         $buildingArea = $this->nullableFloat($input['building_area'] ?? null);
         $landArea = $this->nullableFloat($input['land_area'] ?? null);
         $marketValue = $this->nullableFloat($input['market_value'] ?? null);
-        $materialQualityAdjustment = $this->nullableFloat($input['material_quality_adjustment'] ?? null) ?? 1.0;
-        $maintenanceAdjustmentFactor = $this->nullableFloat($input['maintenance_adjustment_factor'] ?? null) ?? 0.0;
-        $effectiveAge = $this->nullableFloat($input['effective_age'] ?? null);
+        $buildYear = $this->nullableInt($input['build_year'] ?? null);
+        $renovationYear = $this->nullableInt($input['renovation_year'] ?? null) ?? $buildYear;
+        $warnings = [];
+        $designFinishAdditionPercent = $this->normalizePercent($input['design_finish_addition_percent'] ?? null) ?? 0.0;
+        $maintenanceAdjustmentPercent = $this->normalizePercent($input['maintenance_adjustment_percent'] ?? null) ?? 0.0;
+        $incurableDepreciationPercent = $this->normalizePercent($input['incurable_depreciation_percent'] ?? null) ?? 0.0;
+        $functionalObsolescencePercent = $this->normalizePercent($input['functional_obsolescence_percent'] ?? null) ?? 0.0;
+        $economicObsolescencePercent = $this->normalizePercent($input['economic_obsolescence_percent'] ?? null) ?? 0.0;
+        $effectiveAge = null;
+
+        if ($buildYear !== null) {
+            if ($buildYear > $year) {
+                $warnings[] = "Tahun dibangun {$buildYear} melebihi tahun penilaian {$year}; sistem menormalkan ke {$year}.";
+                $buildYear = $year;
+            }
+
+            $renovationYear ??= $buildYear;
+
+            if ($renovationYear !== null && $renovationYear < $buildYear) {
+                $warnings[] = "Tahun renovasi {$renovationYear} lebih kecil dari tahun dibangun {$buildYear}; sistem menormalkan ke {$buildYear}.";
+                $renovationYear = $buildYear;
+            }
+
+            if ($renovationYear !== null && $renovationYear > $year) {
+                $warnings[] = "Tahun renovasi {$renovationYear} melebihi tahun penilaian {$year}; sistem menormalkan ke {$year}.";
+                $renovationYear = $year;
+            }
+
+            $effectiveAge = max(0.0, $year - (($buildYear + $renovationYear) / 2));
+        } else {
+            $warnings[] = 'Tahun dibangun belum diisi; umur efektif dan depresiasi fisik tidak bisa dihitung penuh.';
+        }
 
         $context = [
             'template_key' => $templateKey,
@@ -62,12 +91,14 @@ class BtbWorksheetEngine
             'building_area' => $buildingArea,
             'land_area' => $landArea,
             'market_value' => $marketValue,
+            'build_year' => $buildYear,
+            'renovation_year' => $renovationYear,
         ];
 
         $reference = [
             'ikk_value' => $this->nullableFloat($input['ikk_value'] ?? null) ?? $this->ikkValue($guidelineSetId, $year, $regionCode),
             'floor_index_value' => $this->nullableFloat($input['floor_index_value'] ?? null) ?? $this->floorIndexValue($guidelineSetId, $year, $buildingClass, $floorCount),
-            'economic_life' => $this->nullableInt($input['economic_life'] ?? null) ?? $this->economicLifeValue($guidelineSetId, $year, $buildingType, $buildingClass, $floorCount),
+            'economic_life' => $this->nullableInt($input['economic_life'] ?? null) ?? $this->economicLifeValue($guidelineSetId, $year, $usage, $templateKey, $buildingType, $buildingClass, $floorCount),
             'ppn_percent' => $this->nullableFloat($input['ppn_percent'] ?? null) ?? $this->ppnPercent($guidelineSetId, $year),
             'base_rcn_unit_cost' => $this->nullableFloat($input['base_rcn_unit_cost'] ?? null) ?? $this->baseRcnFromStandardReference(
                 $guidelineSetId,
@@ -82,6 +113,7 @@ class BtbWorksheetEngine
         $subjectOverrides = (array) ($input['subject_overrides'] ?? []);
         $hardCostLines = [];
         $hardCostTotal = 0.0;
+        $missingReferenceLines = [];
 
         foreach (ReviewerBtbCatalog::sections()['hard_cost']['line_codes'] ?? [] as $lineCode) {
             $definition = ReviewerBtbCatalog::lineItems()[$lineCode] ?? null;
@@ -105,6 +137,38 @@ class BtbWorksheetEngine
 
             $hardCostLines[] = $line;
             $hardCostTotal += (float) ($line['subtotal'] ?? 0.0);
+
+            if (($line['items'] ?? []) === []) {
+                $missingReferenceLines[] = $line['label'] ?? $lineCode;
+            }
+        }
+
+        if ($regionCode === null) {
+            $warnings[] = 'Region code aset belum tersedia; IKK tidak bisa dipetakan otomatis.';
+        }
+
+        if ($reference['ikk_value'] === null) {
+            $warnings[] = 'Referensi IKK belum ditemukan untuk guideline dan wilayah aset ini.';
+        }
+
+        if ($reference['floor_index_value'] === null) {
+            $warnings[] = 'Referensi indeks lantai belum ditemukan untuk kelas bangunan dan jumlah lantai ini.';
+        }
+
+        if ($reference['economic_life'] === null) {
+            $warnings[] = 'Referensi umur ekonomis belum ditemukan; depresiasi fisik tidak dapat dihitung penuh.';
+        }
+
+        if ($missingReferenceLines !== []) {
+            $warnings[] = 'Referensi cost element belum lengkap untuk: ' . implode(', ', $missingReferenceLines) . '.';
+        }
+
+        if ($marketValue === null) {
+            $warnings[] = 'Market value aset belum diisi; residual land value belum bisa dihitung.';
+        }
+
+        if ($landArea === null || $landArea <= 0) {
+            $warnings[] = 'Luas tanah belum valid; residual land value per m2 belum bisa dihitung.';
         }
 
         $ikkFactor = $reference['ikk_value'] ?? 1.0;
@@ -112,33 +176,47 @@ class BtbWorksheetEngine
 
         $hardCostAdjustedIkk = $hardCostTotal * $ikkFactor;
         $hardCostAdjustedIkkFloor = $hardCostAdjustedIkk * $floorIndexFactor;
+        $designFinishAdditionAmount = $hardCostAdjustedIkkFloor * $designFinishAdditionPercent;
+        $directCostBase = $hardCostAdjustedIkkFloor + $designFinishAdditionAmount;
 
         $indirectFactors = (array) config('reviewer_btb.indirect_cost_factors', []);
         $indirectCostLines = [
-            $this->factorLine('professional_fee', $hardCostAdjustedIkkFloor, (float) ($indirectFactors['professional_fee'] ?? 0.0)),
-            $this->factorLine('permit_cost', $hardCostAdjustedIkkFloor, (float) ($indirectFactors['permit_cost'] ?? 0.0)),
-            $this->factorLine('contractor_profit', $hardCostAdjustedIkkFloor, (float) ($indirectFactors['contractor_profit'] ?? 0.0)),
+            $this->factorLine('professional_fee', $directCostBase, (float) ($indirectFactors['professional_fee'] ?? 0.0)),
+            $this->factorLine('permit_cost', $directCostBase, (float) ($indirectFactors['permit_cost'] ?? 0.0)),
+            $this->factorLine('contractor_profit', $directCostBase, (float) ($indirectFactors['contractor_profit'] ?? 0.0)),
         ];
         $softCostTotal = array_sum(array_map(fn (array $line): float => (float) $line['value'], $indirectCostLines));
 
         $siteImprovementTotal = $this->nullableFloat($input['site_improvement_total'] ?? null) ?? 0.0;
-        $totalRcnBeforeVat = $hardCostAdjustedIkkFloor + $softCostTotal + $siteImprovementTotal;
+        $totalRcnBeforeVat = $directCostBase + $softCostTotal + $siteImprovementTotal;
         $ppnAmount = $totalRcnBeforeVat * (($reference['ppn_percent'] ?? 0.0) / 100);
         $totalRcn = $totalRcnBeforeVat + $ppnAmount;
+        $totalBrb = $buildingArea !== null ? $totalRcn * $buildingArea : null;
 
-        $rcnAdjustedByMaterial = $totalRcn * $materialQualityAdjustment;
         $economicLife = $reference['economic_life'];
-        $remainingFactor = ($effectiveAge !== null && $economicLife !== null && $economicLife > 0)
-            ? $this->clamp(1 - ($effectiveAge / $economicLife), 0.0, 1.0)
+        $curablePhysicalPercent = ($effectiveAge !== null && $economicLife !== null && $economicLife > 0)
+            ? $this->clamp($effectiveAge / $economicLife, 0.0, 1.0)
             : null;
-        $finalAdjustmentFactor = $remainingFactor !== null
-            ? $this->clamp($remainingFactor + $maintenanceAdjustmentFactor, 0.0, 1.0)
+        $totalDepreciationPercent = $curablePhysicalPercent !== null
+            ? $this->clamp(
+                $curablePhysicalPercent
+                - $maintenanceAdjustmentPercent
+                + $incurableDepreciationPercent
+                + ($functionalObsolescencePercent * $curablePhysicalPercent)
+                + ($economicObsolescencePercent * $curablePhysicalPercent),
+                0.0,
+                1.0
+            )
             : null;
-        $depreciationAmountPerSqm = ($finalAdjustmentFactor !== null && $rcnAdjustedByMaterial > 0)
-            ? $rcnAdjustedByMaterial * (1 - $finalAdjustmentFactor)
+        $remainingFactor = $totalDepreciationPercent !== null
+            ? $this->clamp(1 - $totalDepreciationPercent, 0.0, 1.0)
             : null;
-        $depreciatedBrbPerSqm = ($finalAdjustmentFactor !== null)
-            ? $rcnAdjustedByMaterial * $finalAdjustmentFactor
+        $finalAdjustmentFactor = $remainingFactor;
+        $depreciationAmountPerSqm = ($totalDepreciationPercent !== null && $totalRcn > 0)
+            ? $totalRcn * $totalDepreciationPercent
+            : null;
+        $depreciatedBrbPerSqm = ($remainingFactor !== null)
+            ? $totalRcn * $remainingFactor
             : null;
         $depreciatedBrbTotal = ($depreciatedBrbPerSqm !== null && $buildingArea !== null)
             ? $depreciatedBrbPerSqm * $buildingArea
@@ -149,29 +227,106 @@ class BtbWorksheetEngine
         $residualLandValuePerSqm = ($residualLandValue !== null && $landArea !== null && $landArea > 0)
             ? $residualLandValue / $landArea
             : null;
+        $conditionLabel = $remainingFactor !== null ? $this->conditionLabel($remainingFactor) : null;
+        $audit = [
+            'normalization_notes' => [
+                'Tahun penilaian worksheet mengikuti guideline year, bukan formula YEAR(#REF!) pada workbook.',
+                'PPN object-side distandardkan dari ValuationSetting guideline aktif.',
+                'Indeks lantai memakai referensi sistem ref_floor_index, bukan referensi silang cell workbook.',
+            ],
+            'formula_labels' => [
+                'hard_cost_adjustment' => 'Hard cost x IKK x indeks lantai.',
+                'design_finish' => 'Nilai tambah desain / finishing dihitung dari hard cost setelah IKK dan indeks lantai.',
+                'indirect_cost' => 'Biaya tak langsung = professional fee 3% + permit 1.5% + contractor profit 10%.',
+                'depreciation' => 'Total penyusutan = curable - perawatan + incurable + fungsi x curable + ekonomis x curable.',
+                'residual' => 'Residual land value = market value aset - BRB terdepresiasi total.',
+            ],
+            'reference_checks' => [
+                $this->referenceCheck('IKK', $reference['ikk_value']),
+                $this->referenceCheck('Indeks lantai', $reference['floor_index_value']),
+                $this->referenceCheck('Umur ekonomis', $reference['economic_life']),
+                $this->referenceCheck('PPN guideline', $reference['ppn_percent']),
+            ],
+            'trace' => [
+                'hard_cost_groups' => array_map(fn (array $line): array => [
+                    'line_code' => $line['line_code'] ?? null,
+                    'label' => $line['label'] ?? null,
+                    'subtotal' => $line['subtotal'] ?? null,
+                    'source_refs' => collect((array) ($line['items'] ?? []))
+                        ->map(fn (array $item): string => trim((string) (($item['source_sheet'] ?? '-') . (($item['source_cell'] ?? null) ? '!' . $item['source_cell'] : ''))))
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all(),
+                ], $hardCostLines),
+                'indirect_costs' => array_map(fn (array $line): array => [
+                    'label' => $line['label'] ?? null,
+                    'percentage' => $line['percentage'] ?? null,
+                    'value' => $line['value'] ?? null,
+                ], $indirectCostLines),
+            ],
+            'outputs' => [
+                'hard_cost_total_ikk_floor_index' => $this->roundMoney($hardCostAdjustedIkkFloor),
+                'soft_cost_total' => $this->roundMoney($softCostTotal),
+                'total_brb_per_sqm' => $this->roundMoney($totalRcn),
+                'depreciated_brb_total' => $this->roundNullableMoney($depreciatedBrbTotal),
+                'residual_land_value' => $this->roundNullableMoney($residualLandValue),
+            ],
+        ];
 
         return [
+            'input_snapshot' => [
+                'template_key' => $templateKey,
+                'building_class' => $buildingClass,
+                'floor_count' => $floorCount,
+                'building_area' => $buildingArea,
+                'land_area' => $landArea,
+                'market_value' => $marketValue,
+                'build_year' => $buildYear,
+                'renovation_year' => $renovationYear,
+                'design_finish_addition_percent' => $this->toPercentInput($designFinishAdditionPercent),
+                'maintenance_adjustment_percent' => $this->toPercentInput($maintenanceAdjustmentPercent),
+                'incurable_depreciation_percent' => $this->toPercentInput($incurableDepreciationPercent),
+                'functional_obsolescence_percent' => $this->toPercentInput($functionalObsolescencePercent),
+                'economic_obsolescence_percent' => $this->toPercentInput($economicObsolescencePercent),
+                'subject_overrides' => $subjectOverrides,
+            ],
             'context' => $context,
             'reference' => $reference,
+            'warnings' => array_values(array_unique($warnings)),
+            'audit' => $audit,
             'worksheet' => [
                 'hard_cost_lines' => $hardCostLines,
                 'hard_cost_total' => $this->roundMoney($hardCostTotal),
                 'hard_cost_total_ikk' => $this->roundMoney($hardCostAdjustedIkk),
                 'hard_cost_total_ikk_floor_index' => $this->roundMoney($hardCostAdjustedIkkFloor),
+                'design_finish_addition_percent' => $designFinishAdditionPercent,
+                'design_finish_addition_amount' => $this->roundMoney($designFinishAdditionAmount),
+                'hard_cost_total_with_design_finish' => $this->roundMoney($directCostBase),
                 'indirect_cost_lines' => $indirectCostLines,
                 'soft_cost_total' => $this->roundMoney($softCostTotal),
                 'site_improvement_total' => $this->roundMoney($siteImprovementTotal),
                 'total_rcn_before_vat' => $this->roundMoney($totalRcnBeforeVat),
                 'ppn_amount' => $this->roundMoney($ppnAmount),
                 'total_rcn' => $this->roundMoney($totalRcn),
+                'total_brb_per_sqm' => $this->roundMoney($totalRcn),
+                'total_brb' => $this->roundNullableMoney($totalBrb),
             ],
             'depreciation' => [
-                'material_quality_adjustment' => $materialQualityAdjustment,
-                'maintenance_adjustment_factor' => $maintenanceAdjustmentFactor,
+                'build_year' => $buildYear,
+                'renovation_year' => $renovationYear,
                 'effective_age' => $effectiveAge,
                 'economic_life' => $economicLife,
+                'curable_physical_percent' => $curablePhysicalPercent,
+                'maintenance_adjustment_percent' => $maintenanceAdjustmentPercent,
+                'incurable_depreciation_percent' => $incurableDepreciationPercent,
+                'functional_obsolescence_percent' => $functionalObsolescencePercent,
+                'economic_obsolescence_percent' => $economicObsolescencePercent,
+                'total_depreciation_percent' => $totalDepreciationPercent,
                 'remaining_factor' => $remainingFactor,
+                'remaining_value_factor' => $remainingFactor,
                 'final_adjustment_factor' => $finalAdjustmentFactor,
+                'condition_label' => $conditionLabel,
                 'depreciation_amount_per_sqm' => $this->roundNullableMoney($depreciationAmountPerSqm),
                 'depreciated_brb_per_sqm' => $this->roundNullableMoney($depreciatedBrbPerSqm),
                 'depreciated_brb_total' => $this->roundNullableMoney($depreciatedBrbTotal),
@@ -238,6 +393,21 @@ class BtbWorksheetEngine
         $items = [];
         $subtotal = 0.0;
         $fallbackVolume = count($rows) === 1 ? 1.0 : 0.0;
+        $materialOptions = collect($rows)
+            ->map(function (CostElement $row): array {
+                $spec = is_array($row->spec_json) ? $row->spec_json : [];
+
+                return [
+                    'value' => (string) ($spec['material_spec'] ?? $row->element_name),
+                    'label' => (string) ($spec['material_spec'] ?? $row->element_name),
+                    'unit_cost' => (int) $row->unit_cost,
+                    'source_sheet' => $spec['source_sheet'] ?? 'BUT_Print',
+                    'source_cell' => $spec['source_cell'] ?? null,
+                ];
+            })
+            ->unique('value')
+            ->values()
+            ->all();
 
         foreach ($rows as $index => $row) {
             $spec = is_array($row->spec_json) ? $row->spec_json : [];
@@ -267,6 +437,7 @@ class BtbWorksheetEngine
                 'subject_volume_percent' => $subjectVolumePercent,
                 'other_adjustment_factor' => $otherAdjustmentFactor,
                 'direct_cost_result' => $this->roundMoney($directCostResult),
+                'material_options' => $materialOptions,
                 'source_sheet' => $spec['source_sheet'] ?? 'BUT_Print',
                 'source_cell' => $spec['source_cell'] ?? null,
             ];
@@ -293,6 +464,8 @@ class BtbWorksheetEngine
             'line_code' => $lineCode,
             'label' => $definition['label'] ?? $lineCode,
             'section' => $definition['section'] ?? 'indirect_cost',
+            'base_value' => $this->roundMoney($baseValue),
+            'percentage' => $factor,
             'factor' => $factor,
             'value' => $this->roundMoney($baseValue * $factor),
         ];
@@ -415,37 +588,114 @@ class BtbWorksheetEngine
             ->value('il_value');
     }
 
-    private function economicLifeValue(int $guidelineSetId, int $year, ?string $buildingType, ?string $buildingClass, ?int $floorCount): ?int
+    private function economicLifeValue(
+        int $guidelineSetId,
+        int $year,
+        ?string $usage,
+        string $templateKey,
+        ?string $buildingType,
+        ?string $buildingClass,
+        ?int $floorCount
+    ): ?int
     {
-        $query = BuildingEconomicLife::query()
-            ->where('guideline_item_id', $guidelineSetId)
-            ->where('year', $year);
+        foreach ($this->economicLifeLookupCandidates($usage, $templateKey, $buildingType, $buildingClass) as $candidate) {
+            $query = BuildingEconomicLife::query()
+                ->where('guideline_item_id', $guidelineSetId)
+                ->where('year', $year);
 
-        if ($buildingType !== null && $buildingType !== '') {
-            $query->whereRaw('LOWER(building_type) = ?', [strtolower($buildingType)]);
+            if (($candidate['building_type'] ?? null) !== null && $candidate['building_type'] !== '') {
+                $query->whereRaw('LOWER(building_type) = ?', [strtolower($candidate['building_type'])]);
+            }
+
+            if (($candidate['building_class'] ?? null) !== null && $candidate['building_class'] !== '') {
+                $query->whereRaw('LOWER(building_class) = ?', [strtolower($candidate['building_class'])]);
+            }
+
+            if ($floorCount !== null) {
+                $query->where(function (Builder $scope) use ($floorCount) {
+                    $scope
+                        ->where(function (Builder $q) use ($floorCount) {
+                            $q->whereNotNull('storey_min')
+                                ->whereNotNull('storey_max')
+                                ->where('storey_min', '<=', $floorCount)
+                                ->where('storey_max', '>=', $floorCount);
+                        })
+                        ->orWhere(function (Builder $q) use ($floorCount) {
+                            $q->whereNotNull('storey_min')
+                                ->whereNull('storey_max')
+                                ->where('storey_min', '<=', $floorCount);
+                        })
+                        ->orWhere(function (Builder $q) use ($floorCount) {
+                            $q->whereNull('storey_min')
+                                ->whereNotNull('storey_max')
+                                ->where('storey_max', '>=', $floorCount);
+                        })
+                        ->orWhere(function (Builder $q) {
+                            $q->whereNull('storey_min')
+                                ->whereNull('storey_max');
+                        });
+                });
+            }
+
+            $value = $query->orderByDesc('storey_min')->value('economic_life');
+
+            if ($value !== null) {
+                return (int) $value;
+            }
         }
 
-        if ($buildingClass !== null && $buildingClass !== '') {
-            $query->whereRaw('LOWER(building_class) = ?', [strtolower($buildingClass)]);
+        return null;
+    }
+
+    /**
+     * BEL yang diinput admin saat ini memakai label bisnis yang tidak selalu sama
+     * dengan label MAPPI yang dipakai engine BTB. Fallback ini menjaga lookup tetap
+     * jalan tanpa memaksa data existing di-refactor ulang dulu.
+     *
+     * @return array<int, array{building_type:?string, building_class:?string}>
+     */
+    private function economicLifeLookupCandidates(
+        ?string $usage,
+        string $templateKey,
+        ?string $buildingType,
+        ?string $buildingClass
+    ): array {
+        $candidates = [
+            [
+                'building_type' => $buildingType,
+                'building_class' => $buildingClass,
+            ],
+            [
+                'building_type' => $buildingType,
+                'building_class' => null,
+            ],
+        ];
+
+        $usageKey = strtolower(trim((string) $usage));
+
+        if ($usageKey === 'rumah_tinggal' || str_starts_with($templateKey, 'rumah_')) {
+            $candidates[] = ['building_type' => 'RUMAH TINGGAL', 'building_class' => $buildingClass];
+            $candidates[] = ['building_type' => 'RUMAH TINGGAL', 'building_class' => null];
         }
 
-        if ($floorCount !== null) {
-            $query->where(function (Builder $scope) use ($floorCount) {
-                $scope
-                    ->where(function (Builder $q) use ($floorCount) {
-                        $q->whereNotNull('storey_min')
-                            ->whereNotNull('storey_max')
-                            ->where('storey_min', '<=', $floorCount)
-                            ->where('storey_max', '>=', $floorCount);
-                    })
-                    ->orWhere(function (Builder $q) use ($floorCount) {
-                        $q->whereNull('storey_min')
-                            ->whereNull('storey_max');
-                    });
-            });
+        if ($usageKey === 'kantor') {
+            $candidates[] = ['building_type' => 'KANTOR', 'building_class' => null];
         }
 
-        return $query->orderByDesc('storey_min')->value('economic_life');
+        if (in_array($usageKey, ['ruko', 'kios'], true) || $templateKey === 'low_rise_building') {
+            $candidates[] = ['building_type' => 'PUSAT PERBELANJAAN', 'building_class' => 'RUKO / RUKAN'];
+            $candidates[] = ['building_type' => 'PUSAT PERBELANJAAN', 'building_class' => null];
+            $candidates[] = ['building_type' => 'RUKO', 'building_class' => null];
+        }
+
+        $unique = [];
+
+        foreach ($candidates as $candidate) {
+            $key = strtolower((string) ($candidate['building_type'] ?? '')) . '|' . strtolower((string) ($candidate['building_class'] ?? ''));
+            $unique[$key] = $candidate;
+        }
+
+        return array_values($unique);
     }
 
     private function ikkValue(int $guidelineSetId, int $year, ?string $regionCode): ?float
@@ -550,6 +800,48 @@ class BtbWorksheetEngine
     private function roundNullableMoney(?float $value): ?int
     {
         return $value !== null ? $this->roundMoney($value) : null;
+    }
+
+    private function normalizePercent(mixed $value): ?float
+    {
+        if (! is_numeric($value)) {
+            return null;
+        }
+
+        $number = (float) $value;
+
+        if (abs($number) > 1) {
+            $number /= 100;
+        }
+
+        return $this->clamp($number, 0.0, 1.0);
+    }
+
+    private function toPercentInput(float $value): float
+    {
+        return round($value * 100, 4);
+    }
+
+    private function referenceCheck(string $label, mixed $value): array
+    {
+        return [
+            'label' => $label,
+            'value' => $value,
+            'status' => $value === null ? 'missing' : 'ready',
+        ];
+    }
+
+    private function conditionLabel(float $remainingFactor): string
+    {
+        $remainingPercent = $remainingFactor * 100;
+
+        return match (true) {
+            $remainingPercent > 84 => 'Sangat Baik / Very Good',
+            $remainingPercent > 64 => 'Baik / Good',
+            $remainingPercent > 29 => 'Cukup / Fair',
+            $remainingPercent > 9 => 'Buruk / Poor',
+            default => 'Scrap',
+        };
     }
 
     private function clamp(float $value, float $min, float $max): float

@@ -27,5 +27,11 @@ class DatabaseSeeder extends Seeder
             TagSeeder::class,
             RefUsageToMappiGroupSeeder::class,
         ]);
+
+        if (env('BTB_WORKBOOK_2025_PATH') && env('BTB_GUIDELINE_SET_ID')) {
+            $this->call([
+                BtbWorkbook2025ReferenceSeeder::class,
+            ]);
+        }
     }
 }

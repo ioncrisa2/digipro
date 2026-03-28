@@ -155,7 +155,9 @@ it('returns BTB preview payload for a built asset in reviewer btb preview', func
         ->postJson(route('reviewer.api.assets.btb.preview', $asset), [
             'btb_input' => [
                 'template_key' => 'rumah_menengah',
-                'effective_age' => 10,
+                'renovation_year' => 2020,
+                'design_finish_addition_percent' => 5,
+                'maintenance_adjustment_percent' => 2.5,
             ],
         ]);
 
@@ -163,8 +165,13 @@ it('returns BTB preview payload for a built asset in reviewer btb preview', func
         ->assertOk()
         ->assertJsonPath('btb.enabled', true)
         ->assertJsonPath('btb.input.template_key', 'rumah_menengah')
+        ->assertJsonPath('btb.input.renovation_year', 2020)
+        ->assertJsonPath('btb.input.design_finish_addition_percent', 5)
+        ->assertJsonPath('btb.input.maintenance_adjustment_percent', 2.5)
         ->assertJsonPath('btb.state.context.template_key', 'rumah_menengah')
-        ->assertJsonPath('btb.state.context.usage', 'rumah_tinggal');
+        ->assertJsonPath('btb.state.context.usage', 'rumah_tinggal')
+        ->assertJsonPath('btb.state.depreciation.renovation_year', 2020)
+        ->assertJsonPath('btb.state.worksheet.design_finish_addition_percent', 0.05);
 });
 
 it('blocks BTB preview route for land only assets', function () {
@@ -226,18 +233,24 @@ it('persists BTB valuation rows and combines building value with land range tota
         ->postJson(route('reviewer.api.assets.btb.save', $asset), [
             'btb_input' => [
                 'template_key' => 'rumah_menengah',
-                'effective_age' => 10,
+                'renovation_year' => 2020,
+                'design_finish_addition_percent' => 5,
+                'incurable_depreciation_percent' => 1,
             ],
         ]);
 
     $response
         ->assertOk()
-        ->assertJsonPath('result.btb.state.context.template_key', 'rumah_menengah');
+        ->assertJsonPath('result.btb.state.context.template_key', 'rumah_menengah')
+        ->assertJsonPath('result.btb.saved_valuation.worksheet_template', 'rumah_menengah');
 
     $asset->refresh();
     $valuation = BuildingValuation::query()->where('appraisal_asset_id', $asset->id)->first();
 
     expect($valuation)->not->toBeNull();
+    expect(data_get($valuation->calculation_json, 'input_snapshot.renovation_year'))->toBe(2020);
+    expect(data_get($valuation->calculation_json, 'input_snapshot.design_finish_addition_percent'))->toBe(5);
+    expect(data_get($valuation->calculation_json, 'audit.formula_labels.depreciation'))->toContain('Total penyusutan');
     expect($asset->building_value_final)->toBe(data_get($response->json(), 'result.asset_values.building_value_final'));
     expect($asset->estimated_value_low)->toBe(900000000 + (int) $asset->building_value_final);
     expect($asset->estimated_value_high)->toBe(1000000000 + (int) $asset->building_value_final);

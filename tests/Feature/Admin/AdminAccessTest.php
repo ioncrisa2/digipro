@@ -2692,6 +2692,57 @@ it('creates a construction cost index from the vue admin workspace', function ()
     expect((float) $record->ikk_value)->toBe(1.2345);
 });
 
+it('imports construction cost indices from excel in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IKK Import 2030',
+        'year' => 2030,
+        'description' => null,
+        'is_active' => true,
+    ]);
+    $province = Province::query()->create([
+        'id' => '31',
+        'name' => 'DKI Jakarta',
+    ]);
+    Regency::query()->create([
+        'id' => '3171',
+        'province_id' => $province->id,
+        'name' => 'Jakarta Pusat',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent(
+        'ikk-import.csv',
+        implode("\n", [
+            'kode,nama_provinsi_kota_kabupaten,ikk_mappi',
+            '3171,Jakarta Pusat,1.4321',
+        ])
+    );
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.construction-cost-indices.import'), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2030,
+            'skip_province_rows' => true,
+            'require_regency' => true,
+            'file' => $file,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.construction-cost-indices.index', [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2030,
+        ]));
+
+    $record = ConstructionCostIndex::query()
+        ->where('guideline_set_id', $guidelineSet->id)
+        ->where('year', 2030)
+        ->where('region_code', '3171')
+        ->first();
+
+    expect($record)->not->toBeNull();
+    expect($record->region_name)->toBe('Jakarta Pusat');
+    expect((float) $record->ikk_value)->toBe(1.4321);
+});
+
 it('updates a construction cost index from the vue admin workspace', function () {
     $admin = createAdminUser();
     $guidelineSet = GuidelineSet::query()->create([
@@ -2969,6 +3020,55 @@ it('creates a floor index from the vue admin workspace', function () {
     expect((float) $record->il_value)->toBe(1.1250);
 });
 
+it('imports floor indices from excel in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman IL Import 2031',
+        'year' => 2031,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent(
+        'floor-indices-import.csv',
+        implode("\n", [
+            'building_class,floor_count,il_value',
+            'RUKO,3,1.0000',
+            'OFFICE,8,1.0000',
+        ])
+    );
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.floor-indices.import'), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2031,
+            'file' => $file,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.floor-indices.index', [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2031,
+        ]));
+
+    expect(
+        (float) FloorIndex::query()
+            ->where('guideline_set_id', $guidelineSet->id)
+            ->where('year', 2031)
+            ->where('building_class', 'RUKO')
+            ->where('floor_count', 3)
+            ->value('il_value')
+    )->toBe(1.0);
+
+    expect(
+        (float) FloorIndex::query()
+            ->where('guideline_set_id', $guidelineSet->id)
+            ->where('year', 2031)
+            ->where('building_class', 'OFFICE')
+            ->where('floor_count', 8)
+            ->value('il_value')
+    )->toBe(1.0);
+});
+
 it('updates a floor index from the vue admin workspace', function () {
     $admin = createAdminUser();
     $guidelineSet = GuidelineSet::query()->create([
@@ -3217,6 +3317,63 @@ it('creates a building economic life record from the vue admin workspace', funct
 
     expect($record)->not->toBeNull();
     expect((int) $record->economic_life)->toBe(35);
+});
+
+it('imports building economic life records from excel in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman BEL Import 2030',
+        'year' => 2030,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent(
+        'building-economic-life-import.csv',
+        implode("\n", [
+            'category,sub_category,building_type,building_class,storey_min,storey_max,economic_life',
+            'BANGUNAN KANTOR,Bangunan Kantor <= 4 lantai,KANTOR,, ,4,40',
+            'BANGUNAN KANTOR,Bangunan Kantor >= 5 lantai,KANTOR,,5,,50',
+        ])
+    );
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.building-economic-lives.import'), [
+            'guideline_item_id' => $guidelineSet->id,
+            'year' => 2030,
+            'file' => $file,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.building-economic-lives.index', [
+            'guideline_item_id' => $guidelineSet->id,
+            'year' => 2030,
+        ]));
+
+    expect(
+        BuildingEconomicLife::query()
+            ->where('guideline_item_id', $guidelineSet->id)
+            ->where('year', 2030)
+            ->where('category', 'BANGUNAN KANTOR')
+            ->where('sub_category', 'Bangunan Kantor <= 4 lantai')
+            ->where('building_type', 'KANTOR')
+            ->whereNull('building_class')
+            ->whereNull('storey_min')
+            ->where('storey_max', 4)
+            ->value('economic_life')
+    )->toBe(40);
+
+    expect(
+        BuildingEconomicLife::query()
+            ->where('guideline_item_id', $guidelineSet->id)
+            ->where('year', 2030)
+            ->where('category', 'BANGUNAN KANTOR')
+            ->where('sub_category', 'Bangunan Kantor >= 5 lantai')
+            ->where('building_type', 'KANTOR')
+            ->whereNull('building_class')
+            ->where('storey_min', 5)
+            ->whereNull('storey_max')
+            ->value('economic_life')
+    )->toBe(50);
 });
 
 it('updates a building economic life record from the vue admin workspace', function () {

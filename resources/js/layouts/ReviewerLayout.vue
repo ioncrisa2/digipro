@@ -1,7 +1,7 @@
 ﻿<script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { LayoutDashboard, ClipboardList, House, Scale } from 'lucide-vue-next';
+import { LayoutDashboard, ClipboardList, Scale } from 'lucide-vue-next';
 import { useNotification } from '@/composables/useNotification';
 import GlobalDialog from '@/components/GlobalDialog.vue';
 import NotificationCenter from '@/components/ui/notification/NotificationCenter.vue';
@@ -41,18 +41,11 @@ const navItems = [
     pathPrefixes: ['/reviewer'],
   },
   {
-    label: 'Review Queue',
+    label: 'Review',
     icon: ClipboardList,
     routeName: 'reviewer.reviews.index',
-    activePatterns: ['reviewer.reviews.*'],
-    pathPrefixes: ['/reviewer/reviews'],
-  },
-  {
-    label: 'Assets',
-    icon: House,
-    routeName: 'reviewer.assets.index',
-    activePatterns: ['reviewer.assets.*'],
-    pathPrefixes: ['/reviewer/assets'],
+    activePatterns: ['reviewer.reviews.*', 'reviewer.assets.*'],
+    pathPrefixes: ['/reviewer/reviews', '/reviewer/assets'],
   },
   {
     label: 'Comparables',

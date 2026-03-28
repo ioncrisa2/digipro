@@ -58,7 +58,9 @@ class BtbValuationPersistenceService
             'ikk_region_label' => $asset->ikkRef?->region_name,
             'ikk_value' => $reference['ikk_value'] ?? null,
             'base_rcn_unit_cost' => $summary['base_rcn_unit_cost'] ?? null,
-            'effective_age' => $depreciation['effective_age'] ?? null,
+            'effective_age' => isset($depreciation['effective_age'])
+                ? (int) round((float) $depreciation['effective_age'])
+                : null,
             'economic_life' => $reference['economic_life'] ?? null,
             'economic_life_ref_id' => $this->resolveEconomicLifeRefId(
                 $context['guideline_set_id'] ?? null,
@@ -67,12 +69,12 @@ class BtbValuationPersistenceService
                 $context['building_class'] ?? null,
                 $context['floor_count'] ?? null,
             ),
-            'material_quality_adjustment' => $depreciation['material_quality_adjustment'] ?? null,
-            'depreciation_percent' => isset($depreciation['final_adjustment_factor'])
-                ? round((1 - (float) $depreciation['final_adjustment_factor']) * 100, 2)
+            'material_quality_adjustment' => null,
+            'depreciation_percent' => isset($depreciation['total_depreciation_percent'])
+                ? round((float) $depreciation['total_depreciation_percent'] * 100, 2)
                 : null,
-            'maintenance_adjustment_factor' => $depreciation['maintenance_adjustment_factor'] ?? null,
-            'final_adjustment_factor' => $depreciation['final_adjustment_factor'] ?? null,
+            'maintenance_adjustment_factor' => $depreciation['maintenance_adjustment_percent'] ?? null,
+            'final_adjustment_factor' => $depreciation['remaining_value_factor'] ?? $depreciation['final_adjustment_factor'] ?? null,
             'il_ref_id' => $this->resolveFloorIndexRefId(
                 $context['guideline_set_id'] ?? null,
                 $context['year'] ?? null,
@@ -83,7 +85,7 @@ class BtbValuationPersistenceService
             'hard_cost_total' => $worksheet['hard_cost_total_ikk_floor_index'] ?? $worksheet['hard_cost_total'] ?? null,
             'soft_cost_total' => $worksheet['soft_cost_total'] ?? null,
             'site_improvement_total' => $worksheet['site_improvement_total'] ?? null,
-            'total_rcn' => $worksheet['total_rcn'] ?? null,
+            'total_rcn' => $worksheet['total_brb'] ?? $worksheet['total_rcn'] ?? null,
             'total_depreciated_value' => $depreciation['depreciated_brb_total'] ?? null,
             'residual_land_value' => $summary['residual_land_value'] ?? null,
             'residual_land_value_per_sqm' => $summary['residual_land_value_per_sqm'] ?? null,
@@ -159,6 +161,35 @@ class BtbValuationPersistenceService
             ];
         }
 
+        if (data_get($state, 'worksheet.design_finish_addition_amount') !== null) {
+            $rows[] = [
+                'row_order' => $rowOrder++,
+                'section_name' => 'hard_cost',
+                'is_subtotal' => true,
+                'cost_element_id' => null,
+                'element_code' => 'design_finish_addition',
+                'element_name' => 'Nilai Tambah Desain / Finishing',
+                'unit' => null,
+                'quantity' => null,
+                'ref_unit_cost' => null,
+                'ikk_value_used' => data_get($state, 'reference.ikk_value'),
+                'adjusted_unit_cost' => null,
+                'model_material_spec' => null,
+                'subject_material_spec' => null,
+                'model_volume_percent' => null,
+                'subject_volume_percent' => data_get($state, 'worksheet.design_finish_addition_percent'),
+                'other_adjustment_factor' => null,
+                'direct_cost_result' => data_get($state, 'worksheet.design_finish_addition_amount'),
+                'line_total' => data_get($state, 'worksheet.design_finish_addition_amount'),
+                'source_sheet' => null,
+                'source_cell' => null,
+                'meta_json' => [
+                    'line_code' => 'design_finish_addition',
+                    'type' => 'design_finish_addition',
+                ],
+            ];
+        }
+
         foreach ((array) data_get($state, 'worksheet.indirect_cost_lines', []) as $line) {
             $rows[] = [
                 'row_order' => $rowOrder++,
@@ -189,6 +220,12 @@ class BtbValuationPersistenceService
         }
 
         $depreciationRows = [
+            'curable_physical_percent' => 'Kemunduran Fisik (Curable)',
+            'maintenance_adjustment_percent' => 'Penyesuaian Perawatan',
+            'incurable_depreciation_percent' => 'Kemunduran Incurable',
+            'functional_obsolescence_percent' => 'Keusangan Fungsi',
+            'economic_obsolescence_percent' => 'Keusangan Ekonomis',
+            'total_depreciation_percent' => 'Total Penyusutan',
             'depreciation_amount_per_sqm' => 'DEPRESIASI (Rp/m2)',
             'depreciated_brb_per_sqm' => 'BRB Terdepresiasi (Rp/m2)',
             'depreciated_brb_total' => 'BRB Terdepresiasi Total',

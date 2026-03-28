@@ -184,6 +184,7 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::get('/ikk', [ReferenceGuideDataController::class, 'constructionCostIndicesIndex'])->name('construction-cost-indices.index');
                 Route::get('/ikk/buat', [ReferenceGuideDataController::class, 'constructionCostIndicesCreate'])->name('construction-cost-indices.create');
                 Route::post('/ikk', [ReferenceGuideDataController::class, 'constructionCostIndicesStore'])->name('construction-cost-indices.store');
+                Route::post('/ikk/import', [ReferenceGuideDataController::class, 'constructionCostIndicesImport'])->name('construction-cost-indices.import');
                 Route::get('/ikk/{constructionCostIndex}/edit', [ReferenceGuideDataController::class, 'constructionCostIndicesEdit'])->name('construction-cost-indices.edit');
                 Route::put('/ikk/{constructionCostIndex}', [ReferenceGuideDataController::class, 'constructionCostIndicesUpdate'])->name('construction-cost-indices.update');
                 Route::delete('/ikk/{constructionCostIndex}', [ReferenceGuideDataController::class, 'constructionCostIndicesDestroy'])->name('construction-cost-indices.destroy');
@@ -198,6 +199,7 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::get('/floor-indices', [ReferenceGuideDataController::class, 'floorIndicesIndex'])->name('floor-indices.index');
                 Route::get('/floor-indices/buat', [ReferenceGuideDataController::class, 'floorIndicesCreate'])->name('floor-indices.create');
                 Route::post('/floor-indices', [ReferenceGuideDataController::class, 'floorIndicesStore'])->name('floor-indices.store');
+                Route::post('/floor-indices/import', [ReferenceGuideDataController::class, 'floorIndicesImport'])->name('floor-indices.import');
                 Route::get('/floor-indices/{floorIndex}/edit', [ReferenceGuideDataController::class, 'floorIndicesEdit'])->name('floor-indices.edit');
                 Route::put('/floor-indices/{floorIndex}', [ReferenceGuideDataController::class, 'floorIndicesUpdate'])->name('floor-indices.update');
                 Route::delete('/floor-indices/{floorIndex}', [ReferenceGuideDataController::class, 'floorIndicesDestroy'])->name('floor-indices.destroy');
@@ -212,6 +214,7 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::get('/building-economic-lives', [BuildingEconomicLifeController::class, 'index'])->name('building-economic-lives.index');
                 Route::get('/building-economic-lives/buat', [BuildingEconomicLifeController::class, 'create'])->name('building-economic-lives.create');
                 Route::post('/building-economic-lives', [BuildingEconomicLifeController::class, 'store'])->name('building-economic-lives.store');
+                Route::post('/building-economic-lives/import', [BuildingEconomicLifeController::class, 'import'])->name('building-economic-lives.import');
                 Route::get('/building-economic-lives/{buildingEconomicLife}/edit', [BuildingEconomicLifeController::class, 'edit'])->name('building-economic-lives.edit');
                 Route::put('/building-economic-lives/{buildingEconomicLife}', [BuildingEconomicLifeController::class, 'update'])->name('building-economic-lives.update');
                 Route::delete('/building-economic-lives/{buildingEconomicLife}', [BuildingEconomicLifeController::class, 'destroy'])->name('building-economic-lives.destroy');

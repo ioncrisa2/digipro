@@ -4,17 +4,22 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreBuildingEconomicLifeRequest;
+use App\Imports\BuildingEconomicLifeImport;
 use App\Models\BuildingEconomicLife;
 use App\Models\GuidelineSet;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Throwable;
 
 class BuildingEconomicLifeController extends Controller
 {
     public function index(Request $request): Response
     {
+        $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
         $filters = [
             'q' => trim((string) $request->query('q', '')),
             'guideline_item_id' => (string) $request->query('guideline_item_id', 'all'),
@@ -76,6 +81,15 @@ class BuildingEconomicLifeController extends Controller
             ],
             'records' => $this->paginatedRecordsPayload($records),
             'createUrl' => route('admin.ref-guidelines.building-economic-lives.create'),
+            'importUrl' => route('admin.ref-guidelines.building-economic-lives.import'),
+            'importDefaults' => [
+                'guideline_item_id' => $filters['guideline_item_id'] !== 'all'
+                    ? (int) $filters['guideline_item_id']
+                    : $activeGuideline?->id,
+                'year' => $filters['year'] !== 'all'
+                    ? (int) $filters['year']
+                    : ($activeGuideline?->year ?? (int) now()->format('Y')),
+            ],
         ]);
     }
 
@@ -110,6 +124,38 @@ class BuildingEconomicLifeController extends Controller
         return redirect()
             ->route('admin.ref-guidelines.building-economic-lives.index')
             ->with('success', 'BEL berhasil ditambahkan.');
+    }
+
+    public function import(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'guideline_item_id' => ['required', 'integer', Rule::exists('ref_guideline_sets', 'id')],
+            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
+        ]);
+
+        $import = new BuildingEconomicLifeImport(
+            guidelineItemId: (int) $validated['guideline_item_id'],
+            year: (int) $validated['year'],
+        );
+
+        try {
+            Excel::import($import, $validated['file']);
+        } catch (Throwable $e) {
+            return redirect()
+                ->route('admin.ref-guidelines.building-economic-lives.index')
+                ->with('error', 'Import BEL gagal diproses. Pastikan header file sesuai format: category, sub_category, building_type, building_class, storey_min, storey_max, economic_life.');
+        }
+
+        return redirect()
+            ->route('admin.ref-guidelines.building-economic-lives.index', [
+                'guideline_item_id' => $validated['guideline_item_id'],
+                'year' => $validated['year'],
+            ])
+            ->with(
+                'success',
+                "Import BEL selesai. {$import->processed} row diproses, {$import->skipped} row dilewati."
+            );
     }
 
     public function edit(BuildingEconomicLife $buildingEconomicLife): Response

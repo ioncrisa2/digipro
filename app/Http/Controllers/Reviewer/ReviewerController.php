@@ -149,9 +149,12 @@ class ReviewerController extends Controller
     {
         $review->load([
             'user:id,name,email',
-            'assets.files:id,appraisal_asset_id,type,path,original_name,mime,size,created_at',
+            'assets:id,appraisal_request_id,address',
             'payments:id,appraisal_request_id,status,paid_at,updated_at,created_at',
         ])->loadCount('assets');
+
+        /** @var AppraisalAsset|null $primaryAsset */
+        $primaryAsset = $review->assets->sortBy('id')->first();
 
         return Inertia::render('Reviewer/Reviews/Show', [
             'review' => [
@@ -167,10 +170,8 @@ class ReviewerController extends Controller
                 'fee_total' => $review->fee_total,
                 'assets_count' => (int) $review->assets_count,
                 'latest_payment_status' => $this->workspace->paymentStatusLabel($review->payments->sortByDesc('id')->first()?->status),
-                'assets' => $review->assets->map(fn (AppraisalAsset $asset): array => $this->workspace->serializeAssetDetail($asset))->values(),
-                'files' => $review->assets
-                    ->flatMap(fn (AppraisalAsset $asset) => $this->workspace->serializeActiveAssetFiles($asset))
-                    ->values(),
+                'primary_asset_url' => $primaryAsset ? route('reviewer.assets.show', $primaryAsset) : null,
+                'primary_asset_address' => $primaryAsset?->address,
             ],
         ]);
     }
@@ -280,7 +281,7 @@ class ReviewerController extends Controller
     public function assetsBtb(AppraisalAsset $asset): Response
     {
         $this->ensureBtbAsset($asset);
-        $asset->loadMissing(['request.guidelineSet', 'ikkRef']);
+        $asset->loadMissing(['request.guidelineSet', 'ikkRef', 'buildingValuation']);
 
         return Inertia::render('Reviewer/Assets/Btb', [
             'asset' => [
@@ -292,6 +293,7 @@ class ReviewerController extends Controller
                 'building_area' => $asset->building_area,
                 'building_floors' => $asset->building_floors,
                 'build_year' => $asset->build_year,
+                'renovation_year' => $asset->renovation_year,
                 'market_value_final' => $asset->market_value_final,
                 'btb_save_url' => route('reviewer.api.assets.btb.save', $asset),
                 'btb_preview_url' => route('reviewer.api.assets.btb.preview', $asset),
@@ -599,7 +601,7 @@ class ReviewerController extends Controller
 
     private function buildBtbPayload(AppraisalAsset $asset, array $input = []): array
     {
-        $asset->loadMissing(['request.guidelineSet', 'ikkRef']);
+        $asset->loadMissing(['request.guidelineSet', 'ikkRef', 'buildingValuation']);
 
         $usage = $asset->peruntukan;
         $hasBuilding = (float) ($asset->building_area ?? 0) > 0;
@@ -616,20 +618,20 @@ class ReviewerController extends Controller
 
         $guidelineSetId = (int) ($asset->request?->guideline_set_id ?: 0);
         $guidelineYear = (int) ($asset->request?->guidelineSet?->year ?: now()->year);
+        $savedInput = $this->savedBtbInput($asset);
+        $mergedInput = array_replace_recursive($savedInput, $input);
         $defaultTemplateKey = ReviewerBtbCatalog::defaultTemplateForUsage($usage);
-        $templateKey = $this->nonEmptyString(Arr::get($input, 'template_key')) ?? $defaultTemplateKey;
+        $templateKey = $this->nonEmptyString(Arr::get($mergedInput, 'template_key')) ?? $defaultTemplateKey;
         $template = $templateKey ? ReviewerBtbCatalog::template($templateKey) : null;
-        $buildingClass = $this->nonEmptyString(Arr::get($input, 'building_class'))
+        $buildingClass = $this->nonEmptyString(Arr::get($mergedInput, 'building_class'))
             ?? ($template['mappi_building_class'] ?? null);
-        $floorCount = $this->nullableInt(Arr::get($input, 'floor_count'))
+        $floorCount = $this->nullableInt(Arr::get($mergedInput, 'floor_count'))
             ?? $asset->building_floors
             ?? ($template['default_floor_count'] ?? null);
-        $buildingArea = $this->nullableFloat(Arr::get($input, 'building_area')) ?? $asset->building_area;
-        $landArea = $this->nullableFloat(Arr::get($input, 'land_area')) ?? $asset->land_area;
-        $effectiveAge = $this->nullableFloat(Arr::get($input, 'effective_age'));
-        if ($effectiveAge === null && $asset->build_year) {
-            $effectiveAge = max(0, $guidelineYear - (int) $asset->build_year);
-        }
+        $buildingArea = $this->nullableFloat(Arr::get($mergedInput, 'building_area')) ?? $asset->building_area;
+        $landArea = $this->nullableFloat(Arr::get($mergedInput, 'land_area')) ?? $asset->land_area;
+        $buildYear = $this->nullableInt(Arr::get($mergedInput, 'build_year')) ?? $asset->build_year;
+        $renovationYear = $this->nullableInt(Arr::get($mergedInput, 'renovation_year')) ?? $asset->renovation_year ?? $buildYear;
 
         $engineInput = [
             'guideline_set_id' => $guidelineSetId,
@@ -640,13 +642,17 @@ class ReviewerController extends Controller
             'floor_count' => $floorCount,
             'building_area' => $buildingArea,
             'land_area' => $landArea,
-            'effective_age' => $effectiveAge,
-            'material_quality_adjustment' => $this->nullableFloat(Arr::get($input, 'material_quality_adjustment')) ?? 1.0,
-            'maintenance_adjustment_factor' => $this->nullableFloat(Arr::get($input, 'maintenance_adjustment_factor')) ?? 0.0,
-            'market_value' => $this->nullableFloat(Arr::get($input, 'market_value')) ?? $asset->market_value_final,
+            'build_year' => $buildYear,
+            'renovation_year' => $renovationYear,
+            'design_finish_addition_percent' => $this->nullableFloat(Arr::get($mergedInput, 'design_finish_addition_percent')) ?? 0.0,
+            'maintenance_adjustment_percent' => $this->nullableFloat(Arr::get($mergedInput, 'maintenance_adjustment_percent')) ?? 0.0,
+            'incurable_depreciation_percent' => $this->nullableFloat(Arr::get($mergedInput, 'incurable_depreciation_percent')) ?? 0.0,
+            'functional_obsolescence_percent' => $this->nullableFloat(Arr::get($mergedInput, 'functional_obsolescence_percent')) ?? 0.0,
+            'economic_obsolescence_percent' => $this->nullableFloat(Arr::get($mergedInput, 'economic_obsolescence_percent')) ?? 0.0,
+            'market_value' => $this->nullableFloat(Arr::get($mergedInput, 'market_value')) ?? $asset->market_value_final,
             'region_code' => $asset->regency_id,
             'ikk_value' => $asset->ikk_value_used,
-            'subject_overrides' => (array) Arr::get($input, 'subject_overrides', []),
+            'subject_overrides' => (array) Arr::get($mergedInput, 'subject_overrides', []),
         ];
 
         try {
@@ -655,11 +661,22 @@ class ReviewerController extends Controller
             $state = null;
         }
 
+        $savedValuation = $asset->buildingValuation
+            ? [
+                'id' => $asset->buildingValuation->id,
+                'worksheet_template' => $asset->buildingValuation->worksheet_template,
+                'updated_at' => optional($asset->buildingValuation->updated_at)?->toDateTimeString(),
+                'notes' => $asset->buildingValuation->notes,
+                'cost_items_count' => $asset->buildingValuation->costItems()->count(),
+            ]
+            : null;
+
         return [
             'enabled' => true,
             'reason' => null,
-            'mode' => 'preview',
-            'note' => 'Worksheet BTB sudah bisa dipreview dari reviewer. Penyimpanan permanen ke valuation record akan disambungkan pada fase berikutnya.',
+            'mode' => 'worksheet',
+            'note' => 'Worksheet BTB reviewer mengikuti baseline workbook 2025 dan dapat disimpan ke valuation record.',
+            'saved_valuation' => $savedValuation,
             'templates' => collect(ReviewerBtbCatalog::candidateTemplatesForUsage($usage))
                 ->map(fn (string $key): array => [
                     'value' => $key,
@@ -667,16 +684,20 @@ class ReviewerController extends Controller
                 ])
                 ->values()
                 ->all(),
-            'input' => [
+            'input' => $state['input_snapshot'] ?? [
                 'template_key' => $templateKey,
                 'building_class' => $buildingClass,
                 'floor_count' => $floorCount,
                 'building_area' => $buildingArea,
                 'land_area' => $landArea,
-                'effective_age' => $effectiveAge,
-                'material_quality_adjustment' => $engineInput['material_quality_adjustment'],
-                'maintenance_adjustment_factor' => $engineInput['maintenance_adjustment_factor'],
                 'market_value' => $engineInput['market_value'],
+                'build_year' => $buildYear,
+                'renovation_year' => $renovationYear,
+                'design_finish_addition_percent' => $engineInput['design_finish_addition_percent'],
+                'maintenance_adjustment_percent' => $engineInput['maintenance_adjustment_percent'],
+                'incurable_depreciation_percent' => $engineInput['incurable_depreciation_percent'],
+                'functional_obsolescence_percent' => $engineInput['functional_obsolescence_percent'],
+                'economic_obsolescence_percent' => $engineInput['economic_obsolescence_percent'],
                 'subject_overrides' => $engineInput['subject_overrides'],
             ],
             'state' => $state,
@@ -692,12 +713,72 @@ class ReviewerController extends Controller
             'btb_input.floor_count' => ['nullable', 'integer', 'min:1', 'max:200'],
             'btb_input.building_area' => ['nullable', 'numeric', 'min:0'],
             'btb_input.land_area' => ['nullable', 'numeric', 'min:0'],
-            'btb_input.effective_age' => ['nullable', 'numeric', 'min:0'],
-            'btb_input.material_quality_adjustment' => ['nullable', 'numeric', 'min:0.01', 'max:10'],
-            'btb_input.maintenance_adjustment_factor' => ['nullable', 'numeric', 'min:-1', 'max:1'],
+            'btb_input.build_year' => ['nullable', 'integer', 'min:1900', 'max:' . now()->year],
+            'btb_input.renovation_year' => ['nullable', 'integer', 'min:1900', 'max:' . now()->year],
+            'btb_input.design_finish_addition_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'btb_input.maintenance_adjustment_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'btb_input.incurable_depreciation_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'btb_input.functional_obsolescence_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'btb_input.economic_obsolescence_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'btb_input.market_value' => ['nullable', 'numeric', 'min:0'],
             'btb_input.subject_overrides' => ['nullable', 'array'],
+            'btb_input.subject_overrides.*' => ['nullable', 'array'],
+            'btb_input.subject_overrides.*.subject_material_spec' => ['nullable', 'string'],
+            'btb_input.subject_overrides.*.subject_unit_cost' => ['nullable', 'numeric', 'min:0'],
+            'btb_input.subject_overrides.*.subject_volume_percent' => ['nullable', 'numeric', 'min:0'],
+            'btb_input.subject_overrides.*.other_adjustment_factor' => ['nullable', 'numeric', 'min:0'],
         ]);
+    }
+
+    private function savedBtbInput(AppraisalAsset $asset): array
+    {
+        $state = (array) ($asset->buildingValuation?->calculation_json ?? []);
+
+        if ($state === []) {
+            return [];
+        }
+
+        $inputSnapshot = (array) data_get($state, 'input_snapshot', []);
+
+        if ($inputSnapshot !== []) {
+            return $inputSnapshot;
+        }
+
+        $subjectOverrides = [];
+
+        foreach ((array) data_get($state, 'worksheet.hard_cost_lines', []) as $line) {
+            foreach ((array) data_get($line, 'items', []) as $item) {
+                $itemKey = data_get($item, 'item_key');
+
+                if (! is_string($itemKey) || $itemKey === '') {
+                    continue;
+                }
+
+                $subjectOverrides[$itemKey] = [
+                    'subject_material_spec' => data_get($item, 'subject_material_spec'),
+                    'subject_unit_cost' => data_get($item, 'subject_unit_cost'),
+                    'subject_volume_percent' => data_get($item, 'subject_volume_percent'),
+                    'other_adjustment_factor' => data_get($item, 'other_adjustment_factor'),
+                ];
+            }
+        }
+
+        return [
+            'template_key' => data_get($state, 'context.template_key'),
+            'building_class' => data_get($state, 'context.building_class'),
+            'floor_count' => data_get($state, 'context.floor_count'),
+            'building_area' => data_get($state, 'context.building_area'),
+            'land_area' => data_get($state, 'context.land_area'),
+            'market_value' => data_get($state, 'context.market_value'),
+            'build_year' => data_get($state, 'context.build_year'),
+            'renovation_year' => data_get($state, 'context.renovation_year'),
+            'design_finish_addition_percent' => $this->percentInputFromState(data_get($state, 'worksheet.design_finish_addition_percent')),
+            'maintenance_adjustment_percent' => $this->percentInputFromState(data_get($state, 'depreciation.maintenance_adjustment_percent')),
+            'incurable_depreciation_percent' => $this->percentInputFromState(data_get($state, 'depreciation.incurable_depreciation_percent')),
+            'functional_obsolescence_percent' => $this->percentInputFromState(data_get($state, 'depreciation.functional_obsolescence_percent')),
+            'economic_obsolescence_percent' => $this->percentInputFromState(data_get($state, 'depreciation.economic_obsolescence_percent')),
+            'subject_overrides' => $subjectOverrides,
+        ];
     }
 
     private function ensureBtbAsset(AppraisalAsset $asset): void
@@ -720,6 +801,11 @@ class ReviewerController extends Controller
     private function nullableInt(mixed $value): ?int
     {
         return is_numeric($value) ? (int) $value : null;
+    }
+
+    private function percentInputFromState(mixed $value): float
+    {
+        return is_numeric($value) ? round((float) $value * 100, 4) : 0.0;
     }
 
 }

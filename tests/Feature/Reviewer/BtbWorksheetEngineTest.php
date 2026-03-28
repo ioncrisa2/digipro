@@ -94,12 +94,13 @@ beforeEach(function () {
                 'material_spec' => $row['name'],
                 'default_volume_percent' => 1,
                 'source_sheet' => 'BUT_Print',
+                'source_cell' => 'C2',
             ],
         ]);
     }
 });
 
-it('builds a BTB worksheet with direct, indirect, and depreciation outputs', function () {
+it('builds a BTB worksheet with workbook-style direct, indirect, and depreciation outputs', function () {
     $engine = app(BtbWorksheetEngine::class);
 
     $result = $engine->build([
@@ -110,8 +111,8 @@ it('builds a BTB worksheet with direct, indirect, and depreciation outputs', fun
         'floor_count' => 2,
         'building_area' => 100,
         'region_code' => '3171',
-        'effective_age' => 10,
-        'material_quality_adjustment' => 1.05,
+        'build_year' => 2016,
+        'renovation_year' => 2016,
     ]);
 
     expect(data_get($result, 'context.template_key'))->toBe('rumah_menengah');
@@ -121,13 +122,19 @@ it('builds a BTB worksheet with direct, indirect, and depreciation outputs', fun
     expect(data_get($result, 'worksheet.hard_cost_total'))->toBe(4500000);
     expect(data_get($result, 'worksheet.hard_cost_total_ikk'))->toBe(5400000);
     expect(data_get($result, 'worksheet.hard_cost_total_ikk_floor_index'))->toBe(5940000);
+    expect(data_get($result, 'worksheet.design_finish_addition_amount'))->toBe(0);
     expect(data_get($result, 'worksheet.soft_cost_total'))->toBe(861300);
     expect(data_get($result, 'worksheet.total_rcn_before_vat'))->toBe(6801300);
     expect(data_get($result, 'worksheet.ppn_amount'))->toBe(748143);
-    expect(data_get($result, 'worksheet.total_rcn'))->toBe(7549443);
+    expect(data_get($result, 'worksheet.total_brb_per_sqm'))->toBe(7549443);
+    expect(data_get($result, 'worksheet.total_brb'))->toBe(754944300);
+    expect(data_get($result, 'worksheet.hard_cost_lines.0.items.0.material_options.0.value'))->toBe('Tapak Beton');
+    expect(data_get($result, 'depreciation.effective_age'))->toBe(10);
+    expect(data_get($result, 'depreciation.curable_physical_percent'))->toBe(0.2);
+    expect(data_get($result, 'depreciation.total_depreciation_percent'))->toBe(0.2);
     expect(data_get($result, 'depreciation.final_adjustment_factor'))->toBe(0.8);
-    expect(data_get($result, 'depreciation.depreciated_brb_per_sqm'))->toBe(6341532);
-    expect(data_get($result, 'depreciation.depreciated_brb_total'))->toBe(634153212);
+    expect(data_get($result, 'depreciation.depreciated_brb_per_sqm'))->toBe(6039554);
+    expect(data_get($result, 'depreciation.depreciated_brb_total'))->toBe(603955440);
 });
 
 it('applies subject overrides to direct cost items', function () {
@@ -141,6 +148,8 @@ it('applies subject overrides to direct cost items', function () {
         'floor_count' => 2,
         'building_area' => 100,
         'region_code' => '3171',
+        'build_year' => 2016,
+        'renovation_year' => 2016,
         'subject_overrides' => [
             'foundation:tapak-beton' => [
                 'subject_material_spec' => 'Tapak Beton Upgrade',
@@ -157,4 +166,86 @@ it('applies subject overrides to direct cost items', function () {
     expect(data_get($foundation, 'items.0.subject_material_spec'))->toBe('Tapak Beton Upgrade');
     expect(data_get($foundation, 'items.0.direct_cost_result'))->toBe(90000);
     expect(data_get($result, 'worksheet.hard_cost_total'))->toBe(4490000);
+});
+
+it('records audit metadata and warnings for workbook edge cases', function () {
+    $engine = app(BtbWorksheetEngine::class);
+
+    $result = $engine->build([
+        'guideline_set_id' => $this->guideline->id,
+        'year' => 2026,
+        'usage' => 'rumah_tinggal',
+        'building_class' => 'MENENGAH',
+        'floor_count' => 2,
+        'building_area' => 100,
+        'land_area' => 0,
+        'build_year' => 2028,
+        'renovation_year' => 2010,
+    ]);
+
+    expect(data_get($result, 'context.build_year'))->toBe(2026);
+    expect(data_get($result, 'context.renovation_year'))->toBe(2026);
+    expect(data_get($result, 'warnings'))->toBeArray();
+    expect(implode(' ', data_get($result, 'warnings', [])))->toContain('Tahun dibangun 2028 melebihi tahun penilaian 2026');
+    expect(implode(' ', data_get($result, 'warnings', [])))->toContain('Luas tanah belum valid');
+    expect(implode(' ', data_get($result, 'warnings', [])))->toContain('Market value aset belum diisi');
+    expect(data_get($result, 'audit.formula_labels.depreciation'))->toContain('Total penyusutan');
+    expect(data_get($result, 'audit.reference_checks.0.status'))->toBe('missing');
+    expect(data_get($result, 'audit.trace.hard_cost_groups.0.source_refs'))->toBeArray();
+});
+
+it('falls back to BEL business labels when economic life labels differ from BTB MAPPI labels', function () {
+    BuildingEconomicLife::query()->delete();
+
+    BuildingEconomicLife::create([
+        'guideline_item_id' => $this->guideline->id,
+        'year' => 2026,
+        'category' => 'BANGUNAN RUMAH TINGGAL',
+        'sub_category' => 'Bangunan kelas Menengah',
+        'building_type' => 'RUMAH TINGGAL',
+        'building_class' => 'MENENGAH',
+        'storey_min' => null,
+        'storey_max' => null,
+        'economic_life' => 30,
+    ]);
+
+    BuildingEconomicLife::create([
+        'guideline_item_id' => $this->guideline->id,
+        'year' => 2026,
+        'category' => 'PUSAT PERBELANJAAN',
+        'sub_category' => 'Ruko / Rukan',
+        'building_type' => 'PUSAT PERBELANJAAN',
+        'building_class' => 'RUKO / RUKAN',
+        'storey_min' => null,
+        'storey_max' => null,
+        'economic_life' => 30,
+    ]);
+
+    $engine = app(BtbWorksheetEngine::class);
+
+    $rumah = $engine->build([
+        'guideline_set_id' => $this->guideline->id,
+        'year' => 2026,
+        'usage' => 'rumah_tinggal',
+        'building_class' => 'MENENGAH',
+        'floor_count' => 2,
+        'building_area' => 100,
+        'region_code' => '3171',
+        'build_year' => 2016,
+        'renovation_year' => 2016,
+    ]);
+
+    $ruko = $engine->build([
+        'guideline_set_id' => $this->guideline->id,
+        'year' => 2026,
+        'usage' => 'ruko',
+        'floor_count' => 3,
+        'building_area' => 100,
+        'region_code' => '3171',
+        'build_year' => 2016,
+        'renovation_year' => 2016,
+    ]);
+
+    expect(data_get($rumah, 'reference.economic_life'))->toBe(30);
+    expect(data_get($ruko, 'reference.economic_life'))->toBe(30);
 });

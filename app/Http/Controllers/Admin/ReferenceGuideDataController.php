@@ -7,6 +7,8 @@ use App\Http\Requests\Admin\StoreConstructionCostIndexRequest;
 use App\Http\Requests\Admin\StoreCostElementRequest;
 use App\Http\Requests\Admin\StoreFloorIndexRequest;
 use App\Http\Requests\Admin\StoreMappiRcnStandardRequest;
+use App\Imports\FloorIndexImport;
+use App\Imports\IKKImport;
 use App\Models\ConstructionCostIndex;
 use App\Models\CostElement;
 use App\Models\FloorIndex;
@@ -17,12 +19,16 @@ use App\Models\Regency;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Throwable;
 
 class ReferenceGuideDataController extends Controller
 {
     public function constructionCostIndicesIndex(Request $request): Response
     {
+        $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
         $filters = [
             'q' => trim((string) $request->query('q', '')),
             'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
@@ -82,6 +88,17 @@ class ReferenceGuideDataController extends Controller
             'records' => $this->paginatedRecordsPayload($records),
             'createUrl' => route('admin.ref-guidelines.construction-cost-indices.create'),
             'ikkByProvinceUrl' => route('admin.ref-guidelines.ikk-by-province.index'),
+            'importUrl' => route('admin.ref-guidelines.construction-cost-indices.import'),
+            'importDefaults' => [
+                'guideline_set_id' => $filters['guideline_set_id'] !== 'all'
+                    ? (int) $filters['guideline_set_id']
+                    : $activeGuideline?->id,
+                'year' => $filters['year'] !== 'all'
+                    ? (int) $filters['year']
+                    : ($activeGuideline?->year ?? (int) now()->format('Y')),
+                'skip_province_rows' => true,
+                'require_regency' => true,
+            ],
         ]);
     }
 
@@ -123,6 +140,42 @@ class ReferenceGuideDataController extends Controller
         return redirect()
             ->route('admin.ref-guidelines.construction-cost-indices.index')
             ->with('success', 'IKK berhasil ditambahkan.');
+    }
+
+    public function constructionCostIndicesImport(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'guideline_set_id' => ['required', 'integer', Rule::exists('ref_guideline_sets', 'id')],
+            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
+            'skip_province_rows' => ['nullable', 'boolean'],
+            'require_regency' => ['nullable', 'boolean'],
+        ]);
+
+        $import = new IKKImport(
+            guidelineSetId: (int) $validated['guideline_set_id'],
+            year: (int) $validated['year'],
+            skipProvinceRows: $request->boolean('skip_province_rows', true),
+            requireRegency: $request->boolean('require_regency', true),
+        );
+
+        try {
+            Excel::import($import, $validated['file']);
+        } catch (Throwable $e) {
+            return redirect()
+                ->route('admin.ref-guidelines.construction-cost-indices.index')
+                ->with('error', 'Import IKK gagal diproses. Pastikan format header Excel sesuai template: kode, nama_provinsi_kota_kabupaten, ikk_mappi.');
+        }
+
+        return redirect()
+            ->route('admin.ref-guidelines.construction-cost-indices.index', [
+                'guideline_set_id' => $validated['guideline_set_id'],
+                'year' => $validated['year'],
+            ])
+            ->with(
+                'success',
+                "Import IKK selesai. {$import->inserted} row baru, {$import->updated} row diperbarui, {$import->skipped} row dilewati."
+            );
     }
 
     public function constructionCostIndicesEdit(ConstructionCostIndex $constructionCostIndex): Response
@@ -368,6 +421,7 @@ class ReferenceGuideDataController extends Controller
 
     public function floorIndicesIndex(Request $request): Response
     {
+        $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
         $filters = [
             'q' => trim((string) $request->query('q', '')),
             'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
@@ -420,6 +474,15 @@ class ReferenceGuideDataController extends Controller
             ],
             'records' => $this->paginatedRecordsPayload($records),
             'createUrl' => route('admin.ref-guidelines.floor-indices.create'),
+            'importUrl' => route('admin.ref-guidelines.floor-indices.import'),
+            'importDefaults' => [
+                'guideline_set_id' => $filters['guideline_set_id'] !== 'all'
+                    ? (int) $filters['guideline_set_id']
+                    : $activeGuideline?->id,
+                'year' => $filters['year'] !== 'all'
+                    ? (int) $filters['year']
+                    : ($activeGuideline?->year ?? (int) now()->format('Y')),
+            ],
         ]);
     }
 
@@ -458,6 +521,38 @@ class ReferenceGuideDataController extends Controller
         return redirect()
             ->route('admin.ref-guidelines.floor-indices.index')
             ->with('success', 'Floor index berhasil ditambahkan.');
+    }
+
+    public function floorIndicesImport(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'guideline_set_id' => ['required', 'integer', Rule::exists('ref_guideline_sets', 'id')],
+            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
+        ]);
+
+        $import = new FloorIndexImport(
+            guidelineSetId: (int) $validated['guideline_set_id'],
+            year: (int) $validated['year'],
+        );
+
+        try {
+            Excel::import($import, $validated['file']);
+        } catch (Throwable $e) {
+            return redirect()
+                ->route('admin.ref-guidelines.floor-indices.index')
+                ->with('error', 'Import floor index gagal diproses. Pastikan format header Excel sesuai template: building_class, floor_count, il_value.');
+        }
+
+        return redirect()
+            ->route('admin.ref-guidelines.floor-indices.index', [
+                'guideline_set_id' => $validated['guideline_set_id'],
+                'year' => $validated['year'],
+            ])
+            ->with(
+                'success',
+                "Import floor index selesai. {$import->processed} row diproses, {$import->skipped} row dilewati."
+            );
     }
 
     public function floorIndicesEdit(FloorIndex $floorIndex): Response

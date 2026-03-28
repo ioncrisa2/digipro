@@ -2477,18 +2477,20 @@ class AdjustmentWorkbenchService
 
     private function text(mixed $value): string
     {
-        if ($value === null || $value === '') {
+        $text = $this->stringifyDisplayValue($value);
+
+        if ($text === null || $text === '') {
             return '-';
         }
 
-        return trim((string) $value) !== '' ? trim((string) $value) : '-';
+        return $text;
     }
 
     private function displayOptionLabel(mixed $value): string
     {
-        $text = trim((string) $value);
+        $text = $this->stringifyDisplayValue($value);
 
-        if ($text === '') {
+        if ($text === null || $text === '') {
             return '-';
         }
 
@@ -2501,6 +2503,63 @@ class AdjustmentWorkbenchService
         return (string) Str::of($text)
             ->replace(['_', '-'], ' ')
             ->headline();
+    }
+
+    private function stringifyDisplayValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $text = trim($value);
+
+            return $text !== '' ? $text : null;
+        }
+
+        if (is_numeric($value) || is_bool($value)) {
+            $text = trim((string) $value);
+
+            return $text !== '' ? $text : null;
+        }
+
+        if (is_array($value)) {
+            foreach (['name', 'label', 'title', 'value', 'text'] as $preferredKey) {
+                if (array_key_exists($preferredKey, $value)) {
+                    $preferred = $this->stringifyDisplayValue($value[$preferredKey]);
+
+                    if ($preferred !== null) {
+                        return $preferred;
+                    }
+                }
+            }
+
+            $parts = [];
+
+            foreach ($value as $item) {
+                $text = $this->stringifyDisplayValue($item);
+
+                if ($text !== null) {
+                    $parts[] = $text;
+                }
+            }
+
+            $parts = array_values(array_unique($parts));
+
+            return $parts !== [] ? implode(', ', $parts) : null;
+        }
+
+        if (is_object($value)) {
+            if (method_exists($value, 'toArray')) {
+                return $this->stringifyDisplayValue($value->toArray());
+            }
+
+            return $this->stringifyDisplayValue(get_object_vars($value));
+        }
+
+        $text = trim((string) $value);
+
+        return $text !== '' ? $text : null;
     }
 
     private function formatCoordinates(mixed $lat, mixed $lng): string
