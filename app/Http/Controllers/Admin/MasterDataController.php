@@ -244,8 +244,8 @@ class MasterDataController extends Controller
                 ['label' => 'Provinsi Dengan Kabupaten/Kota', 'value' => Province::query()->has('regencies')->count()],
             ],
             'records' => $this->paginatedRecordsPayload($records),
-            'indexUrl' => route('admin.master-data.provinces.index'),
-            'createUrl' => route('admin.master-data.provinces.create'),
+            'indexUrl' => $this->workspaceRoute('master-data.provinces.index'),
+            'createUrl' => $this->workspaceRoute('master-data.provinces.create'),
         ]);
     }
 
@@ -260,8 +260,8 @@ class MasterDataController extends Controller
             ],
             'selectFields' => [],
             'generator' => $this->locationGeneratorProps('province'),
-            'indexUrl' => route('admin.master-data.provinces.index'),
-            'submitUrl' => route('admin.master-data.provinces.store'),
+            'indexUrl' => $this->workspaceRoute('master-data.provinces.index'),
+            'submitUrl' => $this->workspaceRoute('master-data.provinces.store'),
         ]);
     }
 
@@ -277,7 +277,7 @@ class MasterDataController extends Controller
         });
 
         return redirect()
-            ->route('admin.master-data.provinces.index')
+            ->route($this->workspaceRouteName('master-data.provinces.index'))
             ->with('success', 'Provinsi berhasil ditambahkan.');
     }
 
@@ -292,8 +292,8 @@ class MasterDataController extends Controller
             ],
             'selectFields' => [],
             'generator' => null,
-            'indexUrl' => route('admin.master-data.provinces.index'),
-            'submitUrl' => route('admin.master-data.provinces.update', $province),
+            'indexUrl' => $this->workspaceRoute('master-data.provinces.index'),
+            'submitUrl' => $this->workspaceRoute('master-data.provinces.update', $province),
         ]);
     }
 
@@ -306,13 +306,13 @@ class MasterDataController extends Controller
         ])->save();
 
         return redirect()
-            ->route('admin.master-data.provinces.index')
+            ->route($this->workspaceRouteName('master-data.provinces.index'))
             ->with('success', 'Provinsi berhasil diperbarui.');
     }
 
     public function provincesDestroy(Province $province): RedirectResponse
     {
-        return $this->destroyLocationRecord($province, 'admin.master-data.provinces.index', 'Provinsi');
+        return $this->destroyLocationRecord($province, 'master-data.provinces.index', 'Provinsi');
     }
 
     public function regenciesIndex(Request $request): Response
@@ -355,8 +355,8 @@ class MasterDataController extends Controller
                 ['label' => 'Total Kecamatan', 'value' => District::query()->count()],
             ],
             'records' => $this->paginatedRecordsPayload($records),
-            'indexUrl' => route('admin.master-data.regencies.index'),
-            'createUrl' => route('admin.master-data.regencies.create'),
+            'indexUrl' => $this->workspaceRoute('master-data.regencies.index'),
+            'createUrl' => $this->workspaceRoute('master-data.regencies.create'),
         ]);
     }
 
@@ -380,8 +380,8 @@ class MasterDataController extends Controller
             ]],
             'generator' => $this->locationGeneratorProps('regency', 'province_id'),
             'showIdField' => false,
-            'indexUrl' => route('admin.master-data.regencies.index'),
-            'submitUrl' => route('admin.master-data.regencies.store'),
+            'indexUrl' => $this->workspaceRoute('master-data.regencies.index'),
+            'submitUrl' => $this->workspaceRoute('master-data.regencies.store'),
         ]);
     }
 
@@ -398,7 +398,7 @@ class MasterDataController extends Controller
         });
 
         return redirect()
-            ->route('admin.master-data.regencies.index')
+            ->route($this->workspaceRouteName('master-data.regencies.index'))
             ->with('success', 'Kabupaten/Kota berhasil ditambahkan.');
     }
 
@@ -421,8 +421,8 @@ class MasterDataController extends Controller
                 'options' => $this->provinceSelectOptions(),
             ]],
             'generator' => null,
-            'indexUrl' => route('admin.master-data.regencies.index'),
-            'submitUrl' => route('admin.master-data.regencies.update', $regency),
+            'indexUrl' => $this->workspaceRoute('master-data.regencies.index'),
+            'submitUrl' => $this->workspaceRoute('master-data.regencies.update', $regency),
         ]);
     }
 
@@ -436,13 +436,13 @@ class MasterDataController extends Controller
         ])->save();
 
         return redirect()
-            ->route('admin.master-data.regencies.index')
+            ->route($this->workspaceRouteName('master-data.regencies.index'))
             ->with('success', 'Kabupaten/Kota berhasil diperbarui.');
     }
 
     public function regenciesDestroy(Regency $regency): RedirectResponse
     {
-        return $this->destroyLocationRecord($regency, 'admin.master-data.regencies.index', 'Kabupaten/Kota');
+        return $this->destroyLocationRecord($regency, 'master-data.regencies.index', 'Kabupaten/Kota');
     }
 
     public function districtsIndex(Request $request): Response
@@ -497,8 +497,8 @@ class MasterDataController extends Controller
                 ['label' => 'Total Kelurahan/Desa', 'value' => Village::query()->count()],
             ],
             'records' => $this->paginatedRecordsPayload($records),
-            'indexUrl' => route('admin.master-data.districts.index'),
-            'createUrl' => route('admin.master-data.districts.create'),
+            'indexUrl' => $this->workspaceRoute('master-data.districts.index'),
+            'createUrl' => $this->workspaceRoute('master-data.districts.create'),
         ]);
     }
 
@@ -541,8 +541,8 @@ class MasterDataController extends Controller
             ],
             'generator' => $this->locationGeneratorProps('district', 'regency_id'),
             'showIdField' => false,
-            'indexUrl' => route('admin.master-data.districts.index'),
-            'submitUrl' => route('admin.master-data.districts.store'),
+            'indexUrl' => $this->workspaceRoute('master-data.districts.index'),
+            'submitUrl' => $this->workspaceRoute('master-data.districts.store'),
         ]);
     }
 
@@ -559,7 +559,7 @@ class MasterDataController extends Controller
         });
 
         return redirect()
-            ->route('admin.master-data.districts.index')
+            ->route($this->workspaceRouteName('master-data.districts.index'))
             ->with('success', 'Kecamatan berhasil ditambahkan.');
     }
 
@@ -595,8 +595,8 @@ class MasterDataController extends Controller
                 ],
             ],
             'generator' => null,
-            'indexUrl' => route('admin.master-data.districts.index'),
-            'submitUrl' => route('admin.master-data.districts.update', $district),
+            'indexUrl' => $this->workspaceRoute('master-data.districts.index'),
+            'submitUrl' => $this->workspaceRoute('master-data.districts.update', $district),
         ]);
     }
 
@@ -610,13 +610,13 @@ class MasterDataController extends Controller
         ])->save();
 
         return redirect()
-            ->route('admin.master-data.districts.index')
+            ->route($this->workspaceRouteName('master-data.districts.index'))
             ->with('success', 'Kecamatan berhasil diperbarui.');
     }
 
     public function districtsDestroy(District $district): RedirectResponse
     {
-        return $this->destroyLocationRecord($district, 'admin.master-data.districts.index', 'Kecamatan');
+        return $this->destroyLocationRecord($district, 'master-data.districts.index', 'Kecamatan');
     }
 
     public function villagesIndex(Request $request): Response
@@ -680,8 +680,8 @@ class MasterDataController extends Controller
                 ['label' => 'Kabupaten/Kota Tercakup', 'value' => District::query()->has('villages')->distinct('regency_id')->count('regency_id')],
             ],
             'records' => $this->paginatedRecordsPayload($records),
-            'indexUrl' => route('admin.master-data.villages.index'),
-            'createUrl' => route('admin.master-data.villages.create'),
+            'indexUrl' => $this->workspaceRoute('master-data.villages.index'),
+            'createUrl' => $this->workspaceRoute('master-data.villages.create'),
         ]);
     }
 
@@ -738,8 +738,8 @@ class MasterDataController extends Controller
             ],
             'generator' => $this->locationGeneratorProps('village', 'district_id'),
             'showIdField' => false,
-            'indexUrl' => route('admin.master-data.villages.index'),
-            'submitUrl' => route('admin.master-data.villages.store'),
+            'indexUrl' => $this->workspaceRoute('master-data.villages.index'),
+            'submitUrl' => $this->workspaceRoute('master-data.villages.store'),
         ]);
     }
 
@@ -756,7 +756,7 @@ class MasterDataController extends Controller
         });
 
         return redirect()
-            ->route('admin.master-data.villages.index')
+            ->route($this->workspaceRouteName('master-data.villages.index'))
             ->with('success', 'Kelurahan/Desa berhasil ditambahkan.');
     }
 
@@ -803,8 +803,8 @@ class MasterDataController extends Controller
                 ],
             ],
             'generator' => null,
-            'indexUrl' => route('admin.master-data.villages.index'),
-            'submitUrl' => route('admin.master-data.villages.update', $village),
+            'indexUrl' => $this->workspaceRoute('master-data.villages.index'),
+            'submitUrl' => $this->workspaceRoute('master-data.villages.update', $village),
         ]);
     }
 
@@ -818,13 +818,13 @@ class MasterDataController extends Controller
         ])->save();
 
         return redirect()
-            ->route('admin.master-data.villages.index')
+            ->route($this->workspaceRouteName('master-data.villages.index'))
             ->with('success', 'Kelurahan/Desa berhasil diperbarui.');
     }
 
     public function villagesDestroy(Village $village): RedirectResponse
     {
-        return $this->destroyLocationRecord($village, 'admin.master-data.villages.index', 'Kelurahan/Desa');
+        return $this->destroyLocationRecord($village, 'master-data.villages.index', 'Kelurahan/Desa');
     }
 
     private function canManageUsersCreate(): bool
@@ -939,7 +939,7 @@ class MasterDataController extends Controller
         return [
             'type' => $type,
             'parent_field' => $parentField,
-            'preview_url' => route('admin.master-data.locations.id-preview'),
+            'preview_url' => $this->workspaceRoute('master-data.locations.id-preview'),
         ];
     }
 
@@ -1065,8 +1065,8 @@ class MasterDataController extends Controller
             'stats' => [
                 ['label' => 'Kabupaten/Kota', 'value' => (int) ($province->regencies_count ?? 0)],
             ],
-            'edit_url' => route('admin.master-data.provinces.edit', $province),
-            'destroy_url' => route('admin.master-data.provinces.destroy', $province),
+            'edit_url' => $this->workspaceRoute('master-data.provinces.edit', $province),
+            'destroy_url' => $this->workspaceRoute('master-data.provinces.destroy', $province),
         ];
     }
 
@@ -1082,8 +1082,8 @@ class MasterDataController extends Controller
             'stats' => [
                 ['label' => 'Kecamatan', 'value' => (int) ($regency->districts_count ?? 0)],
             ],
-            'edit_url' => route('admin.master-data.regencies.edit', $regency),
-            'destroy_url' => route('admin.master-data.regencies.destroy', $regency),
+            'edit_url' => $this->workspaceRoute('master-data.regencies.edit', $regency),
+            'destroy_url' => $this->workspaceRoute('master-data.regencies.destroy', $regency),
         ];
     }
 
@@ -1100,8 +1100,8 @@ class MasterDataController extends Controller
             'stats' => [
                 ['label' => 'Kelurahan/Desa', 'value' => (int) ($district->villages_count ?? 0)],
             ],
-            'edit_url' => route('admin.master-data.districts.edit', $district),
-            'destroy_url' => route('admin.master-data.districts.destroy', $district),
+            'edit_url' => $this->workspaceRoute('master-data.districts.edit', $district),
+            'destroy_url' => $this->workspaceRoute('master-data.districts.destroy', $district),
         ];
     }
 
@@ -1117,8 +1117,8 @@ class MasterDataController extends Controller
                 'Provinsi: ' . ($village->district?->regency?->province?->name ?? '-'),
             ],
             'stats' => [],
-            'edit_url' => route('admin.master-data.villages.edit', $village),
-            'destroy_url' => route('admin.master-data.villages.destroy', $village),
+            'edit_url' => $this->workspaceRoute('master-data.villages.edit', $village),
+            'destroy_url' => $this->workspaceRoute('master-data.villages.destroy', $village),
         ];
     }
 
@@ -1128,12 +1128,12 @@ class MasterDataController extends Controller
             $record->delete();
         } catch (QueryException) {
             return redirect()
-                ->route($routeName)
+                ->route($this->workspaceRouteName($routeName))
                 ->with('error', $label . ' tidak bisa dihapus karena masih dipakai data turunan.');
         }
 
         return redirect()
-            ->route($routeName)
+            ->route($this->workspaceRouteName($routeName))
             ->with('success', $label . ' berhasil dihapus.');
     }
 }

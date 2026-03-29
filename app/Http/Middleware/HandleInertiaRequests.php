@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\SystemNavigation;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Illuminate\Support\Facades\Storage;
@@ -53,12 +54,20 @@ class HandleInertiaRequests extends Middleware
                     'roles' => $request->user()->getRoleNames()->values()->all(),
                     'is_admin' => $request->user()->hasAdminAccess(),
                     'is_reviewer' => $request->user()->isReviewer(),
+                    'system_section_permissions' => $request->user()->systemSectionPermissions(),
                     'two_factor_enabled' => ! is_null($request->user()->two_factor_secret),
                     'two_factor_confirmed_at' => $request->user()->two_factor_confirmed_at
                         ? $request->user()->two_factor_confirmed_at->toDateTimeString()
                         : null,
                 ]
                 : null,
+
+            'navigation.reviewer_nav' => fn () => $request->user()
+                ? SystemNavigation::navForUser($request->user(), 'reviewer')
+                : [],
+            'navigation.admin_nav' => fn () => $request->user()
+                ? SystemNavigation::navForUser($request->user(), 'admin')
+                : [],
 
             //flash message
             'flash' => [

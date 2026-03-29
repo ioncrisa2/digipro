@@ -35,6 +35,8 @@ use App\Models\User;
 use App\Models\ValuationSetting;
 use App\Models\District;
 use App\Models\Village;
+use App\Support\SystemNavigation;
+use App\Support\AdminWorkspaceAccessSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -45,9 +47,6 @@ use Spatie\Permission\Models\Role;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    Role::findOrCreate('Reviewer', 'web');
-    Role::findOrCreate('admin', 'web');
-    Role::findOrCreate('super_admin', 'web');
     Role::findOrCreate('customer', 'web');
 
     foreach ([
@@ -63,6 +62,8 @@ beforeEach(function (): void {
     ] as $permissionName) {
         Permission::findOrCreate($permissionName, 'web');
     }
+
+    AdminWorkspaceAccessSynchronizer::sync();
 });
 
 function createAdminUser(): User
@@ -87,6 +88,21 @@ function createSuperAdminUser(): User
     return $user;
 }
 
+function createReviewerUser(bool $withSystemMenus = true): User
+{
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    if ($withSystemMenus) {
+        $user->assignRole('Reviewer');
+    } else {
+        $user->assignRole('customer');
+    }
+
+    return $user;
+}
+
 it('allows admin users to access the vue admin dashboard', function () {
     $admin = createAdminUser();
 
@@ -97,16 +113,92 @@ it('allows admin users to access the vue admin dashboard', function () {
         ->assertInertia(fn (Assert $page) => $page->component('Admin/Dashboard'));
 });
 
-it('blocks reviewer users from the admin dashboard', function () {
-    $reviewer = User::factory()->create([
-        'email_verified_at' => now(),
-    ]);
-    $reviewer->assignRole('Reviewer');
+it('shares super admin widgets on the admin dashboard for super admin users', function () {
+    $superAdmin = createSuperAdminUser();
+
+    $this
+        ->actingAs($superAdmin)
+        ->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Dashboard')
+            ->where('isSuperAdmin', true)
+            ->has('superAdminWidgets.system_health', 6)
+            ->has('superAdminWidgets.role_summary', 6)
+            ->has('superAdminWidgets.reference_completeness.items', 6)
+            ->has('superAdminWidgets.exception_queue', 5)
+            ->has('superAdminWidgets.permission_overview.summary')
+            ->has('superAdminWidgets.sensitive_changes')
+        );
+});
+
+it('redirects reviewer users away from the admin root back to reviewer workspace', function () {
+    $reviewer = createReviewerUser();
+
+    $this
+        ->actingAs($reviewer)
+        ->get(route('admin.dashboard'))
+        ->assertRedirect(route('reviewer.dashboard'));
+});
+
+it('blocks users without admin workspace permission from the admin root', function () {
+    $reviewer = createReviewerUser(withSystemMenus: false);
 
     $this
         ->actingAs($reviewer)
         ->get(route('admin.dashboard'))
         ->assertForbidden();
+});
+
+it('allows reviewer users to access reference guideline pages in reviewer workspace', function () {
+    $reviewer = createReviewerUser();
+
+    $this
+        ->actingAs($reviewer)
+        ->get(route('reviewer.ref-guidelines.guideline-sets.index'))
+        ->assertOk();
+});
+
+it('allows reviewer users to access master data location pages in reviewer workspace', function () {
+    $reviewer = createReviewerUser();
+
+    $this
+        ->actingAs($reviewer)
+        ->get(route('reviewer.master-data.provinces.index'))
+        ->assertOk();
+});
+
+it('redirects reviewer users away from admin-prefixed shared routes', function () {
+    $reviewer = createReviewerUser();
+
+    $this
+        ->actingAs($reviewer)
+        ->get(route('admin.master-data.provinces.index'))
+        ->assertRedirect(route('reviewer.dashboard'));
+});
+
+it('shares filtered system navigation for reviewer and admin layouts', function () {
+    $reviewer = createReviewerUser();
+
+    $this
+        ->actingAs($reviewer)
+        ->get(route('reviewer.dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('auth.user.system_section_permissions', [
+                SystemNavigation::ACCESS_REVIEWER_DASHBOARD,
+                SystemNavigation::MANAGE_REVIEWER_REVIEWS,
+                SystemNavigation::MANAGE_REVIEWER_COMPARABLES,
+                SystemNavigation::MANAGE_ADMIN_MASTER_DATA,
+                SystemNavigation::MANAGE_ADMIN_REF_GUIDELINES,
+            ])
+            ->has('navigation.reviewer_nav', 5)
+            ->where('navigation.reviewer_nav.0.key', 'reviewer.dashboard')
+            ->where('navigation.reviewer_nav.3.key', 'reviewer.master-data')
+            ->where('navigation.reviewer_nav.4.key', 'reviewer.ref-guidelines')
+            ->has('navigation.admin_nav', 2)
+            ->where('navigation.admin_nav.0.key', 'admin.master-data')
+            ->where('navigation.admin_nav.1.key', 'admin.ref-guidelines'));
 });
 
 it('redirects admin users away from the customer dashboard', function () {
@@ -2337,7 +2429,40 @@ it('renders the admin roles index for super admin users', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Roles/Index')
-            ->where('records.meta.total', 5));
+            ->where('records.meta.total', 5)
+            ->where('workspaceMenusUrl', route('admin.access-control.system-menus.index')));
+});
+
+it('renders the admin workspace menu management index for super admin users', function () {
+    $superAdmin = createSuperAdminUser();
+
+    $this
+        ->actingAs($superAdmin)
+        ->get(route('admin.access-control.system-menus.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Roles/WorkspaceMenusIndex')
+            ->where('summary.sections', count(SystemNavigation::menuManagementSections())));
+});
+
+it('renders the admin workspace menu edit page for super admin users', function () {
+    $superAdmin = createSuperAdminUser();
+    $reviewerRole = Role::findByName('Reviewer', 'web');
+
+    $this
+        ->actingAs($superAdmin)
+        ->get(route('admin.access-control.system-menus.edit', $reviewerRole))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Roles/WorkspaceMenusForm')
+            ->where('record.name', 'Reviewer')
+            ->where('record.workspace_permissions', [
+                SystemNavigation::ACCESS_REVIEWER_DASHBOARD,
+                SystemNavigation::MANAGE_REVIEWER_REVIEWS,
+                SystemNavigation::MANAGE_REVIEWER_COMPARABLES,
+                SystemNavigation::MANAGE_ADMIN_REF_GUIDELINES,
+                SystemNavigation::MANAGE_ADMIN_MASTER_DATA,
+            ]));
 });
 
 it('renders the admin role detail for super admin users', function () {
@@ -2353,6 +2478,40 @@ it('renders the admin role detail for super admin users', function () {
             ->component('Admin/Roles/Show')
             ->where('record.name', 'qa_admin')
             ->where('record.permissions_count', 2));
+});
+
+it('updates workspace menu permissions for a role from the admin workspace', function () {
+    $superAdmin = createSuperAdminUser();
+    $reviewerRole = Role::findByName('Reviewer', 'web');
+
+    $this
+        ->actingAs($superAdmin)
+        ->put(route('admin.access-control.system-menus.update', $reviewerRole), [
+            'workspace_permissions' => [
+                SystemNavigation::ACCESS_REVIEWER_DASHBOARD,
+                SystemNavigation::MANAGE_REVIEWER_REVIEWS,
+                SystemNavigation::MANAGE_REVIEWER_COMPARABLES,
+                SystemNavigation::MANAGE_ADMIN_REF_GUIDELINES,
+            ],
+        ])
+        ->assertRedirect(route('admin.access-control.system-menus.edit', $reviewerRole));
+
+    $reviewerRole->refresh();
+
+    expect($reviewerRole->hasPermissionTo(SystemNavigation::MANAGE_ADMIN_REF_GUIDELINES))->toBeTrue();
+    expect($reviewerRole->hasPermissionTo(SystemNavigation::MANAGE_ADMIN_MASTER_DATA))->toBeFalse();
+
+    $reviewer = createReviewerUser();
+
+    $this
+        ->actingAs($reviewer)
+        ->get(route('reviewer.master-data.provinces.index'))
+        ->assertForbidden();
+
+    $this
+        ->actingAs($reviewer)
+        ->get(route('reviewer.ref-guidelines.guideline-sets.index'))
+        ->assertOk();
 });
 
 it('creates a role from the vue admin access control workspace', function () {
@@ -2425,6 +2584,27 @@ it('renders the guideline sets index in the vue admin workspace', function () {
             ->component('Admin/GuidelineSets/Index')
             ->where('records.meta.total', 1)
             ->where('records.data.0.name', 'Pedoman 2026'));
+});
+
+it('exports guideline sets from the vue admin workspace', function () {
+    $admin = createAdminUser();
+
+    GuidelineSet::query()->create([
+        'name' => 'Pedoman Export 2026',
+        'year' => 2026,
+        'description' => 'Acuan export guideline.',
+        'is_active' => true,
+    ]);
+
+    $response = $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.guideline-sets.export', ['q' => 'Export']));
+
+    $response->assertOk();
+
+    expect((string) $response->headers->get('content-disposition'))
+        ->toContain('attachment;')
+        ->toContain('guideline-sets-');
 });
 
 it('creates a guideline set from the vue admin workspace', function () {
@@ -2743,6 +2923,36 @@ it('imports construction cost indices from excel in the vue admin workspace', fu
     expect((float) $record->ikk_value)->toBe(1.4321);
 });
 
+it('exports construction cost indices from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman Export IKK 2030',
+        'year' => 2030,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    ConstructionCostIndex::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2030,
+        'region_code' => '3171',
+        'region_name' => 'Jakarta Pusat',
+        'ikk_value' => 1.4321,
+    ]);
+
+    $response = $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.construction-cost-indices.export', [
+            'guideline_set_id' => $guidelineSet->id,
+        ]));
+
+    $response->assertOk();
+
+    expect((string) $response->headers->get('content-disposition'))
+        ->toContain('attachment;')
+        ->toContain('ikk-');
+});
+
 it('updates a construction cost index from the vue admin workspace', function () {
     $admin = createAdminUser();
     $guidelineSet = GuidelineSet::query()->create([
@@ -2882,6 +3092,93 @@ it('creates a cost element from the vue admin workspace', function () {
     expect($record)->not->toBeNull();
     expect($record->element_name)->toBe('Dinding');
     expect($record->spec_json)->toBe(['line_order' => 2, 'material_spec' => 'Bata ringan']);
+});
+
+it('imports cost elements from excel in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman Cost Import 2032',
+        'year' => 2032,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent(
+        'cost-elements-import.csv',
+        implode("\n", [
+            'group,element_code,element_name,building_type,building_class,storey_pattern,unit,unit_cost,spec_json',
+            'PONDASI,CE-001,Pondasi Batu Kali,RUMAH,GRADE_A,1-2,m2,450000,',
+            'STRUKTUR,CE-002,Beton Bertulang 1 lantai,RUMAH,GRADE_A,1-2,m2,650000,',
+        ])
+    );
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.cost-elements.import'), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2032,
+            'base_region' => 'DKI Jakarta',
+            'file' => $file,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.cost-elements.index', [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2032,
+            'base_region' => 'DKI Jakarta',
+        ]));
+
+    expect(
+        (int) CostElement::query()
+            ->where('guideline_set_id', $guidelineSet->id)
+            ->where('year', 2032)
+            ->where('base_region', 'DKI Jakarta')
+            ->where('element_code', 'CE-001')
+            ->value('unit_cost')
+    )->toBe(450000);
+
+    expect(
+        CostElement::query()
+            ->where('guideline_set_id', $guidelineSet->id)
+            ->where('year', 2032)
+            ->where('element_code', 'CE-002')
+            ->value('element_name')
+    )->toBe('Beton Bertulang 1 lantai');
+});
+
+it('exports cost elements from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman Export Cost 2032',
+        'year' => 2032,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    CostElement::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2032,
+        'base_region' => 'DKI Jakarta',
+        'group' => 'PONDASI',
+        'element_code' => 'CE-001',
+        'element_name' => 'Pondasi Batu Kali',
+        'building_type' => 'RUMAH',
+        'building_class' => 'GRADE_A',
+        'storey_pattern' => '1-2',
+        'unit' => 'm2',
+        'unit_cost' => 450000,
+        'spec_json' => ['material_spec' => 'Batu kali'],
+    ]);
+
+    $response = $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.cost-elements.export', [
+            'guideline_set_id' => $guidelineSet->id,
+        ]));
+
+    $response->assertOk();
+
+    expect((string) $response->headers->get('content-disposition'))
+        ->toContain('attachment;')
+        ->toContain('cost-elements-');
 });
 
 it('updates a cost element from the vue admin workspace', function () {
@@ -3069,6 +3366,36 @@ it('imports floor indices from excel in the vue admin workspace', function () {
     )->toBe(1.0);
 });
 
+it('exports floor indices from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman Export IL 2031',
+        'year' => 2031,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    FloorIndex::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2031,
+        'building_class' => 'RUKO',
+        'floor_count' => 3,
+        'il_value' => 1.0,
+    ]);
+
+    $response = $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.floor-indices.export', [
+            'guideline_set_id' => $guidelineSet->id,
+        ]));
+
+    $response->assertOk();
+
+    expect((string) $response->headers->get('content-disposition'))
+        ->toContain('attachment;')
+        ->toContain('floor-indices-');
+});
+
 it('updates a floor index from the vue admin workspace', function () {
     $admin = createAdminUser();
     $guidelineSet = GuidelineSet::query()->create([
@@ -3188,6 +3515,87 @@ it('creates a mappi rcn standard from the vue admin workspace', function () {
     expect((int) $record->rcn_value)->toBe(6500000);
 });
 
+it('imports mappi rcn standards from excel in the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman RCN Import 2033',
+        'year' => 2033,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent(
+        'mappi-rcn-import.csv',
+        implode("\n", [
+            'building_type,building_class,storey_pattern,rcn_value,notes',
+            'RUKO,,1-2,4250000,Import ruko',
+            'BANGUNAN_GEDUNG_BERTINGKAT,LOW_RISE,3-5,6500000,Import low rise',
+        ])
+    );
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.ref-guidelines.mappi-rcn-standards.import'), [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2033,
+            'reference_region' => 'DKI Jakarta',
+            'file' => $file,
+        ])
+        ->assertRedirect(route('admin.ref-guidelines.mappi-rcn-standards.index', [
+            'guideline_set_id' => $guidelineSet->id,
+            'year' => 2033,
+        ]));
+
+    expect(
+        (int) MappiRcnStandard::query()
+            ->where('guideline_set_id', $guidelineSet->id)
+            ->where('year', 2033)
+            ->where('building_type', 'RUKO')
+            ->value('rcn_value')
+    )->toBe(4250000);
+
+    expect(
+        MappiRcnStandard::query()
+            ->where('guideline_set_id', $guidelineSet->id)
+            ->where('year', 2033)
+            ->where('building_type', 'BANGUNAN_GEDUNG_BERTINGKAT')
+            ->value('notes')
+    )->toBe('Import low rise');
+});
+
+it('exports mappi rcn standards from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman Export RCN 2033',
+        'year' => 2033,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    MappiRcnStandard::query()->create([
+        'guideline_set_id' => $guidelineSet->id,
+        'year' => 2033,
+        'reference_region' => 'DKI Jakarta',
+        'building_type' => 'RUKO',
+        'building_class' => null,
+        'storey_pattern' => '1-2',
+        'rcn_value' => 4250000,
+        'notes' => 'Export ruko',
+    ]);
+
+    $response = $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.mappi-rcn-standards.export', [
+            'guideline_set_id' => $guidelineSet->id,
+        ]));
+
+    $response->assertOk();
+
+    expect((string) $response->headers->get('content-disposition'))
+        ->toContain('attachment;')
+        ->toContain('mappi-rcn-standards-');
+});
+
 it('updates a mappi rcn standard from the vue admin workspace', function () {
     $admin = createAdminUser();
     $guidelineSet = GuidelineSet::query()->create([
@@ -3283,6 +3691,40 @@ it('renders the building economic life list in the vue admin workspace', functio
             ->component('Admin/BuildingEconomicLives/Index')
             ->where('records.meta.total', 1)
             ->where('records.data.0.economic_life', 40));
+});
+
+it('exports building economic life records from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $guidelineSet = GuidelineSet::query()->create([
+        'name' => 'Pedoman BEL Export 2026',
+        'year' => 2026,
+        'description' => null,
+        'is_active' => true,
+    ]);
+
+    BuildingEconomicLife::query()->create([
+        'guideline_item_id' => $guidelineSet->id,
+        'year' => 2026,
+        'category' => 'Rumah Tinggal',
+        'sub_category' => 'Menengah',
+        'building_type' => 'RUMAH',
+        'building_class' => 'GRADE_A',
+        'storey_min' => 1,
+        'storey_max' => 2,
+        'economic_life' => 40,
+    ]);
+
+    $response = $this
+        ->actingAs($admin)
+        ->get(route('admin.ref-guidelines.building-economic-lives.export', [
+            'guideline_item_id' => $guidelineSet->id,
+        ]));
+
+    $response->assertOk();
+
+    expect((string) $response->headers->get('content-disposition'))
+        ->toContain('attachment;')
+        ->toContain('building-economic-lives-');
 });
 
 it('creates a building economic life record from the vue admin workspace', function () {

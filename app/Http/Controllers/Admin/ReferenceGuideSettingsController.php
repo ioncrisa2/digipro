@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\GuidelineSetExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreGuidelineSetRequest;
 use App\Http\Requests\Admin\StoreValuationSettingRequest;
@@ -13,6 +14,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReferenceGuideSettingsController extends Controller
 {
@@ -24,22 +27,13 @@ class ReferenceGuideSettingsController extends Controller
             'per_page' => (string) $this->adminPerPage($request),
         ];
 
-        $records = GuidelineSet::query()
+        $records = $this->guidelineSetFilteredQuery($filters)
             ->withCount([
                 'constructionCostIndexes',
                 'costElements',
                 'floorIndexes',
                 'mappiRcnStandards',
             ])
-            ->when($filters['q'] !== '', function ($query) use ($filters): void {
-                $query->where(function ($innerQuery) use ($filters): void {
-                    $innerQuery
-                        ->where('name', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('description', 'like', '%' . $filters['q'] . '%');
-                });
-            })
-            ->when($filters['status'] === 'active', fn ($query) => $query->where('is_active', true))
-            ->when($filters['status'] === 'inactive', fn ($query) => $query->where('is_active', false))
             ->orderByDesc('year')
             ->paginate($this->adminPerPage($request))
             ->withQueryString();
@@ -60,8 +54,28 @@ class ReferenceGuideSettingsController extends Controller
                 'ikk_rows' => ConstructionCostIndex::query()->count(),
             ],
             'records' => $this->paginatedRecordsPayload($records),
-            'createUrl' => route('admin.ref-guidelines.guideline-sets.create'),
+            'indexUrl' => $this->workspaceRoute('ref-guidelines.guideline-sets.index'),
+            'createUrl' => $this->workspaceRoute('ref-guidelines.guideline-sets.create'),
+            'exportUrl' => $this->workspaceRoute('ref-guidelines.guideline-sets.export', array_filter([
+                'q' => $filters['q'] !== '' ? $filters['q'] : null,
+                'status' => $filters['status'] !== 'all' ? $filters['status'] : null,
+            ])),
         ]);
+    }
+
+    public function guidelineSetsExport(Request $request): BinaryFileResponse
+    {
+        $filters = [
+            'q' => trim((string) $request->query('q', '')),
+            'status' => (string) $request->query('status', 'all'),
+        ];
+
+        $query = $this->guidelineSetFilteredQuery($filters)->orderByDesc('year');
+
+        return Excel::download(
+            new GuidelineSetExport($query),
+            'guideline-sets-' . now()->format('Ymd-His') . '.xlsx'
+        );
     }
 
     public function guidelineSetsCreate(): Response
@@ -74,8 +88,8 @@ class ReferenceGuideSettingsController extends Controller
                 'description' => '',
                 'is_active' => false,
             ],
-            'submitUrl' => route('admin.ref-guidelines.guideline-sets.store'),
-            'indexUrl' => route('admin.ref-guidelines.guideline-sets.index'),
+            'submitUrl' => $this->workspaceRoute('ref-guidelines.guideline-sets.store'),
+            'indexUrl' => $this->workspaceRoute('ref-guidelines.guideline-sets.index'),
         ]);
     }
 
@@ -97,7 +111,7 @@ class ReferenceGuideSettingsController extends Controller
         });
 
         return redirect()
-            ->route('admin.ref-guidelines.guideline-sets.index')
+            ->route($this->workspaceRouteName('ref-guidelines.guideline-sets.index'))
             ->with('success', 'Guideline set berhasil ditambahkan.');
     }
 
@@ -112,8 +126,8 @@ class ReferenceGuideSettingsController extends Controller
                 'description' => $guidelineSet->description,
                 'is_active' => (bool) $guidelineSet->is_active,
             ],
-            'submitUrl' => route('admin.ref-guidelines.guideline-sets.update', $guidelineSet),
-            'indexUrl' => route('admin.ref-guidelines.guideline-sets.index'),
+            'submitUrl' => $this->workspaceRoute('ref-guidelines.guideline-sets.update', $guidelineSet),
+            'indexUrl' => $this->workspaceRoute('ref-guidelines.guideline-sets.index'),
         ]);
     }
 
@@ -137,7 +151,7 @@ class ReferenceGuideSettingsController extends Controller
         });
 
         return redirect()
-            ->route('admin.ref-guidelines.guideline-sets.index')
+            ->route($this->workspaceRouteName('ref-guidelines.guideline-sets.index'))
             ->with('success', 'Guideline set berhasil diperbarui.');
     }
 
@@ -147,12 +161,12 @@ class ReferenceGuideSettingsController extends Controller
             $guidelineSet->delete();
         } catch (QueryException) {
             return redirect()
-                ->route('admin.ref-guidelines.guideline-sets.index')
+                ->route($this->workspaceRouteName('ref-guidelines.guideline-sets.index'))
                 ->with('error', 'Guideline set tidak bisa dihapus karena masih dipakai resource referensi lain.');
         }
 
         return redirect()
-            ->route('admin.ref-guidelines.guideline-sets.index')
+            ->route($this->workspaceRouteName('ref-guidelines.guideline-sets.index'))
             ->with('success', 'Guideline set berhasil dihapus.');
     }
 
@@ -207,7 +221,7 @@ class ReferenceGuideSettingsController extends Controller
                     ->count(),
             ],
             'records' => $this->paginatedRecordsPayload($records),
-            'createUrl' => route('admin.ref-guidelines.valuation-settings.create'),
+            'createUrl' => $this->workspaceRoute('ref-guidelines.valuation-settings.create'),
         ]);
     }
 
@@ -228,8 +242,8 @@ class ReferenceGuideSettingsController extends Controller
             ],
             'guidelineSetOptions' => $this->guidelineSetOptions(),
             'keyOptions' => $this->valuationSettingKeyOptions(),
-            'submitUrl' => route('admin.ref-guidelines.valuation-settings.store'),
-            'indexUrl' => route('admin.ref-guidelines.valuation-settings.index'),
+            'submitUrl' => $this->workspaceRoute('ref-guidelines.valuation-settings.store'),
+            'indexUrl' => $this->workspaceRoute('ref-guidelines.valuation-settings.index'),
         ]);
     }
 
@@ -248,7 +262,7 @@ class ReferenceGuideSettingsController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.ref-guidelines.valuation-settings.index')
+            ->route($this->workspaceRouteName('ref-guidelines.valuation-settings.index'))
             ->with('success', 'Valuation setting berhasil ditambahkan.');
     }
 
@@ -268,8 +282,8 @@ class ReferenceGuideSettingsController extends Controller
             ],
             'guidelineSetOptions' => $this->guidelineSetOptions(),
             'keyOptions' => $this->valuationSettingKeyOptions(),
-            'submitUrl' => route('admin.ref-guidelines.valuation-settings.update', $valuationSetting),
-            'indexUrl' => route('admin.ref-guidelines.valuation-settings.index'),
+            'submitUrl' => $this->workspaceRoute('ref-guidelines.valuation-settings.update', $valuationSetting),
+            'indexUrl' => $this->workspaceRoute('ref-guidelines.valuation-settings.index'),
         ]);
     }
 
@@ -288,7 +302,7 @@ class ReferenceGuideSettingsController extends Controller
         ])->save();
 
         return redirect()
-            ->route('admin.ref-guidelines.valuation-settings.index')
+            ->route($this->workspaceRouteName('ref-guidelines.valuation-settings.index'))
             ->with('success', 'Valuation setting berhasil diperbarui.');
     }
 
@@ -297,7 +311,7 @@ class ReferenceGuideSettingsController extends Controller
         $valuationSetting->delete();
 
         return redirect()
-            ->route('admin.ref-guidelines.valuation-settings.index')
+            ->route($this->workspaceRouteName('ref-guidelines.valuation-settings.index'))
             ->with('success', 'Valuation setting berhasil dihapus.');
     }
 
@@ -314,9 +328,23 @@ class ReferenceGuideSettingsController extends Controller
             'floor_indexes_count' => (int) ($guidelineSet->floor_indexes_count ?? 0),
             'mappi_rcn_standards_count' => (int) ($guidelineSet->mappi_rcn_standards_count ?? 0),
             'updated_at' => $guidelineSet->updated_at?->toIso8601String(),
-            'edit_url' => route('admin.ref-guidelines.guideline-sets.edit', $guidelineSet),
-            'destroy_url' => route('admin.ref-guidelines.guideline-sets.destroy', $guidelineSet),
+            'edit_url' => $this->workspaceRoute('ref-guidelines.guideline-sets.edit', $guidelineSet),
+            'destroy_url' => $this->workspaceRoute('ref-guidelines.guideline-sets.destroy', $guidelineSet),
         ];
+    }
+
+    private function guidelineSetFilteredQuery(array $filters)
+    {
+        return GuidelineSet::query()
+            ->when($filters['q'] !== '', function ($query) use ($filters): void {
+                $query->where(function ($innerQuery) use ($filters): void {
+                    $innerQuery
+                        ->where('name', 'like', '%' . $filters['q'] . '%')
+                        ->orWhere('description', 'like', '%' . $filters['q'] . '%');
+                });
+            })
+            ->when($filters['status'] === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($filters['status'] === 'inactive', fn ($query) => $query->where('is_active', false));
     }
 
     private function transformValuationSettingRow(ValuationSetting $valuationSetting): array
@@ -335,8 +363,8 @@ class ReferenceGuideSettingsController extends Controller
             'value_text' => $valuationSetting->value_text,
             'notes' => $valuationSetting->notes,
             'updated_at' => $valuationSetting->updated_at?->toIso8601String(),
-            'edit_url' => route('admin.ref-guidelines.valuation-settings.edit', $valuationSetting),
-            'destroy_url' => route('admin.ref-guidelines.valuation-settings.destroy', $valuationSetting),
+            'edit_url' => $this->workspaceRoute('ref-guidelines.valuation-settings.edit', $valuationSetting),
+            'destroy_url' => $this->workspaceRoute('ref-guidelines.valuation-settings.destroy', $valuationSetting),
         ];
     }
 

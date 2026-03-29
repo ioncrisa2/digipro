@@ -13,15 +13,17 @@ use App\Http\Controllers\Admin\IkkByProvinceController;
 use App\Http\Controllers\Admin\MasterDataController;
 use App\Http\Controllers\Admin\ReferenceGuideDataController;
 use App\Http\Controllers\Admin\ReferenceGuideSettingsController;
+use App\Support\SystemNavigation;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'verified', 'admin.role'])
+Route::middleware(['auth', 'verified', 'not.reviewer'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function (): void {
-        Route::get('/', [AdminDashboardController::class, 'dashboard'])->name('dashboard');
+        Route::get('/', [AdminDashboardController::class, 'entry'])->name('dashboard');
 
-        Route::prefix('permohonan-penilaian')
+        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_APPRAISAL_REQUESTS)
+            ->prefix('permohonan-penilaian')
             ->name('appraisal-requests.')
             ->group(function (): void {
                 Route::get('/', [AppraisalRequestController::class, 'appraisalRequestsIndex'])->name('index');
@@ -39,7 +41,8 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::post('/{appraisalRequest}/approve-latest-negotiation', [AppraisalRequestWorkflowController::class, 'approveLatestNegotiation'])->name('actions.approve-latest-negotiation');
             });
 
-        Route::prefix('keuangan')
+        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_FINANCE)
+            ->prefix('keuangan')
             ->name('finance.')
             ->group(function (): void {
                 Route::get('/pembayaran', [FinanceController::class, 'paymentsIndex'])->name('payments.index');
@@ -54,7 +57,8 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::delete('/rekening-kantor/{officeBankAccount}', [FinanceController::class, 'officeBankAccountsDestroy'])->name('office-bank-accounts.destroy');
             });
 
-        Route::prefix('konten')
+        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_CONTENT)
+            ->prefix('konten')
             ->name('content.')
             ->group(function (): void {
                 Route::get('/artikel', [ContentController::class, 'articlesIndex'])->name('articles.index');
@@ -130,17 +134,22 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                     });
             });
 
-        Route::prefix('master-data')
+        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_MASTER_DATA)
+            ->prefix('master-data')
             ->name('master-data.')
             ->group(function (): void {
                 Route::get('/location-id-preview', [MasterDataController::class, 'locationIdPreview'])->name('locations.id-preview');
                 Route::get('/location-options', [MasterDataController::class, 'locationOptions'])->name('locations.options');
-                Route::get('/users', [MasterDataController::class, 'usersIndex'])->name('users.index');
-                Route::get('/users/buat', [MasterDataController::class, 'usersCreate'])->name('users.create');
-                Route::post('/users', [MasterDataController::class, 'usersStore'])->name('users.store');
-                Route::get('/users/{user}', [MasterDataController::class, 'usersShow'])->name('users.show');
-                Route::get('/users/{user}/edit', [MasterDataController::class, 'usersEdit'])->name('users.edit');
-                Route::put('/users/{user}', [MasterDataController::class, 'usersUpdate'])->name('users.update');
+
+                Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_MASTER_DATA_USERS)
+                    ->group(function (): void {
+                        Route::get('/users', [MasterDataController::class, 'usersIndex'])->name('users.index');
+                        Route::get('/users/buat', [MasterDataController::class, 'usersCreate'])->name('users.create');
+                        Route::post('/users', [MasterDataController::class, 'usersStore'])->name('users.store');
+                        Route::get('/users/{user}', [MasterDataController::class, 'usersShow'])->name('users.show');
+                        Route::get('/users/{user}/edit', [MasterDataController::class, 'usersEdit'])->name('users.edit');
+                        Route::put('/users/{user}', [MasterDataController::class, 'usersUpdate'])->name('users.update');
+                    });
 
                 Route::get('/provinsi', [MasterDataController::class, 'provincesIndex'])->name('provinces.index');
                 Route::get('/provinsi/buat', [MasterDataController::class, 'provincesCreate'])->name('provinces.create');
@@ -171,10 +180,12 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::delete('/kelurahan-desa/{village}', [MasterDataController::class, 'villagesDestroy'])->name('villages.destroy');
             });
 
-        Route::prefix('ref-guidelines')
+        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_REF_GUIDELINES)
+            ->prefix('ref-guidelines')
             ->name('ref-guidelines.')
             ->group(function (): void {
                 Route::get('/guideline-sets', [ReferenceGuideSettingsController::class, 'guidelineSetsIndex'])->name('guideline-sets.index');
+                Route::get('/guideline-sets/export', [ReferenceGuideSettingsController::class, 'guidelineSetsExport'])->name('guideline-sets.export');
                 Route::get('/guideline-sets/buat', [ReferenceGuideSettingsController::class, 'guidelineSetsCreate'])->name('guideline-sets.create');
                 Route::post('/guideline-sets', [ReferenceGuideSettingsController::class, 'guidelineSetsStore'])->name('guideline-sets.store');
                 Route::get('/guideline-sets/{guidelineSet}/edit', [ReferenceGuideSettingsController::class, 'guidelineSetsEdit'])->name('guideline-sets.edit');
@@ -182,6 +193,7 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::delete('/guideline-sets/{guidelineSet}', [ReferenceGuideSettingsController::class, 'guidelineSetsDestroy'])->name('guideline-sets.destroy');
 
                 Route::get('/ikk', [ReferenceGuideDataController::class, 'constructionCostIndicesIndex'])->name('construction-cost-indices.index');
+                Route::get('/ikk/export', [ReferenceGuideDataController::class, 'constructionCostIndicesExport'])->name('construction-cost-indices.export');
                 Route::get('/ikk/buat', [ReferenceGuideDataController::class, 'constructionCostIndicesCreate'])->name('construction-cost-indices.create');
                 Route::post('/ikk', [ReferenceGuideDataController::class, 'constructionCostIndicesStore'])->name('construction-cost-indices.store');
                 Route::post('/ikk/import', [ReferenceGuideDataController::class, 'constructionCostIndicesImport'])->name('construction-cost-indices.import');
@@ -190,13 +202,16 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::delete('/ikk/{constructionCostIndex}', [ReferenceGuideDataController::class, 'constructionCostIndicesDestroy'])->name('construction-cost-indices.destroy');
 
                 Route::get('/cost-elements', [ReferenceGuideDataController::class, 'costElementsIndex'])->name('cost-elements.index');
+                Route::get('/cost-elements/export', [ReferenceGuideDataController::class, 'costElementsExport'])->name('cost-elements.export');
                 Route::get('/cost-elements/buat', [ReferenceGuideDataController::class, 'costElementsCreate'])->name('cost-elements.create');
                 Route::post('/cost-elements', [ReferenceGuideDataController::class, 'costElementsStore'])->name('cost-elements.store');
+                Route::post('/cost-elements/import', [ReferenceGuideDataController::class, 'costElementsImport'])->name('cost-elements.import');
                 Route::get('/cost-elements/{costElement}/edit', [ReferenceGuideDataController::class, 'costElementsEdit'])->name('cost-elements.edit');
                 Route::put('/cost-elements/{costElement}', [ReferenceGuideDataController::class, 'costElementsUpdate'])->name('cost-elements.update');
                 Route::delete('/cost-elements/{costElement}', [ReferenceGuideDataController::class, 'costElementsDestroy'])->name('cost-elements.destroy');
 
                 Route::get('/floor-indices', [ReferenceGuideDataController::class, 'floorIndicesIndex'])->name('floor-indices.index');
+                Route::get('/floor-indices/export', [ReferenceGuideDataController::class, 'floorIndicesExport'])->name('floor-indices.export');
                 Route::get('/floor-indices/buat', [ReferenceGuideDataController::class, 'floorIndicesCreate'])->name('floor-indices.create');
                 Route::post('/floor-indices', [ReferenceGuideDataController::class, 'floorIndicesStore'])->name('floor-indices.store');
                 Route::post('/floor-indices/import', [ReferenceGuideDataController::class, 'floorIndicesImport'])->name('floor-indices.import');
@@ -205,13 +220,16 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::delete('/floor-indices/{floorIndex}', [ReferenceGuideDataController::class, 'floorIndicesDestroy'])->name('floor-indices.destroy');
 
                 Route::get('/mappi-rcn-standards', [ReferenceGuideDataController::class, 'mappiRcnStandardsIndex'])->name('mappi-rcn-standards.index');
+                Route::get('/mappi-rcn-standards/export', [ReferenceGuideDataController::class, 'mappiRcnStandardsExport'])->name('mappi-rcn-standards.export');
                 Route::get('/mappi-rcn-standards/buat', [ReferenceGuideDataController::class, 'mappiRcnStandardsCreate'])->name('mappi-rcn-standards.create');
                 Route::post('/mappi-rcn-standards', [ReferenceGuideDataController::class, 'mappiRcnStandardsStore'])->name('mappi-rcn-standards.store');
+                Route::post('/mappi-rcn-standards/import', [ReferenceGuideDataController::class, 'mappiRcnStandardsImport'])->name('mappi-rcn-standards.import');
                 Route::get('/mappi-rcn-standards/{mappiRcnStandard}/edit', [ReferenceGuideDataController::class, 'mappiRcnStandardsEdit'])->name('mappi-rcn-standards.edit');
                 Route::put('/mappi-rcn-standards/{mappiRcnStandard}', [ReferenceGuideDataController::class, 'mappiRcnStandardsUpdate'])->name('mappi-rcn-standards.update');
                 Route::delete('/mappi-rcn-standards/{mappiRcnStandard}', [ReferenceGuideDataController::class, 'mappiRcnStandardsDestroy'])->name('mappi-rcn-standards.destroy');
 
                 Route::get('/building-economic-lives', [BuildingEconomicLifeController::class, 'index'])->name('building-economic-lives.index');
+                Route::get('/building-economic-lives/export', [BuildingEconomicLifeController::class, 'export'])->name('building-economic-lives.export');
                 Route::get('/building-economic-lives/buat', [BuildingEconomicLifeController::class, 'create'])->name('building-economic-lives.create');
                 Route::post('/building-economic-lives', [BuildingEconomicLifeController::class, 'store'])->name('building-economic-lives.store');
                 Route::post('/building-economic-lives/import', [BuildingEconomicLifeController::class, 'import'])->name('building-economic-lives.import');
@@ -230,7 +248,8 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::delete('/valuation-settings/{valuationSetting}', [ReferenceGuideSettingsController::class, 'valuationSettingsDestroy'])->name('valuation-settings.destroy');
             });
 
-        Route::prefix('hak-akses')
+        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_ACCESS_CONTROL)
+            ->prefix('hak-akses')
             ->name('access-control.')
             ->group(function (): void {
                 Route::get('/roles', [AccessControlController::class, 'rolesIndex'])->name('roles.index');
@@ -240,9 +259,13 @@ Route::middleware(['auth', 'verified', 'admin.role'])
                 Route::get('/roles/{role}/edit', [AccessControlController::class, 'rolesEdit'])->name('roles.edit');
                 Route::put('/roles/{role}', [AccessControlController::class, 'rolesUpdate'])->name('roles.update');
                 Route::delete('/roles/{role}', [AccessControlController::class, 'rolesDestroy'])->name('roles.destroy');
+                Route::get('/menu-sistem', [AccessControlController::class, 'workspaceMenusIndex'])->name('system-menus.index');
+                Route::get('/menu-sistem/{role}/edit', [AccessControlController::class, 'workspaceMenusEdit'])->name('system-menus.edit');
+                Route::put('/menu-sistem/{role}', [AccessControlController::class, 'workspaceMenusUpdate'])->name('system-menus.update');
             });
 
-        Route::prefix('komunikasi')
+        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_COMMUNICATIONS)
+            ->prefix('komunikasi')
             ->name('communications.')
             ->group(function (): void {
                 Route::get('/contact-messages', [CommunicationController::class, 'contactMessagesIndex'])->name('contact-messages.index');

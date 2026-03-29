@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminImportExportButtonGroup from '@/components/admin/AdminImportExportButtonGroup.vue';
 import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,9 +29,11 @@ const props = defineProps({
   provinceOptions: { type: Array, default: () => [] },
   summary: { type: Object, default: () => ({ total: 0, guideline_sets: 0, provinces: 0, active_guideline: 0 }) },
   records: { type: Object, required: true },
+  indexUrl: { type: String, required: true },
   createUrl: { type: String, required: true },
   ikkByProvinceUrl: { type: String, default: '' },
   importUrl: { type: String, default: '' },
+  exportUrl: { type: String, default: '' },
   importDefaults: { type: Object, default: () => ({ guideline_set_id: '', year: '', skip_province_rows: true, require_regency: true }) },
 });
 
@@ -61,7 +64,7 @@ const columns = [
 ];
 
 const submitFilters = () => {
-  router.get(route('admin.ref-guidelines.construction-cost-indices.index'), {
+  router.get(props.indexUrl, {
     q: form.q || undefined,
     guideline_set_id: form.guideline_set_id === 'all' ? undefined : form.guideline_set_id,
     year: form.year === 'all' ? undefined : form.year,
@@ -113,7 +116,12 @@ const submitImport = () => {
         </div>
         <div class="flex flex-wrap gap-2">
           <Button v-if="ikkByProvinceUrl" variant="outline" as-child><Link :href="ikkByProvinceUrl">Input IKK by Provinsi</Link></Button>
-          <Button v-if="importUrl" variant="outline" type="button" @click="importDialogOpen = true">Import</Button>
+          <AdminImportExportButtonGroup
+            :show-import="Boolean(importUrl)"
+            :show-export="Boolean(exportUrl)"
+            :export-url="exportUrl"
+            @import="importDialogOpen = true"
+          />
           <Button as-child><Link :href="createUrl">Tambah IKK</Link></Button>
         </div>
       </section>

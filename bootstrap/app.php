@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsureCustomerRole;
 use App\Http\Middleware\EnsureNotReviewerRole;
 use App\Http\Middleware\EnsureReviewerRole;
+use App\Http\Middleware\EnsureSystemSectionPermission;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'customer.role' => EnsureCustomerRole::class,
             'not.reviewer' => EnsureNotReviewerRole::class,
             'reviewer.role' => EnsureReviewerRole::class,
+            'system.section' => EnsureSystemSectionPermission::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [

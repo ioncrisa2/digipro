@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Support\SystemNavigation;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Notifications\Notifiable;
 use App\Notifications\ResetPasswordNotification;
@@ -68,6 +69,16 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isReviewer(): bool
     {
         return $this->hasRole('Reviewer');
+    }
+
+    public function hasAdminNavigationAccess(): bool
+    {
+        return SystemNavigation::hasContextAccess($this, 'admin');
+    }
+
+    public function systemSectionPermissions(): array
+    {
+        return SystemNavigation::permissionsForUser($this);
     }
 
     // public function sendPasswordResetNotification($token): void

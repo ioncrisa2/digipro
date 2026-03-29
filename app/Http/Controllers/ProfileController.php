@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Http\Requests\PasswordUpdateRequest;
+use App\Support\SystemNavigation;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $isReviewer = (bool) $user?->hasRole('Reviewer');
-        $isAdmin = (bool) $user?->hasAdminAccess();
+        $isAdmin = (bool) $user && SystemNavigation::hasContextAccess($user, 'admin');
 
         if ($isReviewer && $request->routeIs('profile.edit')) {
             return redirect()->route('reviewer.profile.edit');

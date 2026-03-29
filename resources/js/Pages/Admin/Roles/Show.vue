@@ -15,6 +15,7 @@ const props = defineProps({
   indexUrl: { type: String, required: true },
   editUrl: { type: String, required: true },
   deleteUrl: { type: String, required: true },
+  workspaceMenuEditUrl: { type: String, default: null },
 });
 
 const { confirmDelete } = useAdminConfirmDialog();
@@ -42,6 +43,7 @@ const destroyRole = async () => {
         </div>
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" as-child><Link :href="indexUrl"><ArrowLeft class="h-4 w-4" />Kembali ke daftar</Link></Button>
+          <Button v-if="workspaceMenuEditUrl" variant="outline" as-child><Link :href="workspaceMenuEditUrl">Atur Menu Sistem</Link></Button>
           <Button v-if="canUpdate" variant="outline" as-child><Link :href="editUrl"><Pencil class="h-4 w-4" />Edit Role</Link></Button>
           <Button v-if="canDelete" variant="destructive" @click="destroyRole"><Trash2 class="h-4 w-4" />Hapus</Button>
         </div>

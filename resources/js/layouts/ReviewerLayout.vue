@@ -1,7 +1,22 @@
 ﻿<script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { LayoutDashboard, ClipboardList, Scale } from 'lucide-vue-next';
+import {
+  BookOpen,
+  BookText,
+  BookMarked,
+  Building2,
+  ClipboardList,
+  Factory,
+  House,
+  Layers3,
+  LayoutDashboard,
+  Map,
+  MapPinned,
+  Ruler,
+  Scale,
+  Users,
+} from 'lucide-vue-next';
 import { useNotification } from '@/composables/useNotification';
 import GlobalDialog from '@/components/GlobalDialog.vue';
 import NotificationCenter from '@/components/ui/notification/NotificationCenter.vue';
@@ -32,34 +47,36 @@ const reviewerProfileHref = computed(() => {
   }
 });
 
-const navItems = [
-  {
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-    routeName: 'reviewer.dashboard',
-    activePatterns: ['reviewer.dashboard'],
-    pathPrefixes: ['/reviewer'],
-  },
-  {
-    label: 'Review',
-    icon: ClipboardList,
-    routeName: 'reviewer.reviews.index',
-    activePatterns: ['reviewer.reviews.*', 'reviewer.assets.*'],
-    pathPrefixes: ['/reviewer/reviews', '/reviewer/assets'],
-  },
-  {
-    label: 'Comparables',
-    icon: Scale,
-    routeName: 'reviewer.comparables.index',
-    activePatterns: ['reviewer.comparables.*'],
-    pathPrefixes: ['/reviewer/comparables'],
-  },
-];
+const iconMap = {
+  BookOpen,
+  BookText,
+  BookMarked,
+  Building2,
+  ClipboardList,
+  Factory,
+  House,
+  Layers3,
+  LayoutDashboard,
+  Map,
+  MapPinned,
+  Ruler,
+  Scale,
+  Users,
+};
+
+const mapNavItems = (items = []) => items.map((item) => ({
+  ...item,
+  icon: iconMap[item.icon] || ClipboardList,
+  subItems: item.subItems?.length ? mapNavItems(item.subItems) : undefined,
+}));
+
+const navItems = computed(() => mapNavItems(page.props.navigation?.reviewer_nav || []));
 
 const sidebarOpen = ref(true);
 const sidebarCollapsed = ref(false);
 const showLogoutDialog = ref(false);
 const notifRefreshing = ref(false);
+const openGroups = ref({});
 let notifTimer = null;
 
 const handleResize = () => {
@@ -69,6 +86,7 @@ const handleResize = () => {
 onMounted(() => {
   handleResize();
   window.addEventListener('resize', handleResize);
+  syncOpenGroups();
 
   refreshNotifications();
   notifTimer = setInterval(refreshNotifications, 15000);
@@ -109,6 +127,16 @@ const isProfileActive = computed(() => {
     return matchesPathPrefix(currentPath.value, ['/reviewer/profile']);
   }
 });
+
+const syncOpenGroups = () => {
+  openGroups.value = navItems.value.reduce((carry, item) => {
+    if (item.subItems?.length) {
+      carry[item.key] = isActive(item);
+    }
+
+    return carry;
+  }, {});
+};
 
 const toggleSidebar = () => {
   sidebarOpen.value = !sidebarOpen.value;
@@ -216,6 +244,7 @@ watch(
 watch(
   () => page.url,
   () => {
+    syncOpenGroups();
     closeSidebar();
   },
 );
@@ -235,6 +264,7 @@ watch(
       :sidebar-open="sidebarOpen"
       :sidebar-collapsed="sidebarCollapsed"
       :is-active="isActive"
+      :open-groups="openGroups"
       :is-profile-active="isProfileActive"
       :user="user"
       :close-sidebar="closeSidebar"

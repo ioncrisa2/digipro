@@ -3,6 +3,7 @@ import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminImportExportButtonGroup from '@/components/admin/AdminImportExportButtonGroup.vue';
 import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,9 @@ const props = defineProps({
   statusOptions: { type: Array, default: () => [] },
   summary: { type: Object, default: () => ({ total: 0, active: 0, valuation_settings: 0, ikk_rows: 0 }) },
   records: { type: Object, required: true },
+  indexUrl: { type: String, required: true },
   createUrl: { type: String, required: true },
+  exportUrl: { type: String, default: '' },
 });
 
 const form = reactive({
@@ -41,7 +44,7 @@ const columns = [
 ];
 
 const submitFilters = () => {
-  router.get(route('admin.ref-guidelines.guideline-sets.index'), {
+  router.get(props.indexUrl, {
     q: form.q || undefined,
     status: form.status === 'all' ? undefined : form.status,
   }, {
@@ -75,6 +78,10 @@ const activeFilterCount = computed(() => (form.status !== 'all' ? 1 : 0));
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <AdminImportExportButtonGroup
+            :show-export="Boolean(exportUrl)"
+            :export-url="exportUrl"
+          />
           <Button as-child><Link :href="createUrl">Tambah Guideline Set</Link></Button>
         </div>
       </section>

@@ -34,7 +34,7 @@ class IkkByProvinceController extends Controller
                 $this->normalizeYear($filters['year']),
                 $this->normalizeProvinceId($filters['province_id'])
             ),
-            'submitUrl' => route('admin.ref-guidelines.ikk-by-province.save'),
+            'submitUrl' => $this->workspaceRoute('ref-guidelines.ikk-by-province.save'),
         ]);
     }
 
@@ -79,7 +79,7 @@ class IkkByProvinceController extends Controller
         });
 
         return redirect()
-            ->route('admin.ref-guidelines.ikk-by-province.index', [
+            ->route($this->workspaceRouteName('ref-guidelines.ikk-by-province.index'), [
                 'guideline_set_id' => $guidelineSetId,
                 'year' => $year,
                 'province_id' => $provinceId,

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\BuildingEconomicLifeExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreBuildingEconomicLifeRequest;
 use App\Imports\BuildingEconomicLifeImport;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
 class BuildingEconomicLifeController extends Controller
@@ -29,33 +31,8 @@ class BuildingEconomicLifeController extends Controller
             'per_page' => (string) $this->adminPerPage($request),
         ];
 
-        $records = BuildingEconomicLife::query()
+        $records = $this->buildingEconomicLifeFilteredQuery($filters)
             ->with('guidelineSet:id,name,year,is_active')
-            ->when($filters['q'] !== '', function ($query) use ($filters): void {
-                $query->where(function ($innerQuery) use ($filters): void {
-                    $innerQuery
-                        ->where('category', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('sub_category', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('building_type', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('building_class', 'like', '%' . $filters['q'] . '%');
-                });
-            })
-            ->when(
-                $filters['guideline_item_id'] !== 'all',
-                fn ($query) => $query->where('guideline_item_id', (int) $filters['guideline_item_id'])
-            )
-            ->when(
-                $filters['year'] !== 'all',
-                fn ($query) => $query->where('year', (int) $filters['year'])
-            )
-            ->when(
-                $filters['category'] !== 'all',
-                fn ($query) => $query->where('category', $filters['category'])
-            )
-            ->when(
-                $filters['building_class'] !== 'all',
-                fn ($query) => $query->where('building_class', $filters['building_class'])
-            )
             ->orderByDesc('year')
             ->orderBy('category')
             ->orderBy('building_class')
@@ -80,8 +57,16 @@ class BuildingEconomicLifeController extends Controller
                     ->count(),
             ],
             'records' => $this->paginatedRecordsPayload($records),
-            'createUrl' => route('admin.ref-guidelines.building-economic-lives.create'),
-            'importUrl' => route('admin.ref-guidelines.building-economic-lives.import'),
+            'indexUrl' => $this->workspaceRoute('ref-guidelines.building-economic-lives.index'),
+            'createUrl' => $this->workspaceRoute('ref-guidelines.building-economic-lives.create'),
+            'importUrl' => $this->workspaceRoute('ref-guidelines.building-economic-lives.import'),
+            'exportUrl' => $this->workspaceRoute('ref-guidelines.building-economic-lives.export', array_filter([
+                'q' => $filters['q'] !== '' ? $filters['q'] : null,
+                'guideline_item_id' => $filters['guideline_item_id'] !== 'all' ? $filters['guideline_item_id'] : null,
+                'year' => $filters['year'] !== 'all' ? $filters['year'] : null,
+                'category' => $filters['category'] !== 'all' ? $filters['category'] : null,
+                'building_class' => $filters['building_class'] !== 'all' ? $filters['building_class'] : null,
+            ])),
             'importDefaults' => [
                 'guideline_item_id' => $filters['guideline_item_id'] !== 'all'
                     ? (int) $filters['guideline_item_id']
@@ -91,6 +76,28 @@ class BuildingEconomicLifeController extends Controller
                     : ($activeGuideline?->year ?? (int) now()->format('Y')),
             ],
         ]);
+    }
+
+    public function export(Request $request): BinaryFileResponse
+    {
+        $filters = [
+            'q' => trim((string) $request->query('q', '')),
+            'guideline_item_id' => (string) $request->query('guideline_item_id', 'all'),
+            'year' => (string) $request->query('year', 'all'),
+            'category' => (string) $request->query('category', 'all'),
+            'building_class' => (string) $request->query('building_class', 'all'),
+        ];
+
+        $query = $this->buildingEconomicLifeFilteredQuery($filters)
+            ->orderByDesc('year')
+            ->orderBy('category')
+            ->orderBy('building_class')
+            ->orderBy('storey_min');
+
+        return Excel::download(
+            new BuildingEconomicLifeExport($query),
+            'building-economic-lives-' . now()->format('Ymd-His') . '.xlsx'
+        );
     }
 
     public function create(): Response
@@ -112,8 +119,8 @@ class BuildingEconomicLifeController extends Controller
             ],
             'guidelineSetOptions' => $this->guidelineSetOptions(),
             'formOptions' => $this->formOptions(),
-            'submitUrl' => route('admin.ref-guidelines.building-economic-lives.store'),
-            'indexUrl' => route('admin.ref-guidelines.building-economic-lives.index'),
+            'submitUrl' => $this->workspaceRoute('ref-guidelines.building-economic-lives.store'),
+            'indexUrl' => $this->workspaceRoute('ref-guidelines.building-economic-lives.index'),
         ]);
     }
 
@@ -122,7 +129,7 @@ class BuildingEconomicLifeController extends Controller
         BuildingEconomicLife::query()->create($this->payload($request->validated()));
 
         return redirect()
-            ->route('admin.ref-guidelines.building-economic-lives.index')
+            ->route($this->workspaceRouteName('ref-guidelines.building-economic-lives.index'))
             ->with('success', 'BEL berhasil ditambahkan.');
     }
 
@@ -143,12 +150,12 @@ class BuildingEconomicLifeController extends Controller
             Excel::import($import, $validated['file']);
         } catch (Throwable $e) {
             return redirect()
-                ->route('admin.ref-guidelines.building-economic-lives.index')
+                ->route($this->workspaceRouteName('ref-guidelines.building-economic-lives.index'))
                 ->with('error', 'Import BEL gagal diproses. Pastikan header file sesuai format: category, sub_category, building_type, building_class, storey_min, storey_max, economic_life.');
         }
 
         return redirect()
-            ->route('admin.ref-guidelines.building-economic-lives.index', [
+            ->route($this->workspaceRouteName('ref-guidelines.building-economic-lives.index'), [
                 'guideline_item_id' => $validated['guideline_item_id'],
                 'year' => $validated['year'],
             ])
@@ -176,8 +183,8 @@ class BuildingEconomicLifeController extends Controller
             ],
             'guidelineSetOptions' => $this->guidelineSetOptions(),
             'formOptions' => $this->formOptions(),
-            'submitUrl' => route('admin.ref-guidelines.building-economic-lives.update', $buildingEconomicLife),
-            'indexUrl' => route('admin.ref-guidelines.building-economic-lives.index'),
+            'submitUrl' => $this->workspaceRoute('ref-guidelines.building-economic-lives.update', $buildingEconomicLife),
+            'indexUrl' => $this->workspaceRoute('ref-guidelines.building-economic-lives.index'),
         ]);
     }
 
@@ -188,7 +195,7 @@ class BuildingEconomicLifeController extends Controller
         $buildingEconomicLife->forceFill($this->payload($request->validated()))->save();
 
         return redirect()
-            ->route('admin.ref-guidelines.building-economic-lives.index')
+            ->route($this->workspaceRouteName('ref-guidelines.building-economic-lives.index'))
             ->with('success', 'BEL berhasil diperbarui.');
     }
 
@@ -198,12 +205,12 @@ class BuildingEconomicLifeController extends Controller
             $buildingEconomicLife->delete();
         } catch (QueryException) {
             return redirect()
-                ->route('admin.ref-guidelines.building-economic-lives.index')
+                ->route($this->workspaceRouteName('ref-guidelines.building-economic-lives.index'))
                 ->with('error', 'BEL tidak bisa dihapus karena masih dipakai perhitungan reviewer.');
         }
 
         return redirect()
-            ->route('admin.ref-guidelines.building-economic-lives.index')
+            ->route($this->workspaceRouteName('ref-guidelines.building-economic-lives.index'))
             ->with('success', 'BEL berhasil dihapus.');
     }
 
@@ -223,8 +230,8 @@ class BuildingEconomicLifeController extends Controller
             'storey_label' => $this->storeyLabel($record),
             'economic_life' => (int) $record->economic_life,
             'updated_at' => $record->updated_at?->toIso8601String(),
-            'edit_url' => route('admin.ref-guidelines.building-economic-lives.edit', $record),
-            'destroy_url' => route('admin.ref-guidelines.building-economic-lives.destroy', $record),
+            'edit_url' => $this->workspaceRoute('ref-guidelines.building-economic-lives.edit', $record),
+            'destroy_url' => $this->workspaceRoute('ref-guidelines.building-economic-lives.destroy', $record),
         ];
     }
 
@@ -241,6 +248,36 @@ class BuildingEconomicLifeController extends Controller
             'storey_max' => $this->blankToNull($validated['storey_max'] ?? null),
             'economic_life' => $validated['economic_life'],
         ];
+    }
+
+    private function buildingEconomicLifeFilteredQuery(array $filters)
+    {
+        return BuildingEconomicLife::query()
+            ->when($filters['q'] !== '', function ($query) use ($filters): void {
+                $query->where(function ($innerQuery) use ($filters): void {
+                    $innerQuery
+                        ->where('category', 'like', '%' . $filters['q'] . '%')
+                        ->orWhere('sub_category', 'like', '%' . $filters['q'] . '%')
+                        ->orWhere('building_type', 'like', '%' . $filters['q'] . '%')
+                        ->orWhere('building_class', 'like', '%' . $filters['q'] . '%');
+                });
+            })
+            ->when(
+                $filters['guideline_item_id'] !== 'all',
+                fn ($query) => $query->where('guideline_item_id', (int) $filters['guideline_item_id'])
+            )
+            ->when(
+                $filters['year'] !== 'all',
+                fn ($query) => $query->where('year', (int) $filters['year'])
+            )
+            ->when(
+                $filters['category'] !== 'all',
+                fn ($query) => $query->where('category', $filters['category'])
+            )
+            ->when(
+                $filters['building_class'] !== 'all',
+                fn ($query) => $query->where('building_class', $filters['building_class'])
+            );
     }
 
     private function guidelineSetOptions(bool $includeAll = false): array

@@ -9,6 +9,23 @@ use Illuminate\Http\Request;
  */
 abstract class Controller
 {
+    protected function workspacePrefix(?Request $request = null): string
+    {
+        $request ??= request();
+
+        return $request->routeIs('reviewer.*') ? 'reviewer' : 'admin';
+    }
+
+    protected function workspaceRouteName(string $suffix, ?Request $request = null): string
+    {
+        return $this->workspacePrefix($request) . '.' . ltrim($suffix, '.');
+    }
+
+    protected function workspaceRoute(string $suffix, mixed $parameters = [], ?Request $request = null): string
+    {
+        return route($this->workspaceRouteName($suffix, $request), $parameters);
+    }
+
     protected function adminPerPage(?Request $request = null, int $default = 10, int $max = 100): int
     {
         $request ??= request();

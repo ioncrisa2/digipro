@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\SystemNavigation;
 use App\Http\Requests\Admin\StoreRoleRequest;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Inertia\Response;
 use Spatie\Permission\Models\Permission;
@@ -50,6 +52,7 @@ class AccessControlController extends Controller
             'canCreate' => $this->roleAbility('create_role'),
             'canDeleteAny' => $this->roleAbility('delete_any_role') || $this->roleAbility('delete_role'),
             'createUrl' => route('admin.access-control.roles.create'),
+            'workspaceMenusUrl' => route('admin.access-control.system-menus.index'),
         ]);
     }
 
@@ -100,7 +103,97 @@ class AccessControlController extends Controller
             'indexUrl' => route('admin.access-control.roles.index'),
             'editUrl' => route('admin.access-control.roles.edit', $role),
             'deleteUrl' => route('admin.access-control.roles.destroy', $role),
+            'workspaceMenuEditUrl' => route('admin.access-control.system-menus.edit', $role),
         ]);
+    }
+
+    public function workspaceMenusIndex(Request $request): Response
+    {
+        $this->authorizeRoleAbility('view_any_role');
+
+        $filters = [
+            'q' => trim((string) $request->query('q', '')),
+            'guard' => (string) $request->query('guard', 'all'),
+            'per_page' => (string) $this->adminPerPage($request),
+        ];
+
+        $records = Role::query()
+            ->with('permissions:id,name,guard_name')
+            ->when($filters['q'] !== '', function ($query) use ($filters): void {
+                $query->where('name', 'like', '%' . $filters['q'] . '%');
+            })
+            ->when($filters['guard'] !== 'all', fn ($query) => $query->where('guard_name', $filters['guard']))
+            ->orderBy('name')
+            ->paginate($this->adminPerPage($request))
+            ->withQueryString();
+
+        $records->through(fn (Role $role) => $this->transformWorkspaceMenuRoleRow($role));
+
+        return inertia('Admin/Roles/WorkspaceMenusIndex', [
+            'filters' => $filters,
+            'guardOptions' => $this->roleGuardOptions(),
+            'records' => $this->paginatedRecordsPayload($records),
+            'summary' => [
+                'roles' => Role::query()->count(),
+                'sections' => count(SystemNavigation::menuManagementSections()),
+                'default_reviewer_sections' => 5,
+            ],
+            'roleIndexUrl' => route('admin.access-control.roles.index'),
+        ]);
+    }
+
+    public function workspaceMenusEdit(Role $role): Response
+    {
+        $this->authorizeRoleAbility('update_role');
+        $role->loadMissing('permissions:id,name,guard_name');
+
+        $selectedPermissions = $role->permissions
+            ->pluck('name')
+            ->intersect(SystemNavigation::sectionPermissions())
+            ->values()
+            ->all();
+
+        return inertia('Admin/Roles/WorkspaceMenusForm', [
+            'record' => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'guard_name' => $role->guard_name,
+                'workspace_permissions' => $selectedPermissions,
+            ],
+            'sections' => SystemNavigation::menuManagementSections(),
+            'indexUrl' => route('admin.access-control.system-menus.index'),
+            'roleShowUrl' => route('admin.access-control.roles.show', $role),
+            'submitUrl' => route('admin.access-control.system-menus.update', $role),
+        ]);
+    }
+
+    public function workspaceMenusUpdate(Request $request, Role $role): RedirectResponse
+    {
+        $this->authorizeRoleAbility('update_role');
+
+        $validated = $request->validate([
+            'workspace_permissions' => ['array'],
+            'workspace_permissions.*' => ['string', Rule::in(SystemNavigation::sectionPermissions())],
+        ]);
+
+        $selectedWorkspacePermissions = collect($validated['workspace_permissions'] ?? [])
+            ->values()
+            ->all();
+
+        $remainingPermissions = $role->permissions
+            ->pluck('name')
+            ->reject(fn (string $permission) => in_array($permission, SystemNavigation::sectionPermissions(), true))
+            ->values()
+            ->all();
+
+        $role->syncPermissions(array_values(array_unique([
+            ...$remainingPermissions,
+            ...$selectedWorkspacePermissions,
+        ])));
+
+        return redirect()
+            ->route('admin.access-control.system-menus.edit', $role)
+            ->with('success', 'Akses menu sistem role berhasil diperbarui.');
     }
 
     public function rolesEdit(Role $role): Response
@@ -213,6 +306,30 @@ class AccessControlController extends Controller
         ];
     }
 
+    private function transformWorkspaceMenuRoleRow(Role $role): array
+    {
+        $workspacePermissions = $role->permissions
+            ->pluck('name')
+            ->intersect(SystemNavigation::sectionPermissions())
+            ->values();
+
+        $enabledSections = collect(SystemNavigation::menuManagementSections())
+            ->filter(fn (array $section) => $workspacePermissions->contains($section['permission']))
+            ->pluck('label')
+            ->values()
+            ->all();
+
+        return [
+            'id' => $role->id,
+            'name' => $role->name,
+            'guard_name' => $role->guard_name,
+            'workspace_sections_count' => count($enabledSections),
+            'workspace_sections' => $enabledSections,
+            'edit_url' => route('admin.access-control.system-menus.edit', $role),
+            'role_show_url' => route('admin.access-control.roles.show', $role),
+        ];
+    }
+
     private function roleShowPayload(Role $role): array
     {
         return [
@@ -236,6 +353,7 @@ class AccessControlController extends Controller
 
     private function groupPermissions(iterable $permissions, bool $includeSelectionData = false): array
     {
+        $workspaceRegistry = SystemNavigation::permissionRegistry();
         $knownPrefixes = [
             'force_delete_any',
             'force_delete',
@@ -270,6 +388,11 @@ class AccessControlController extends Controller
                 }
             }
 
+            if (isset($workspaceRegistry[$name])) {
+                $matchedPrefix = 'workspace';
+                $subject = $workspaceRegistry[$name]['title'];
+            }
+
             $subjectKey = $subject;
             $grouped[$subjectKey] ??= [
                 'key' => $subjectKey,
@@ -279,7 +402,7 @@ class AccessControlController extends Controller
 
             $entry = [
                 'name' => $name,
-                'label' => Str::headline(str_replace(['::', '_'], [' ', ' '], $matchedPrefix)),
+                'label' => $workspaceRegistry[$name]['label'] ?? Str::headline(str_replace(['::', '_'], [' ', ' '], $matchedPrefix)),
                 'guard_name' => $guardName,
             ];
 

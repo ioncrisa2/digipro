@@ -2,7 +2,7 @@
 
 namespace App\Exports;
 
-use App\Models\ConstructionCostIndex;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -11,24 +11,20 @@ use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 
 class IkkExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithColumnFormatting
 {
-
-    public function __construct(
-        public int $guidelineSetId,
-        public int $year,
-    ) {}
+    public function __construct(protected Builder $query) {}
 
     public function query()
     {
-        return ConstructionCostIndex::query()
-            ->where('guideline_set_id', $this->guidelineSetId)
-            ->where('year', $this->year)
-            ->orderBy('region_code');
+        return $this->query->select([
+            'region_code',
+            'region_name',
+            'ikk_value',
+        ]);
     }
 
     public function headings(): array
     {
-        // format sama seperti template import kamu
-        return ['KODE', 'NAMA PROVINSI / KOTA / KABUPATEN', 'IKK-MAPPI'];
+        return ['kode', 'nama_provinsi_kota_kabupaten', 'ikk_mappi'];
     }
 
     public function map($row): array

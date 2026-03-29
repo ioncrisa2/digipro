@@ -23,6 +23,8 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call([
+            AdminWorkspaceAccessSeeder::class,
+            SuperAdminUserSeeder::class,
             ArticleCategorySeeder::class,
             TagSeeder::class,
             RefUsageToMappiGroupSeeder::class,

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\SystemNavigation;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,12 +17,12 @@ class EnsureCustomerRole
             return redirect()->route('login');
         }
 
-        if ($user->hasAdminAccess()) {
-            return redirect()->route('admin.dashboard');
+        if ($user->isReviewer()) {
+            return redirect()->route(SystemNavigation::firstAccessibleRouteName($user, 'reviewer') ?? 'reviewer.dashboard');
         }
 
-        if ($user->isReviewer()) {
-            return redirect()->route('reviewer.dashboard');
+        if ($user->hasAdminNavigationAccess()) {
+            return redirect()->route('admin.dashboard');
         }
 
         return $next($request);

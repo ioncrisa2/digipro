@@ -7,14 +7,17 @@ use App\Models\AppraisalAssetComparable;
 use App\Models\AppraisalRequest;
 use App\Models\User;
 use App\Services\ComparableDataApi;
+use App\Support\AdminWorkspaceAccessSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
+use App\Support\SystemNavigation;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     Role::findOrCreate('Reviewer', 'web');
     Role::findOrCreate('customer', 'web');
+    AdminWorkspaceAccessSynchronizer::sync();
 });
 
 function createReviewerAssetFixture(): array
@@ -60,6 +63,21 @@ it('allows reviewer to access the reviewer dashboard', function (): void {
     $response->assertOk();
 });
 
+it('allows reviewer to access shared reference and master data routes under reviewer prefix', function (): void {
+    $user = User::factory()->create();
+    $user->assignRole('Reviewer');
+
+    $this
+        ->actingAs($user)
+        ->get(route('reviewer.ref-guidelines.guideline-sets.index'))
+        ->assertOk();
+
+    $this
+        ->actingAs($user)
+        ->get(route('reviewer.master-data.provinces.index'))
+        ->assertOk();
+});
+
 it('blocks non reviewer users from the reviewer dashboard', function (): void {
     $user = User::factory()->create();
     $user->assignRole('customer');
@@ -69,6 +87,19 @@ it('blocks non reviewer users from the reviewer dashboard', function (): void {
         ->get(route('reviewer.dashboard'));
 
     $response->assertForbidden();
+});
+
+it('blocks reviewer routes when the matching system permission is removed from the role', function (): void {
+    $role = Role::findByName('Reviewer', 'web');
+    $role->revokePermissionTo(SystemNavigation::MANAGE_REVIEWER_COMPARABLES);
+
+    $user = User::factory()->create();
+    $user->assignRole('Reviewer');
+
+    $this
+        ->actingAs($user)
+        ->get(route('reviewer.comparables.index'))
+        ->assertForbidden();
 });
 
 it('redirects reviewer away from customer dashboard and profile', function (): void {

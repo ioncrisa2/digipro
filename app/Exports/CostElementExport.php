@@ -18,11 +18,11 @@ class CostElementExport implements FromQuery, WithHeadings, WithMapping
             'group',
             'element_code',
             'element_name',
-            'unit',
-            'unit_cost',
             'building_type',
             'building_class',
             'storey_pattern',
+            'unit',
+            'unit_cost',
             'spec_json',
         ]);
     }
@@ -33,11 +33,11 @@ class CostElementExport implements FromQuery, WithHeadings, WithMapping
             'group',
             'element_code',
             'element_name',
-            'unit',
-            'unit_cost',
             'building_type',
             'building_class',
             'storey_pattern',
+            'unit',
+            'unit_cost',
             'spec_json',
         ];
     }
@@ -49,11 +49,11 @@ class CostElementExport implements FromQuery, WithHeadings, WithMapping
             $row->group,
             $row->element_code,
             $row->element_name,
-            $row->unit,
-            $row->unit_cost,
             $row->building_type,
             $row->building_class,
             $row->storey_pattern,
+            $row->unit,
+            $row->unit_cost,
             $row->spec_json ? json_encode($row->spec_json, JSON_UNESCAPED_UNICODE) : null,
         ];
     }

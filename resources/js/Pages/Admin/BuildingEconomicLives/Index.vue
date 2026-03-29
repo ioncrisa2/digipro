@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminEntityActions from '@/components/admin/AdminEntityActions.vue';
+import AdminImportExportButtonGroup from '@/components/admin/AdminImportExportButtonGroup.vue';
 import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,8 +29,10 @@ const props = defineProps({
   buildingClassOptions: { type: Array, default: () => [] },
   summary: { type: Object, default: () => ({ total: 0, guideline_sets: 0, categories: 0, active_guideline: 0 }) },
   records: { type: Object, required: true },
+  indexUrl: { type: String, required: true },
   createUrl: { type: String, required: true },
   importUrl: { type: String, default: '' },
+  exportUrl: { type: String, default: '' },
   importDefaults: { type: Object, default: () => ({ guideline_item_id: '', year: '' }) },
 });
 
@@ -60,7 +63,7 @@ const columns = [
 ];
 
 const submitFilters = () => {
-  router.get(route('admin.ref-guidelines.building-economic-lives.index'), {
+  router.get(props.indexUrl, {
     q: form.q || undefined,
     guideline_item_id: form.guideline_item_id === 'all' ? undefined : form.guideline_item_id,
     year: form.year === 'all' ? undefined : form.year,
@@ -114,7 +117,12 @@ const submitImport = () => {
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <Button v-if="importUrl" variant="outline" type="button" @click="importDialogOpen = true">Import</Button>
+          <AdminImportExportButtonGroup
+            :show-import="Boolean(importUrl)"
+            :show-export="Boolean(exportUrl)"
+            :export-url="exportUrl"
+            @import="importDialogOpen = true"
+          />
           <Button as-child><Link :href="createUrl">Tambah BEL</Link></Button>
         </div>
       </section>

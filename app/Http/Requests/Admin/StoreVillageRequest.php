@@ -2,12 +2,14 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Support\SystemNavigation;
 use Illuminate\Foundation\Http\FormRequest;
+
 class StoreVillageRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAdminAccess() ?? false;
+        return SystemNavigation::hasSectionAccess($this->user(), SystemNavigation::MANAGE_ADMIN_MASTER_DATA);
     }
 
     public function rules(): array

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Models\User;
+use App\Support\SystemNavigation;
 use App\Http\Requests\LoginRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
@@ -63,8 +64,8 @@ class AuthController extends Controller
         }
 
         $defaultRoute = $user->isReviewer()
-            ? route('reviewer.dashboard')
-            : ($user->hasAdminAccess()
+            ? route(SystemNavigation::firstAccessibleRouteName($user, 'reviewer') ?? 'reviewer.dashboard')
+            : ($user->hasAdminNavigationAccess()
                 ? route('admin.dashboard')
                 : route('dashboard'));
 
