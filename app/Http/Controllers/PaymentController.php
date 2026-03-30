@@ -367,7 +367,6 @@ class PaymentController extends Controller
             'method' => $this->resolvePaymentMethodLabel($payment),
             'status_label' => 'LUNAS',
             'payment_status' => $payment->status,
-            'selected_bank_account' => null,
             'gateway_details' => $gatewayDetails,
             'company_name' => config('app.name', 'DigiPro'),
             'external_payment_id' => $payment->external_payment_id,

@@ -210,10 +210,6 @@ class MidtransSnapService
             return 'Midtrans Snap';
         }
 
-        if ($payment->method === 'manual') {
-            return 'Pembayaran Legacy';
-        }
-
         $details = $this->gatewayDetailsFromMetadata(is_array($payment->metadata) ? $payment->metadata : []);
 
         return $details['label'] ?? 'Midtrans Snap';

@@ -14,7 +14,6 @@ use App\Models\CostElement;
 use App\Models\FloorIndex;
 use App\Models\GuidelineSet;
 use App\Models\MappiRcnStandard;
-use App\Models\OfficeBankAccount;
 use App\Models\Payment;
 use App\Models\User;
 use App\Models\ValuationSetting;
@@ -436,20 +435,6 @@ class DashboardController extends Controller
                         'url' => route('admin.ref-guidelines.valuation-settings.index'),
                     ])
             )
-            ->merge(
-                OfficeBankAccount::query()
-                    ->latest('updated_at')
-                    ->limit(3)
-                    ->get()
-                    ->map(fn (OfficeBankAccount $account) => [
-                        'key' => 'office-bank-account-' . $account->id,
-                        'group' => 'Keuangan',
-                        'title' => $account->bank_name . ' · ' . $account->account_holder,
-                        'description' => $account->is_active ? 'Rekening aktif' : 'Rekening nonaktif',
-                        'changed_at' => $account->updated_at?->toIso8601String(),
-                        'url' => route('admin.finance.office-bank-accounts.index'),
-                    ])
-            )
             ->filter(fn (array $item) => $item['changed_at'] !== null)
             ->sortByDesc('changed_at')
             ->take(10)
@@ -548,12 +533,12 @@ class DashboardController extends Controller
                 'url' => route('admin.communications.contact-messages.index', ['unread' => 'yes']),
             ],
             [
-                'key' => 'inactive_bank_accounts',
-                'label' => 'Rekening Nonaktif',
-                'value' => OfficeBankAccount::query()->where('is_active', false)->count(),
-                'description' => 'Perlu review jika rekening aktif sangat sedikit.',
+                'key' => 'refunded_payments',
+                'label' => 'Pembayaran Refund',
+                'value' => Payment::query()->where('status', 'refunded')->count(),
+                'description' => 'Transaksi yang sudah masuk status refund.',
                 'tone' => 'primary',
-                'url' => route('admin.finance.office-bank-accounts.index'),
+                'url' => route('admin.finance.payments.index', ['status' => 'refunded']),
             ],
             [
                 'key' => 'unpublished_articles',
@@ -571,3 +556,4 @@ class DashboardController extends Controller
         return (string) config('access-control.super_admin.name', 'super_admin');
     }
 }
+

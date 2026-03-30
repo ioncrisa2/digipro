@@ -171,7 +171,6 @@
 <body>
 @php
     $idr = fn ($value) => 'Rp ' . number_format((int) ($value ?? 0), 0, ',', '.');
-    $bank = is_array($invoice['selected_bank_account'] ?? null) ? $invoice['selected_bank_account'] : null;
     $gateway = is_array($invoice['gateway_details'] ?? null) ? $invoice['gateway_details'] : null;
 @endphp
 
@@ -245,7 +244,7 @@
 
     <div class="section-title">Informasi Pembayaran</div>
     <div class="payment-box">
-        <div class="payment-box-title">Detail Transfer</div>
+        <div class="payment-box-title">Detail Gateway</div>
         <table class="payment-table">
             <tr>
                 <td class="payment-label">Metode</td>
@@ -264,8 +263,6 @@
                         @if(!empty($gateway['reference']))
                             | {{ $gateway['reference'] }}
                         @endif
-                    @elseif($bank)
-                        {{ $bank['bank_name'] ?? '-' }} | {{ $bank['account_number'] ?? '-' }} | a.n. {{ $bank['account_holder'] ?? '-' }}
                     @else
                         -
                     @endif

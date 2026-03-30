@@ -38,7 +38,6 @@ const props = defineProps({
 const form = useForm({
   amount: props.record.amount ?? '',
   status: props.record.status ?? 'pending',
-  gateway: props.record.gateway ?? 'midtrans',
   external_payment_id: props.record.external_payment_id ?? '',
   paid_at: props.record.paid_at ?? '',
   metadata_json: props.record.metadata_json ?? '',
@@ -142,12 +141,6 @@ const submit = () => {
                 </SelectContent>
               </Select>
               <p v-if="form.errors.status" class="text-xs text-rose-600">{{ form.errors.status }}</p>
-            </div>
-
-            <div class="space-y-2">
-              <Label for="gateway">Gateway</Label>
-              <Input id="gateway" v-model="form.gateway" placeholder="midtrans" />
-              <p v-if="form.errors.gateway" class="text-xs text-rose-600">{{ form.errors.gateway }}</p>
             </div>
 
             <div class="space-y-2">

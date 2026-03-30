@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\StoreOfficeBankAccountRequest;
 use App\Http\Requests\Admin\UpdatePaymentRequest;
-use App\Models\OfficeBankAccount;
 use App\Models\Payment;
 use App\Services\Payments\MidtransSnapService;
 use Illuminate\Http\RedirectResponse;
@@ -20,7 +18,6 @@ class FinanceController extends Controller
         $filters = [
             'q' => trim((string) $request->query('q', '')),
             'status' => (string) $request->query('status', 'all'),
-            'method' => (string) $request->query('method', 'all'),
             'per_page' => (string) $this->adminPerPage($request),
         ];
 
@@ -39,7 +36,6 @@ class FinanceController extends Controller
                 });
             })
             ->when($filters['status'] !== 'all', fn ($query) => $query->where('status', $filters['status']))
-            ->when($filters['method'] !== 'all', fn ($query) => $query->where('method', $filters['method']))
             ->latest('created_at')
             ->paginate($this->adminPerPage($request))
             ->withQueryString();
@@ -57,19 +53,13 @@ class FinanceController extends Controller
                 ['value' => 'rejected', 'label' => 'Ditolak'],
                 ['value' => 'refunded', 'label' => 'Refund'],
             ],
-            'methodOptions' => [
-                ['value' => 'all', 'label' => 'Semua Metode'],
-                ['value' => 'gateway', 'label' => 'Gateway / Midtrans'],
-                ['value' => 'manual', 'label' => 'Manual'],
-            ],
             'summary' => [
                 'total' => Payment::query()->count(),
                 'pending' => Payment::query()->where('status', 'pending')->count(),
                 'paid' => Payment::query()->where('status', 'paid')->count(),
-                'active_bank_accounts' => OfficeBankAccount::query()->where('is_active', true)->count(),
+                'exceptions' => Payment::query()->whereIn('status', ['failed', 'expired', 'rejected', 'refunded'])->count(),
             ],
             'records' => $this->paginatedRecordsPayload($records),
-            'officeBankAccountsUrl' => route('admin.finance.office-bank-accounts.index'),
         ]);
     }
 
@@ -116,7 +106,6 @@ class FinanceController extends Controller
                 'updated_at' => $payment->updated_at?->toIso8601String(),
             ],
             'gatewayDetails' => $gatewayDetails,
-            'officeBankAccountsUrl' => route('admin.finance.office-bank-accounts.index'),
             'indexUrl' => route('admin.finance.payments.index'),
         ]);
     }
@@ -132,7 +121,7 @@ class FinanceController extends Controller
                 'id' => $payment->id,
                 'invoice_number' => $this->paymentInvoiceNumber($payment),
                 'method' => $payment->method,
-                'method_label' => $payment->method === 'gateway' ? 'Midtrans Gateway' : 'Manual',
+                'method_label' => $payment->method === 'gateway' ? 'Midtrans Gateway' : 'Gateway Legacy',
                 'amount' => (int) $payment->amount,
                 'status' => $payment->status,
                 'gateway' => $payment->gateway,
@@ -168,7 +157,7 @@ class FinanceController extends Controller
         $payment->forceFill([
             'amount' => (int) $validated['amount'],
             'status' => $validated['status'],
-            'gateway' => $validated['gateway'] ?: 'midtrans',
+            'gateway' => $validated['gateway'] ?: ($payment->gateway ?: 'midtrans'),
             'external_payment_id' => $validated['external_payment_id'] ?: null,
             'paid_at' => $validated['paid_at'] ?? null,
             'metadata' => $this->decodePaymentMetadata($validated['metadata_json'] ?? null),
@@ -177,116 +166,6 @@ class FinanceController extends Controller
         return redirect()
             ->route('admin.finance.payments.show', $payment)
             ->with('success', 'Pembayaran berhasil diperbarui.');
-    }
-
-    public function officeBankAccountsIndex(Request $request): Response
-    {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-        ];
-
-        $records = OfficeBankAccount::query()
-            ->when($filters['q'] !== '', function ($query) use ($filters): void {
-                $query->where(function ($innerQuery) use ($filters): void {
-                    $innerQuery
-                        ->where('bank_name', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('account_number', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('account_holder', 'like', '%' . $filters['q'] . '%');
-                });
-            })
-            ->when($filters['status'] === 'active', fn ($query) => $query->where('is_active', true))
-            ->when($filters['status'] === 'inactive', fn ($query) => $query->where('is_active', false))
-            ->orderBy('sort_order')
-            ->orderBy('bank_name')
-            ->get()
-            ->map(fn (OfficeBankAccount $account) => $this->transformOfficeBankAccountRow($account))
-            ->values();
-
-        return inertia('Admin/OfficeBankAccounts/Index', [
-            'filters' => $filters,
-            'statusOptions' => [
-                ['value' => 'all', 'label' => 'Semua Status'],
-                ['value' => 'active', 'label' => 'Aktif'],
-                ['value' => 'inactive', 'label' => 'Nonaktif'],
-            ],
-            'summary' => [
-                'total' => OfficeBankAccount::query()->count(),
-                'active' => OfficeBankAccount::query()->where('is_active', true)->count(),
-                'inactive' => OfficeBankAccount::query()->where('is_active', false)->count(),
-            ],
-            'records' => $records,
-            'createUrl' => route('admin.finance.office-bank-accounts.create'),
-            'paymentsUrl' => route('admin.finance.payments.index'),
-        ]);
-    }
-
-    public function officeBankAccountsCreate(): Response
-    {
-        return inertia('Admin/OfficeBankAccounts/Form', [
-            'mode' => 'create',
-            'record' => [
-                'bank_name' => '',
-                'account_number' => '',
-                'account_holder' => '',
-                'branch' => '',
-                'currency' => 'IDR',
-                'notes' => '',
-                'is_active' => true,
-                'sort_order' => 0,
-            ],
-            'indexUrl' => route('admin.finance.office-bank-accounts.index'),
-            'submitUrl' => route('admin.finance.office-bank-accounts.store'),
-        ]);
-    }
-
-    public function officeBankAccountsStore(StoreOfficeBankAccountRequest $request): RedirectResponse
-    {
-        OfficeBankAccount::query()->create($request->validated());
-
-        return redirect()
-            ->route('admin.finance.office-bank-accounts.index')
-            ->with('success', 'Rekening kantor berhasil ditambahkan.');
-    }
-
-    public function officeBankAccountsEdit(OfficeBankAccount $officeBankAccount): Response
-    {
-        return inertia('Admin/OfficeBankAccounts/Form', [
-            'mode' => 'edit',
-            'record' => [
-                'id' => $officeBankAccount->id,
-                'bank_name' => $officeBankAccount->bank_name,
-                'account_number' => $officeBankAccount->account_number,
-                'account_holder' => $officeBankAccount->account_holder,
-                'branch' => $officeBankAccount->branch,
-                'currency' => $officeBankAccount->currency,
-                'notes' => $officeBankAccount->notes,
-                'is_active' => (bool) $officeBankAccount->is_active,
-                'sort_order' => (int) $officeBankAccount->sort_order,
-            ],
-            'indexUrl' => route('admin.finance.office-bank-accounts.index'),
-            'submitUrl' => route('admin.finance.office-bank-accounts.update', $officeBankAccount),
-        ]);
-    }
-
-    public function officeBankAccountsUpdate(
-        StoreOfficeBankAccountRequest $request,
-        OfficeBankAccount $officeBankAccount
-    ): RedirectResponse {
-        $officeBankAccount->update($request->validated());
-
-        return redirect()
-            ->route('admin.finance.office-bank-accounts.index')
-            ->with('success', 'Rekening kantor berhasil diperbarui.');
-    }
-
-    public function officeBankAccountsDestroy(OfficeBankAccount $officeBankAccount): RedirectResponse
-    {
-        $officeBankAccount->delete();
-
-        return redirect()
-            ->route('admin.finance.office-bank-accounts.index')
-            ->with('success', 'Rekening kantor berhasil dihapus.');
     }
 
     private function transformPaymentRow(Payment $payment, MidtransSnapService $midtrans): array
@@ -323,24 +202,6 @@ class FinanceController extends Controller
     private function canEditPayment(Payment $payment): bool
     {
         return in_array($payment->status, ['pending', 'failed', 'expired', 'rejected', 'refunded'], true);
-    }
-
-    private function transformOfficeBankAccountRow(OfficeBankAccount $account): array
-    {
-        return [
-            'id' => $account->id,
-            'bank_name' => $account->bank_name,
-            'account_number' => $account->account_number,
-            'account_holder' => $account->account_holder,
-            'branch' => $account->branch,
-            'currency' => $account->currency,
-            'is_active' => (bool) $account->is_active,
-            'sort_order' => (int) $account->sort_order,
-            'notes' => $account->notes,
-            'updated_at' => $account->updated_at?->toIso8601String(),
-            'edit_url' => route('admin.finance.office-bank-accounts.edit', $account),
-            'destroy_url' => route('admin.finance.office-bank-accounts.destroy', $account),
-        ];
     }
 
     private function paymentInvoiceNumber(Payment $payment): string

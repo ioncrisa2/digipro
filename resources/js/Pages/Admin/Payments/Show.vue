@@ -22,10 +22,6 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
-  officeBankAccountsUrl: {
-    type: String,
-    required: true,
-  },
   indexUrl: {
     type: String,
     required: true,
@@ -70,9 +66,6 @@ const statusTone = (status) => {
           </Button>
           <Button variant="outline" as-child>
             <Link :href="indexUrl">Kembali ke daftar</Link>
-          </Button>
-          <Button variant="outline" as-child>
-            <Link :href="officeBankAccountsUrl">Rekening Kantor</Link>
           </Button>
         </div>
       </section>

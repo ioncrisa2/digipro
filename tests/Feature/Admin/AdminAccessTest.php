@@ -22,7 +22,6 @@ use App\Models\Faq;
 use App\Models\Feature;
 use App\Models\FloorIndex;
 use App\Models\GuidelineSet;
-use App\Models\OfficeBankAccount;
 use App\Models\Payment;
 use App\Models\PrivacyPolicy;
 use App\Models\Province;
@@ -359,137 +358,6 @@ it('renders the admin payment detail in the vue workspace', function () {
             ->where('record.invoice_number', 'INV-2026-90002')
             ->where('record.external_payment_id', 'MID-ADMIN-SHOW-001')
             ->where('record.edit_url', null));
-});
-
-it('renders the admin office bank accounts index in the vue workspace', function () {
-    $admin = createAdminUser();
-
-    OfficeBankAccount::create([
-        'bank_name' => 'Bank Digi',
-        'account_number' => '1234567890',
-        'account_holder' => 'PT Digi Pro',
-        'currency' => 'IDR',
-        'is_active' => true,
-        'sort_order' => 1,
-    ]);
-
-    $this
-        ->actingAs($admin)
-        ->get(route('admin.finance.office-bank-accounts.index'))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/OfficeBankAccounts/Index')
-            ->where('records.0.bank_name', 'Bank Digi')
-            ->where('summary.active', 1));
-});
-
-it('renders the admin office bank account create page in the vue workspace', function () {
-    $admin = createAdminUser();
-
-    $this
-        ->actingAs($admin)
-        ->get(route('admin.finance.office-bank-accounts.create'))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/OfficeBankAccounts/Form')
-            ->where('mode', 'create')
-            ->where('record.currency', 'IDR'));
-});
-
-it('stores an office bank account from the vue admin workspace', function () {
-    $admin = createAdminUser();
-
-    $this
-        ->actingAs($admin)
-        ->post(route('admin.finance.office-bank-accounts.store'), [
-            'bank_name' => 'Bank Baru',
-            'account_number' => '9876543210',
-            'account_holder' => 'PT Digi Baru',
-            'branch' => 'Jakarta',
-            'currency' => 'idr',
-            'notes' => 'rekening operasional',
-            'is_active' => true,
-            'sort_order' => 2,
-        ])
-        ->assertRedirect(route('admin.finance.office-bank-accounts.index'));
-
-    $record = OfficeBankAccount::query()->where('account_number', '9876543210')->first();
-
-    expect($record)->not->toBeNull();
-    expect($record->currency)->toBe('IDR');
-});
-
-it('renders the admin office bank account edit page in the vue workspace', function () {
-    $admin = createAdminUser();
-    $account = OfficeBankAccount::create([
-        'bank_name' => 'Bank Edit',
-        'account_number' => '444333222',
-        'account_holder' => 'PT Digi Edit',
-        'currency' => 'IDR',
-        'is_active' => true,
-        'sort_order' => 3,
-    ]);
-
-    $this
-        ->actingAs($admin)
-        ->get(route('admin.finance.office-bank-accounts.edit', $account))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/OfficeBankAccounts/Form')
-            ->where('mode', 'edit')
-            ->where('record.account_number', '444333222'));
-});
-
-it('updates an office bank account from the vue admin workspace', function () {
-    $admin = createAdminUser();
-    $account = OfficeBankAccount::create([
-        'bank_name' => 'Bank Update',
-        'account_number' => '555444333',
-        'account_holder' => 'PT Digi Update',
-        'currency' => 'IDR',
-        'is_active' => true,
-        'sort_order' => 4,
-    ]);
-
-    $this
-        ->actingAs($admin)
-        ->put(route('admin.finance.office-bank-accounts.update', $account), [
-            'bank_name' => 'Bank Update Final',
-            'account_number' => '555444333',
-            'account_holder' => 'PT Digi Update Final',
-            'branch' => 'Bandung',
-            'currency' => 'usd',
-            'notes' => 'updated',
-            'is_active' => false,
-            'sort_order' => 8,
-        ])
-        ->assertRedirect(route('admin.finance.office-bank-accounts.index'));
-
-    $account->refresh();
-
-    expect($account->bank_name)->toBe('Bank Update Final');
-    expect($account->currency)->toBe('USD');
-    expect($account->is_active)->toBeFalse();
-    expect($account->sort_order)->toBe(8);
-});
-
-it('deletes an office bank account from the vue admin workspace', function () {
-    $admin = createAdminUser();
-    $account = OfficeBankAccount::create([
-        'bank_name' => 'Bank Delete',
-        'account_number' => '111222333',
-        'account_holder' => 'PT Digi Delete',
-        'currency' => 'IDR',
-        'is_active' => true,
-        'sort_order' => 1,
-    ]);
-
-    $this
-        ->actingAs($admin)
-        ->delete(route('admin.finance.office-bank-accounts.destroy', $account))
-        ->assertRedirect(route('admin.finance.office-bank-accounts.index'));
-
-    expect(OfficeBankAccount::find($account->id))->toBeNull();
 });
 
 it('renders the admin payment edit page in the vue workspace', function () {
@@ -1812,8 +1680,6 @@ it('sends an initial offer from the vue admin workflow', function () {
         ->actingAs($admin)
         ->post(route('admin.appraisal-requests.actions.send-offer', $record), [
             'fee_total' => 18000000,
-            'fee_has_dp' => true,
-            'fee_dp_percent' => 50,
             'contract_sequence' => 3,
             'offer_validity_days' => 10,
         ])
@@ -1827,8 +1693,8 @@ it('sends an initial offer from the vue admin workflow', function () {
     expect($record->contract_number)->toBe('00003/AGR/DP/05/2026');
     expect($record->contract_date?->toDateString())->toBe('2026-05-10');
     expect($record->fee_total)->toBe(18000000);
-    expect($record->fee_has_dp)->toBeTrue();
-    expect((float) $record->fee_dp_percent)->toBe(50.0);
+    expect($record->fee_has_dp)->toBeFalse();
+    expect($record->fee_dp_percent)->toBeNull();
     expect($latestNegotiation?->action)->toBe('offer_sent');
     expect($latestNegotiation?->offered_fee)->toBe(18000000);
     $requester->refresh();
@@ -1871,7 +1737,6 @@ it('sends a revised offer from the vue admin workflow when negotiation is active
         ->actingAs($admin)
         ->post(route('admin.appraisal-requests.actions.send-offer', $record), [
             'fee_total' => 19500000,
-            'fee_has_dp' => false,
             'contract_sequence' => 7,
             'offer_validity_days' => 7,
         ])
@@ -2104,8 +1969,6 @@ it('updates contract and fee fields from the vue admin form', function () {
             'valuation_duration_days' => 25,
             'offer_validity_days' => 14,
             'fee_total' => 17500000,
-            'fee_has_dp' => true,
-            'fee_dp_percent' => 50,
             'user_request_note' => 'Butuh update kontrak',
             'notes' => 'Siap penawaran',
         ])
@@ -2123,37 +1986,10 @@ it('updates contract and fee fields from the vue admin form', function () {
     expect($record->valuation_duration_days)->toBe(25);
     expect($record->offer_validity_days)->toBe(14);
     expect($record->fee_total)->toBe(17500000);
-    expect($record->fee_has_dp)->toBeTrue();
-    expect((float) $record->fee_dp_percent)->toBe(50.0);
+    expect($record->fee_has_dp)->toBeFalse();
+    expect($record->fee_dp_percent)->toBeNull();
 
     Carbon::setTestNow();
-});
-
-it('requires dp percent when dp is enabled on the vue admin edit form', function () {
-    $admin = createAdminUser();
-    $requester = User::factory()->create([
-        'email_verified_at' => now(),
-    ]);
-
-    $record = AppraisalRequest::create([
-        'user_id' => $requester->id,
-        'request_number' => 'REQ-DP-001',
-        'purpose' => PurposeEnum::JualBeli,
-        'status' => AppraisalStatusEnum::Submitted,
-        'requested_at' => now(),
-    ]);
-
-    $this
-        ->actingAs($admin)
-        ->from(route('admin.appraisal-requests.edit', $record))
-        ->put(route('admin.appraisal-requests.update', $record), [
-            'client_name' => 'PT DP',
-            'report_type' => 'terinci',
-            'fee_has_dp' => true,
-            'fee_dp_percent' => '',
-        ])
-        ->assertRedirect(route('admin.appraisal-requests.edit', $record))
-        ->assertSessionHasErrors(['fee_dp_percent']);
 });
 
 it('validates report type on the vue admin edit form', function () {

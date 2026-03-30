@@ -25,8 +25,6 @@ class UpdateAppraisalRequestBasicRequest extends FormRequest
             'valuation_duration_days' => ['nullable', 'integer', 'min:1'],
             'offer_validity_days' => ['nullable', 'integer', 'min:1'],
             'fee_total' => ['nullable', 'integer', 'min:1'],
-            'fee_has_dp' => ['nullable', 'boolean'],
-            'fee_dp_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'user_request_note' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
         ];
@@ -44,17 +42,6 @@ class UpdateAppraisalRequestBasicRequest extends FormRequest
             'valuation_duration_days' => $normalize($this->input('valuation_duration_days')),
             'offer_validity_days' => $normalize($this->input('offer_validity_days')),
             'fee_total' => $normalize($this->input('fee_total')),
-            'fee_dp_percent' => $normalize($this->input('fee_dp_percent')),
-            'fee_has_dp' => $this->boolean('fee_has_dp'),
         ]);
-    }
-
-    public function withValidator($validator): void
-    {
-        $validator->after(function ($validator): void {
-            if ($this->boolean('fee_has_dp') && blank($this->input('fee_dp_percent'))) {
-                $validator->errors()->add('fee_dp_percent', 'Persentase DP wajib diisi saat skema DP aktif.');
-            }
-        });
     }
 }

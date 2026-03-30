@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -46,8 +45,6 @@ const form = useForm({
   valuation_duration_days: props.record.valuation_duration_days ?? '',
   offer_validity_days: props.record.offer_validity_days ?? '',
   fee_total: props.record.fee_total ?? '',
-  fee_has_dp: Boolean(props.record.fee_has_dp ?? false),
-  fee_dp_percent: props.record.fee_dp_percent ?? '',
   user_request_note: props.record.user_request_note ?? '',
   notes: props.record.notes ?? '',
 });
@@ -214,28 +211,20 @@ const submit = () => {
         <Card>
           <CardHeader>
             <CardTitle>Fee Penilaian</CardTitle>
-            <CardDescription>Bagian ini hanya menyimpan data fee. Proses kirim penawaran masih belum dipindah di batch ini.</CardDescription>
+            <CardDescription>Bagian ini hanya menyimpan total fee pelunasan penuh via payment gateway.</CardDescription>
           </CardHeader>
           <CardContent class="space-y-6">
-            <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div class="grid gap-6 md:grid-cols-2">
               <div class="space-y-2">
                 <Label for="fee_total">Total Fee (Rp)</Label>
                 <Input id="fee_total" v-model="form.fee_total" type="number" min="1" placeholder="15000000" />
                 <p v-if="form.errors.fee_total" class="text-xs text-red-500">{{ form.errors.fee_total }}</p>
               </div>
-
-              <div class="space-y-3">
-                <Label>Skema DP</Label>
-                <label class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm text-slate-700">
-                  <Checkbox v-model="form.fee_has_dp" />
-                  <span>Gunakan DP</span>
-                </label>
-              </div>
-
-              <div class="space-y-2" v-if="form.fee_has_dp">
-                <Label for="fee_dp_percent">Persentase DP (%)</Label>
-                <Input id="fee_dp_percent" v-model="form.fee_dp_percent" type="number" min="0" max="100" step="0.01" placeholder="50" />
-                <p v-if="form.errors.fee_dp_percent" class="text-xs text-red-500">{{ form.errors.fee_dp_percent }}</p>
+              <div class="space-y-2">
+                <Label>Skema Pembayaran</Label>
+                <div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900">
+                  Pelunasan penuh via payment gateway
+                </div>
               </div>
             </div>
           </CardContent>

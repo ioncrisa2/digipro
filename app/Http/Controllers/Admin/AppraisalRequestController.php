@@ -127,8 +127,6 @@ class AppraisalRequestController extends Controller
                 'valuation_duration_days' => $appraisalRequest->valuation_duration_days,
                 'offer_validity_days' => $appraisalRequest->offer_validity_days,
                 'fee_total' => (int) ($appraisalRequest->fee_total ?? 0),
-                'fee_has_dp' => (bool) $appraisalRequest->fee_has_dp,
-                'fee_dp_percent' => $appraisalRequest->fee_dp_percent,
                 'latest_expected_fee' => $latestCounterRequest?->expected_fee,
                 'latest_negotiation_reason' => $latestCounterRequest?->reason,
                 'notes' => $appraisalRequest->notes,
@@ -160,7 +158,7 @@ class AppraisalRequestController extends Controller
             'payments' => $appraisalRequest->payments->map(fn ($payment) => [
                 'id' => $payment->id,
                 'amount' => (int) $payment->amount,
-                'method_label' => $payment->method === 'gateway' ? 'Gateway' : 'Manual',
+                'method_label' => $payment->method === 'gateway' ? 'Midtrans Gateway' : 'Gateway Legacy',
                 'status' => $payment->status,
                 'gateway' => $payment->gateway,
                 'external_payment_id' => $payment->external_payment_id,
@@ -207,8 +205,6 @@ class AppraisalRequestController extends Controller
                 'valuation_duration_days' => $appraisalRequest->valuation_duration_days,
                 'offer_validity_days' => $appraisalRequest->offer_validity_days,
                 'fee_total' => $appraisalRequest->fee_total,
-                'fee_has_dp' => (bool) $appraisalRequest->fee_has_dp,
-                'fee_dp_percent' => $appraisalRequest->fee_dp_percent,
                 'user_request_note' => $appraisalRequest->user_request_note,
                 'notes' => $appraisalRequest->notes,
             ],
@@ -258,10 +254,8 @@ class AppraisalRequestController extends Controller
             'valuation_duration_days' => $this->blankToNull($validated['valuation_duration_days'] ?? null),
             'offer_validity_days' => $this->blankToNull($validated['offer_validity_days'] ?? null),
             'fee_total' => $this->blankToNull($validated['fee_total'] ?? null),
-            'fee_has_dp' => (bool) ($validated['fee_has_dp'] ?? false),
-            'fee_dp_percent' => ($validated['fee_has_dp'] ?? false)
-                ? $this->blankToNull($validated['fee_dp_percent'] ?? null)
-                : null,
+            'fee_has_dp' => false,
+            'fee_dp_percent' => null,
             'user_request_note' => $this->blankToNull($validated['user_request_note'] ?? null),
             'notes' => $this->blankToNull($validated['notes'] ?? null),
         ]);

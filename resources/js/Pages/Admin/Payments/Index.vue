@@ -26,26 +26,18 @@ import { formatCurrency, formatDateTime } from '@/utils/reviewer';
 const props = defineProps({
   filters: {
     type: Object,
-    default: () => ({ q: '', status: 'all', method: 'all' }),
+    default: () => ({ q: '', status: 'all' }),
   },
   statusOptions: {
     type: Array,
     default: () => [],
   },
-  methodOptions: {
-    type: Array,
-    default: () => [],
-  },
   summary: {
     type: Object,
-    default: () => ({ total: 0, pending: 0, paid: 0, active_bank_accounts: 0 }),
+    default: () => ({ total: 0, pending: 0, paid: 0, exceptions: 0 }),
   },
   records: {
     type: Object,
-    required: true,
-  },
-  officeBankAccountsUrl: {
-    type: String,
     required: true,
   },
 });
@@ -53,14 +45,12 @@ const props = defineProps({
 const form = reactive({
   q: props.filters.q ?? '',
   status: props.filters.status ?? 'all',
-  method: props.filters.method ?? 'all',
 });
 
 const submitFilters = () => {
   router.get(route('admin.finance.payments.index'), {
     q: form.q || undefined,
     status: form.status === 'all' ? undefined : form.status,
-    method: form.method === 'all' ? undefined : form.method,
   }, {
     preserveState: true,
     preserveScroll: true,
@@ -71,14 +61,12 @@ const submitFilters = () => {
 const resetFilters = () => {
   form.q = '';
   form.status = 'all';
-  form.method = 'all';
   submitFilters();
 };
 
 const activeFilterCount = computed(() => {
   let count = 0;
   if (form.status !== 'all') count += 1;
-  if (form.method !== 'all') count += 1;
   return count;
 });
 
@@ -120,15 +108,8 @@ const columns = [
         <div>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Workspace Keuangan</h1>
           <p class="mt-2 text-sm text-slate-600">
-            List pembayaran admin untuk operasional baca dan audit cepat.
+            Monitoring pembayaran gateway untuk operasional baca dan audit cepat.
           </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <Button variant="outline" as-child>
-            <Link :href="officeBankAccountsUrl">Lihat Rekening Kantor</Link>
-          </Button>
-
-
         </div>
       </section>
 
@@ -153,8 +134,8 @@ const columns = [
         </Card>
         <Card>
           <CardContent class="p-5">
-            <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Rekening Aktif</p>
-            <p class="mt-3 text-4xl font-semibold text-slate-950">{{ summary.active_bank_accounts }}</p>
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Butuh Tindak Lanjut</p>
+            <p class="mt-3 text-4xl font-semibold text-slate-950">{{ summary.exceptions }}</p>
           </CardContent>
         </Card>
       </section>
@@ -168,13 +149,13 @@ const columns = [
             :search-value="form.q"
             search-placeholder="Cari invoice, request, payment ID, atau nama klien"
             filter-title="Filter pembayaran"
-            filter-description="Saring transaksi berdasarkan status dan metode pembayaran."
+            filter-description="Saring transaksi berdasarkan status pembayaran."
             :active-filter-count="activeFilterCount"
             @search="(value) => { form.q = value; submitFilters(); }"
             @apply-filters="submitFilters"
             @reset-filters="resetFilters"
           >
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-4">
               <div class="space-y-2">
                 <Label for="payment_status_filter">Status</Label>
                 <Select v-model="form.status">
@@ -184,24 +165,6 @@ const columns = [
                   <SelectContent>
                     <SelectItem
                       v-for="option in statusOptions"
-                      :key="option.value"
-                      :value="option.value"
-                    >
-                      {{ option.label }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div class="space-y-2">
-                <Label for="payment_method_filter">Metode</Label>
-                <Select v-model="form.method">
-                  <SelectTrigger id="payment_method_filter">
-                    <SelectValue placeholder="Pilih metode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem
-                      v-for="option in methodOptions"
                       :key="option.value"
                       :value="option.value"
                     >

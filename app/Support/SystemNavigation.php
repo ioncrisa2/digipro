@@ -565,9 +565,9 @@ class SystemNavigation
                 'key' => 'finance',
                 'surface' => 'admin',
                 'label' => 'Keuangan',
-                'description' => 'Pembayaran dan rekening kantor.',
+                'description' => 'Monitoring dan audit pembayaran gateway.',
                 'permission' => self::MANAGE_ADMIN_FINANCE,
-                'items' => ['Pembayaran', 'Rekening Kantor'],
+                'items' => ['Pembayaran'],
             ],
             [
                 'key' => 'master-data',

@@ -5,7 +5,6 @@ import { ArrowLeft, Download, ExternalLink, Eye, FileText, Search, X } from 'luc
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -125,8 +124,6 @@ const activeTab = ref('ringkasan');
 
 const offerForm = useForm({
   fee_total: offerAction.value?.defaults?.fee_total ?? '',
-  fee_has_dp: Boolean(offerAction.value?.defaults?.fee_has_dp ?? false),
-  fee_dp_percent: offerAction.value?.defaults?.fee_dp_percent ?? '',
   contract_sequence: offerAction.value?.defaults?.contract_sequence ?? '',
   offer_validity_days: offerAction.value?.defaults?.offer_validity_days ?? '',
 });
@@ -670,10 +667,8 @@ const submitRevisionItem = () => {
                 <p class="mt-2 text-sm text-slate-900">{{ formatCurrency(record.fee_total) }}</p>
               </div>
               <div>
-                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Skema DP</p>
-                <p class="mt-2 text-sm text-slate-900">
-                  {{ record.fee_has_dp ? `Ya, ${record.fee_dp_percent ?? 0}%` : 'Tidak ada DP' }}
-                </p>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Skema Pembayaran</p>
+                <p class="mt-2 text-sm text-slate-900">Pelunasan penuh via payment gateway</p>
               </div>
               <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Harapan Fee Terakhir</p>
@@ -1291,7 +1286,7 @@ const submitRevisionItem = () => {
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Penugasan</p>
                   <p class="mt-3 text-sm font-semibold text-slate-950">{{ formatCurrency(record.fee_total) }}</p>
                   <p class="mt-2 text-xs text-slate-500">
-                    {{ record.fee_has_dp ? `Skema DP ${record.fee_dp_percent ?? 0}%` : 'Tanpa skema DP' }}
+                    Pelunasan penuh via payment gateway
                   </p>
                 </div>
                 <div class="rounded-2xl border bg-slate-50 p-4">
@@ -1380,7 +1375,7 @@ const submitRevisionItem = () => {
                     <div>
                       <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Skema Pembayaran</p>
                       <p class="mt-2 text-sm text-slate-950">
-                        {{ record.fee_has_dp ? `DP ${record.fee_dp_percent ?? 0}%` : 'Pelunasan penuh' }}
+                        Pelunasan penuh
                       </p>
                     </div>
                     <div>
@@ -1520,20 +1515,8 @@ const submitRevisionItem = () => {
                     </div>
                   </div>
 
-                  <div class="grid gap-5 xl:grid-cols-2">
-                    <div class="space-y-3">
-                      <Label>Skema DP</Label>
-                      <label class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm text-slate-700">
-                        <Checkbox v-model="offerForm.fee_has_dp" />
-                        <span>Gunakan DP</span>
-                      </label>
-                    </div>
-
-                    <div class="space-y-2" v-if="offerForm.fee_has_dp">
-                      <Label for="offer_fee_dp_percent">Persentase DP (%)</Label>
-                      <Input id="offer_fee_dp_percent" v-model="offerForm.fee_dp_percent" type="number" min="0" max="100" step="0.01" placeholder="50" />
-                      <p v-if="offerForm.errors.fee_dp_percent" class="text-xs text-red-500">{{ offerForm.errors.fee_dp_percent }}</p>
-                    </div>
+                  <div class="rounded-2xl border bg-slate-50 p-4 text-sm text-slate-700">
+                    Sistem pembayaran memakai pelunasan penuh melalui payment gateway. Penawaran yang dikirim ke user tidak lagi memakai skema DP.
                   </div>
 
                   <div class="grid gap-5 xl:grid-cols-2">

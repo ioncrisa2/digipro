@@ -49,12 +49,6 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::get('/pembayaran/{payment}', [FinanceController::class, 'paymentsShow'])->name('payments.show');
                 Route::get('/pembayaran/{payment}/edit', [FinanceController::class, 'paymentsEdit'])->name('payments.edit');
                 Route::put('/pembayaran/{payment}', [FinanceController::class, 'paymentsUpdate'])->name('payments.update');
-                Route::get('/rekening-kantor', [FinanceController::class, 'officeBankAccountsIndex'])->name('office-bank-accounts.index');
-                Route::get('/rekening-kantor/buat', [FinanceController::class, 'officeBankAccountsCreate'])->name('office-bank-accounts.create');
-                Route::post('/rekening-kantor', [FinanceController::class, 'officeBankAccountsStore'])->name('office-bank-accounts.store');
-                Route::get('/rekening-kantor/{officeBankAccount}/edit', [FinanceController::class, 'officeBankAccountsEdit'])->name('office-bank-accounts.edit');
-                Route::put('/rekening-kantor/{officeBankAccount}', [FinanceController::class, 'officeBankAccountsUpdate'])->name('office-bank-accounts.update');
-                Route::delete('/rekening-kantor/{officeBankAccount}', [FinanceController::class, 'officeBankAccountsDestroy'])->name('office-bank-accounts.destroy');
             });
 
         Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_CONTENT)

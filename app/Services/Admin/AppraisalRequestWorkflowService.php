@@ -119,8 +119,6 @@ class AppraisalRequestWorkflowService
 
         return [
             'fee_total' => $defaultFee,
-            'fee_has_dp' => (bool) $record->fee_has_dp,
-            'fee_dp_percent' => $record->fee_dp_percent,
             'contract_sequence' => $record->contract_sequence,
             'offer_validity_days' => $record->offer_validity_days,
         ];
@@ -235,8 +233,6 @@ class AppraisalRequestWorkflowService
         $actionType = $contractStatusBefore === ContractStatusEnum::Negotiation->value ? 'offer_revised' : 'offer_sent';
         $round = $this->countNegotiationRounds($record);
         $feeTotal = (int) $data['fee_total'];
-        $feeHasDp = (bool) ($data['fee_has_dp'] ?? false);
-        $feeDpPercent = $feeHasDp ? ($data['fee_dp_percent'] ?? null) : null;
         $contractDate = optional($record->contract_date)->toDateString() ?: now()->toDateString();
 
         DB::transaction(function () use (
@@ -249,14 +245,12 @@ class AppraisalRequestWorkflowService
             $actionType,
             $round,
             $feeTotal,
-            $feeHasDp,
-            $feeDpPercent,
             $contractDate
         ): void {
             $record->update([
                 'fee_total' => $feeTotal,
-                'fee_has_dp' => $feeHasDp,
-                'fee_dp_percent' => $feeDpPercent,
+                'fee_has_dp' => false,
+                'fee_dp_percent' => null,
                 'contract_sequence' => $data['contract_sequence'],
                 'contract_office_code' => $contractMeta['contract_office_code'],
                 'contract_month' => $contractMeta['contract_month'],
