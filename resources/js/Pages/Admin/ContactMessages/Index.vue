@@ -126,11 +126,11 @@ const statusTone = (status) => {
             @apply-filters="submitFilters"
             @reset-filters="resetFilters"
           >
-            <div class="grid gap-4 sm:grid-cols-3">
+            <div class="grid gap-4">
               <div class="space-y-2">
                 <Label for="contact_status_filter">Status</Label>
                 <Select v-model="form.status">
-                  <SelectTrigger id="contact_status_filter"><SelectValue placeholder="Pilih status" /></SelectTrigger>
+                  <SelectTrigger id="contact_status_filter" class="w-full"><SelectValue placeholder="Pilih status" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
                   </SelectContent>
@@ -139,7 +139,7 @@ const statusTone = (status) => {
               <div class="space-y-2">
                 <Label for="contact_unread_filter">Unread</Label>
                 <Select v-model="form.unread">
-                  <SelectTrigger id="contact_unread_filter"><SelectValue placeholder="Pilih unread" /></SelectTrigger>
+                  <SelectTrigger id="contact_unread_filter" class="w-full"><SelectValue placeholder="Pilih unread" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem v-for="option in unreadOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
                   </SelectContent>
@@ -148,7 +148,7 @@ const statusTone = (status) => {
               <div class="space-y-2">
                 <Label for="contact_source_filter">Source</Label>
                 <Select v-model="form.source">
-                  <SelectTrigger id="contact_source_filter"><SelectValue placeholder="Pilih source" /></SelectTrigger>
+                  <SelectTrigger id="contact_source_filter" class="w-full"><SelectValue placeholder="Pilih source" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Source</SelectItem>
                     <SelectItem v-for="option in sourceOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>

@@ -27,11 +27,15 @@ const props = defineProps({
   selectFields: { type: Array, default: () => [] },
   generator: { type: Object, default: null },
   showIdField: { type: Boolean, default: true },
+  optionsUrl: { type: String, default: '' },
   submitUrl: { type: String, required: true },
   indexUrl: { type: String, required: true },
 });
 
 const isEditMode = computed(() => props.mode === 'edit');
+const isVillageResource = computed(() => props.resource.key === 'villages');
+const villageSelectFields = computed(() => (isVillageResource.value ? props.selectFields : []));
+const standardSelectFields = computed(() => (isVillageResource.value ? [] : props.selectFields));
 
 const form = useForm({
   id: props.record.id ?? '',
@@ -143,7 +147,7 @@ const loadFieldOptions = async (field) => {
       [field.parent_param]: parentValue,
     });
 
-    const response = await fetch(`${route('admin.master-data.locations.options')}?${params.toString()}`, {
+    const response = await fetch(`${props.optionsUrl}?${params.toString()}`, {
       headers: {
         Accept: 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
@@ -234,16 +238,20 @@ const submit = () => {
             <CardTitle>{{ resource.singular }}</CardTitle>
             <CardDescription>Form master data {{ resource.singular.toLowerCase() }}.</CardDescription>
           </CardHeader>
-          <CardContent class="grid gap-6 md:grid-cols-2">
+          <CardContent :class="isVillageResource ? 'grid gap-6 lg:grid-cols-3' : 'grid gap-6 md:grid-cols-2'">
             <input v-if="!showIdField" v-model="form.id" type="hidden" />
 
-            <div v-if="showIdField" class="space-y-2">
+            <div
+              v-if="showIdField"
+              :class="isVillageResource ? 'space-y-2 lg:col-span-3' : 'space-y-2'"
+            >
               <Label for="location_id">{{ resource.code_label }}</Label>
               <Input
                 id="location_id"
                 v-model="form.id"
-                readonly
-                class="bg-slate-50 text-slate-500"
+                :disabled="isVillageResource"
+                :readonly="!isVillageResource"
+                class="w-full bg-slate-50 text-slate-500"
               />
               <p class="text-xs text-slate-500">
                 {{
@@ -258,38 +266,75 @@ const submit = () => {
               <p v-if="form.errors.id" class="text-xs text-rose-600">{{ form.errors.id }}</p>
             </div>
 
-            <div class="space-y-2">
-              <Label for="location_name">Nama</Label>
-              <Input id="location_name" v-model="form.name" />
-              <p v-if="form.errors.name" class="text-xs text-rose-600">{{ form.errors.name }}</p>
-            </div>
-
-            <div
-              v-for="field in selectFields"
-              :key="field.key"
-              class="space-y-2 md:col-span-2"
-            >
-              <Label :for="`location_${field.key}`">{{ field.label }}</Label>
-              <Select
-                :model-value="form[field.key]"
-                @update:model-value="form[field.key] = $event"
+            <template v-if="isVillageResource">
+              <div
+                v-for="field in villageSelectFields"
+                :key="field.key"
+                class="space-y-2"
               >
-                <SelectTrigger :id="`location_${field.key}`">
-                  <SelectValue :placeholder="field.placeholder" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in fieldOptions[field.key] ?? []"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <p v-if="fieldLoading[field.key]" class="text-xs text-slate-500">Memuat opsi {{ field.label.toLowerCase() }}...</p>
-              <p v-if="form.errors[field.key]" class="text-xs text-rose-600">{{ form.errors[field.key] }}</p>
-            </div>
+                <Label :for="`location_${field.key}`">{{ field.label }}</Label>
+                <Select
+                  :model-value="form[field.key]"
+                  @update:model-value="form[field.key] = $event"
+                >
+                  <SelectTrigger :id="`location_${field.key}`" class="w-full">
+                    <SelectValue :placeholder="field.placeholder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem
+                      v-for="option in fieldOptions[field.key] ?? []"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p v-if="fieldLoading[field.key]" class="text-xs text-slate-500">Memuat opsi {{ field.label.toLowerCase() }}...</p>
+                <p v-if="form.errors[field.key]" class="text-xs text-rose-600">{{ form.errors[field.key] }}</p>
+              </div>
+
+              <div class="space-y-2 lg:col-span-3">
+                <Label for="location_name">Nama</Label>
+                <Input id="location_name" v-model="form.name" />
+                <p v-if="form.errors.name" class="text-xs text-rose-600">{{ form.errors.name }}</p>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="space-y-2">
+                <Label for="location_name">Nama</Label>
+                <Input id="location_name" v-model="form.name" />
+                <p v-if="form.errors.name" class="text-xs text-rose-600">{{ form.errors.name }}</p>
+              </div>
+
+              <div
+                v-for="field in standardSelectFields"
+                :key="field.key"
+                class="space-y-2 md:col-span-2"
+              >
+                <Label :for="`location_${field.key}`">{{ field.label }}</Label>
+                <Select
+                  :model-value="form[field.key]"
+                  @update:model-value="form[field.key] = $event"
+                >
+                  <SelectTrigger :id="`location_${field.key}`" class="w-full">
+                    <SelectValue :placeholder="field.placeholder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem
+                      v-for="option in fieldOptions[field.key] ?? []"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p v-if="fieldLoading[field.key]" class="text-xs text-slate-500">Memuat opsi {{ field.label.toLowerCase() }}...</p>
+                <p v-if="form.errors[field.key]" class="text-xs text-rose-600">{{ form.errors[field.key] }}</p>
+              </div>
+            </template>
           </CardContent>
         </Card>
 

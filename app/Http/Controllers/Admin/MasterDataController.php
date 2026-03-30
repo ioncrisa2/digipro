@@ -34,7 +34,9 @@ class MasterDataController extends Controller
             'per_page' => (string) $this->adminPerPage($request),
         ];
 
-        $records = User::query()
+        $baseQuery = $this->manageableUsersQuery();
+
+        $records = $this->manageableUsersQuery()
             ->with('roles:id,name')
             ->when($filters['q'] !== '', function ($query) use ($filters): void {
                 $query->where(function ($innerQuery) use ($filters): void {
@@ -61,10 +63,10 @@ class MasterDataController extends Controller
                 ['value' => 'unverified', 'label' => 'Belum Verified'],
             ],
             'summary' => [
-                'total' => User::query()->count(),
-                'verified' => User::query()->whereNotNull('email_verified_at')->count(),
-                'admins' => User::role(['admin', $this->superAdminRoleName()])->count(),
-                'reviewers' => User::role('Reviewer')->count(),
+                'total' => (clone $baseQuery)->count(),
+                'verified' => (clone $baseQuery)->whereNotNull('email_verified_at')->count(),
+                'admins' => (clone $baseQuery)->role(['admin', $this->superAdminRoleName()])->count(),
+                'reviewers' => (clone $baseQuery)->role('Reviewer')->count(),
             ],
             'records' => $this->paginatedRecordsPayload($records),
             'canCreate' => $this->canManageUsersCreate(),
@@ -82,7 +84,7 @@ class MasterDataController extends Controller
                 'name' => '',
                 'email' => '',
                 'email_verified_at' => '',
-                'roles' => [],
+                'roles' => $this->isSuperAdmin(auth()->user()) ? [] : ['customer'],
             ],
             'roleOptions' => $this->roleSelectOptions(),
             'indexUrl' => route('admin.master-data.users.index'),
@@ -105,7 +107,7 @@ class MasterDataController extends Controller
         ]);
         $user->save();
 
-        $user->syncRoles($validated['roles'] ?? []);
+        $user->syncRoles($this->assignableRolesPayload($validated));
 
         return redirect()
             ->route('admin.master-data.users.show', $user)
@@ -114,17 +116,22 @@ class MasterDataController extends Controller
 
     public function usersShow(User $user): Response
     {
+        abort_unless($this->canManageUser($user), 403);
+
         $user->loadMissing('roles:id,name');
 
         return inertia('Admin/Users/Show', [
             'record' => $this->userShowPayload($user),
             'indexUrl' => route('admin.master-data.users.index'),
             'editUrl' => route('admin.master-data.users.edit', $user),
+            'destroyUrl' => $this->canDeleteUser($user) ? route('admin.master-data.users.destroy', $user) : null,
         ]);
     }
 
     public function usersEdit(User $user): Response
     {
+        abort_unless($this->canManageUser($user), 403);
+
         $user->loadMissing('roles:id,name');
 
         return inertia('Admin/Users/Form', [
@@ -144,6 +151,8 @@ class MasterDataController extends Controller
 
     public function usersUpdate(StoreUserRequest $request, User $user): RedirectResponse
     {
+        abort_unless($this->canManageUser($user), 403);
+
         $validated = $request->validated();
 
         $payload = [
@@ -157,11 +166,22 @@ class MasterDataController extends Controller
         }
 
         $user->forceFill($payload)->save();
-        $user->syncRoles($validated['roles'] ?? []);
+        $user->syncRoles($this->assignableRolesPayload($validated));
 
         return redirect()
             ->route('admin.master-data.users.show', $user)
             ->with('success', 'User berhasil diperbarui.');
+    }
+
+    public function usersDestroy(User $user): RedirectResponse
+    {
+        abort_unless($this->canDeleteUser($user), 403);
+
+        $user->delete();
+
+        return redirect()
+            ->route('admin.master-data.users.index')
+            ->with('success', 'User berhasil dihapus.');
     }
 
     public function locationIdPreview(Request $request, LocationIdGenerator $generator): JsonResponse
@@ -260,6 +280,7 @@ class MasterDataController extends Controller
             ],
             'selectFields' => [],
             'generator' => $this->locationGeneratorProps('province'),
+            'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.provinces.index'),
             'submitUrl' => $this->workspaceRoute('master-data.provinces.store'),
         ]);
@@ -292,6 +313,7 @@ class MasterDataController extends Controller
             ],
             'selectFields' => [],
             'generator' => null,
+            'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.provinces.index'),
             'submitUrl' => $this->workspaceRoute('master-data.provinces.update', $province),
         ]);
@@ -380,6 +402,7 @@ class MasterDataController extends Controller
             ]],
             'generator' => $this->locationGeneratorProps('regency', 'province_id'),
             'showIdField' => false,
+            'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.regencies.index'),
             'submitUrl' => $this->workspaceRoute('master-data.regencies.store'),
         ]);
@@ -421,6 +444,7 @@ class MasterDataController extends Controller
                 'options' => $this->provinceSelectOptions(),
             ]],
             'generator' => null,
+            'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.regencies.index'),
             'submitUrl' => $this->workspaceRoute('master-data.regencies.update', $regency),
         ]);
@@ -541,6 +565,7 @@ class MasterDataController extends Controller
             ],
             'generator' => $this->locationGeneratorProps('district', 'regency_id'),
             'showIdField' => false,
+            'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.districts.index'),
             'submitUrl' => $this->workspaceRoute('master-data.districts.store'),
         ]);
@@ -595,6 +620,7 @@ class MasterDataController extends Controller
                 ],
             ],
             'generator' => null,
+            'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.districts.index'),
             'submitUrl' => $this->workspaceRoute('master-data.districts.update', $district),
         ]);
@@ -738,6 +764,7 @@ class MasterDataController extends Controller
             ],
             'generator' => $this->locationGeneratorProps('village', 'district_id'),
             'showIdField' => false,
+            'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.villages.index'),
             'submitUrl' => $this->workspaceRoute('master-data.villages.store'),
         ]);
@@ -803,6 +830,7 @@ class MasterDataController extends Controller
                 ],
             ],
             'generator' => null,
+            'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.villages.index'),
             'submitUrl' => $this->workspaceRoute('master-data.villages.update', $village),
         ]);
@@ -831,7 +859,7 @@ class MasterDataController extends Controller
     {
         $user = auth()->user();
 
-        return $user !== null && $user->hasRole($this->superAdminRoleName());
+        return $user !== null && $user->hasAdminAccess();
     }
 
     private function superAdminRoleName(): string
@@ -843,6 +871,7 @@ class MasterDataController extends Controller
     {
         return Role::query()
             ->where('guard_name', 'web')
+            ->when(! $this->isSuperAdmin(auth()->user()), fn ($query) => $query->where('name', 'customer'))
             ->orderBy('name')
             ->get(['name'])
             ->map(fn (Role $role) => [
@@ -864,6 +893,7 @@ class MasterDataController extends Controller
             'created_at' => $user->created_at?->toIso8601String(),
             'show_url' => route('admin.master-data.users.show', $user),
             'edit_url' => route('admin.master-data.users.edit', $user),
+            'destroy_url' => $this->canDeleteUser($user) ? route('admin.master-data.users.destroy', $user) : null,
         ];
     }
 
@@ -878,6 +908,57 @@ class MasterDataController extends Controller
             'created_at' => $user->created_at?->toIso8601String(),
             'updated_at' => $user->updated_at?->toIso8601String(),
         ];
+    }
+
+    private function manageableUsersQuery()
+    {
+        $query = User::query();
+
+        if ($this->isSuperAdmin(auth()->user())) {
+            return $query;
+        }
+
+        return $query
+            ->whereHas('roles', fn ($roleQuery) => $roleQuery->where('name', 'customer'))
+            ->whereDoesntHave('roles', fn ($roleQuery) => $roleQuery->where('name', '<>', 'customer'));
+    }
+
+    private function assignableRolesPayload(array $validated): array
+    {
+        if ($this->isSuperAdmin(auth()->user())) {
+            return $validated['roles'] ?? [];
+        }
+
+        return ['customer'];
+    }
+
+    private function canManageUser(User $user): bool
+    {
+        $authUser = auth()->user();
+
+        if (! ($authUser?->hasAdminAccess() ?? false)) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($authUser)) {
+            return true;
+        }
+
+        $roleNames = $user->roles()->pluck('name')->all();
+
+        return $roleNames === ['customer'];
+    }
+
+    private function canDeleteUser(User $user): bool
+    {
+        $authUser = auth()->user();
+
+        return $this->isSuperAdmin($authUser) && $authUser?->id !== $user->id;
+    }
+
+    private function isSuperAdmin(?User $user): bool
+    {
+        return $user !== null && $user->hasRole($this->superAdminRoleName());
     }
 
     protected function paginatedRecordsPayload(object $records): array

@@ -115,11 +115,11 @@ const submit = () => {
             <CardTitle>Parameter</CardTitle>
             <CardDescription>Pilih guideline set, tahun, dan provinsi untuk memuat daftar kabupaten/kota.</CardDescription>
           </CardHeader>
-          <CardContent class="grid gap-6 md:grid-cols-3">
+          <CardContent class="grid gap-6 lg:grid-cols-3">
             <div class="space-y-2">
               <Label for="ikkbp_guideline">Guideline Set</Label>
               <Select :model-value="form.guideline_set_id" @update:model-value="onGuidelineChange">
-                <SelectTrigger id="ikkbp_guideline"><SelectValue placeholder="Pilih guideline set" /></SelectTrigger>
+                <SelectTrigger id="ikkbp_guideline" class="w-full"><SelectValue placeholder="Pilih guideline set" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
                 </SelectContent>
@@ -136,7 +136,7 @@ const submit = () => {
             <div class="space-y-2">
               <Label for="ikkbp_province">Provinsi</Label>
               <Select :model-value="form.province_id" @update:model-value="onProvinceChange">
-                <SelectTrigger id="ikkbp_province"><SelectValue placeholder="Pilih provinsi" /></SelectTrigger>
+                <SelectTrigger id="ikkbp_province" class="w-full"><SelectValue placeholder="Pilih provinsi" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="option in provinceOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
                 </SelectContent>

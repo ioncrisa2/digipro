@@ -48,8 +48,8 @@ const resetFilters = () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
-    <div class="flex items-center justify-end gap-2">
+  <div class="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-end">
+    <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
       <Popover v-if="hasFilter" v-model:open="open">
         <PopoverTrigger as-child>
           <Button type="button" variant="outline" class="shrink-0">
@@ -61,7 +61,7 @@ const resetFilters = () => {
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent>
+        <PopoverContent align="end" class="w-[min(92vw,42rem)] max-h-[80vh] overflow-y-auto p-4">
           <div class="space-y-4">
             <div>
               <p class="text-sm font-semibold text-slate-950">{{ filterTitle }}</p>

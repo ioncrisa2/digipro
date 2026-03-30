@@ -53,11 +53,8 @@ const importForm = useForm({
 
 const columns = [
   { key: 'guideline_set_name', label: 'Guideline', cellClass: 'min-w-[220px]' },
-  { key: 'category', label: 'Kategori', cellClass: 'min-w-[180px]' },
-  { key: 'building_type', label: 'Jenis', cellClass: 'min-w-[160px]' },
-  { key: 'building_class', label: 'Class', cellClass: 'min-w-[140px]' },
-  { key: 'storey_label', label: 'Rentang Lantai', cellClass: 'min-w-[140px]' },
-  { key: 'economic_life', label: 'BEL', cellClass: 'min-w-[90px]', sortable: true },
+  { key: 'category', label: 'Kategori', cellClass: 'min-w-[280px]' },
+  { key: 'economic_life', label: 'Umur', cellClass: 'min-w-[90px]', sortable: true },
   { key: 'updated_at', label: 'Diubah', cellClass: 'min-w-[140px]', sortable: true },
   { key: 'actions', label: 'Aksi', cellClass: 'min-w-[200px]' },
 ];
@@ -104,16 +101,16 @@ const submitImport = () => {
 </script>
 
 <template>
-  <Head title="Admin - BEL" />
+  <Head title="Admin - Umur Ekonomis Bangunan" />
 
-  <AdminLayout title="BEL">
+  <AdminLayout title="Umur Ekonomis Bangunan">
     <div class="space-y-6">
       <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Pedoman Referensi</p>
-          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">BEL</h1>
+          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Umur Ekonomis Bangunan</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Building Economic Life berdasarkan guideline, kategori bangunan, class, dan rentang lantai.
+            Data umur ekonomis bangunan berdasarkan guideline aktif maupun historis untuk kebutuhan valuasi.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -123,7 +120,7 @@ const submitImport = () => {
             :export-url="exportUrl"
             @import="importDialogOpen = true"
           />
-          <Button as-child><Link :href="createUrl">Tambah BEL</Link></Button>
+          <Button as-child><Link :href="createUrl">Tambah Umur Ekonomis</Link></Button>
         </div>
       </section>
 
@@ -137,44 +134,44 @@ const submitImport = () => {
       <Card>
         <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <CardTitle>Daftar BEL</CardTitle>
+            <CardTitle>Daftar Umur Ekonomis Bangunan</CardTitle>
           </div>
           <AdminTableToolbar
             :search-value="form.q"
             search-placeholder="Cari kategori, sub kategori, jenis, atau class"
-            filter-title="Filter BEL"
-            filter-description="Saring data BEL berdasarkan guideline, tahun, kategori, dan class."
+            filter-title="Filter Umur Ekonomis Bangunan"
+            filter-description="Saring data berdasarkan guideline, tahun, kategori, dan class."
             :active-filter-count="activeFilterCount"
             @search="(value) => { form.q = value; submitFilters(); }"
             @apply-filters="submitFilters"
             @reset-filters="resetFilters"
           >
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-4">
               <div class="space-y-2">
                 <Label for="bel_guideline_filter">Guideline</Label>
                 <Select v-model="form.guideline_item_id">
-                  <SelectTrigger id="bel_guideline_filter"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
+                  <SelectTrigger id="bel_guideline_filter" class="w-full"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
                   <SelectContent><SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
                 </Select>
               </div>
               <div class="space-y-2">
                 <Label for="bel_year_filter">Tahun</Label>
                 <Select v-model="form.year">
-                  <SelectTrigger id="bel_year_filter"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
+                  <SelectTrigger id="bel_year_filter" class="w-full"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
                   <SelectContent><SelectItem v-for="option in yearOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
                 </Select>
               </div>
               <div class="space-y-2">
                 <Label for="bel_category_filter">Kategori</Label>
                 <Select v-model="form.category">
-                  <SelectTrigger id="bel_category_filter"><SelectValue placeholder="Pilih kategori" /></SelectTrigger>
+                  <SelectTrigger id="bel_category_filter" class="w-full"><SelectValue placeholder="Pilih kategori" /></SelectTrigger>
                   <SelectContent><SelectItem v-for="option in categoryOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
                 </Select>
               </div>
               <div class="space-y-2">
                 <Label for="bel_class_filter">Class</Label>
                 <Select v-model="form.building_class">
-                  <SelectTrigger id="bel_class_filter"><SelectValue placeholder="Pilih class" /></SelectTrigger>
+                  <SelectTrigger id="bel_class_filter" class="w-full"><SelectValue placeholder="Pilih class" /></SelectTrigger>
                   <SelectContent><SelectItem v-for="option in buildingClassOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
                 </Select>
               </div>
@@ -182,7 +179,7 @@ const submitImport = () => {
           </AdminTableToolbar>
         </CardHeader>
         <CardContent>
-          <AdminDataTable :columns="columns" :rows="records.data" :meta="records.meta" empty-text="Belum ada data BEL.">
+          <AdminDataTable :columns="columns" :rows="records.data" :meta="records.meta" empty-text="Belum ada data umur ekonomis bangunan.">
             <template #cell-guideline_set_name="{ row }">
               <div class="space-y-1">
                 <div class="flex flex-wrap items-center gap-2">
@@ -194,26 +191,25 @@ const submitImport = () => {
             </template>
 
             <template #cell-category="{ row }">
-              <div class="space-y-1">
+              <div class="space-y-2">
                 <p class="font-medium text-slate-950">{{ row.category }}</p>
                 <p v-if="row.sub_category" class="text-xs text-slate-500">{{ row.sub_category }}</p>
+                <div class="flex flex-wrap gap-2">
+                  <Badge v-if="row.building_type" variant="outline" class="border-slate-200 bg-slate-50 text-slate-700">
+                    {{ row.building_type }}
+                  </Badge>
+                  <Badge v-if="row.building_class" variant="outline" class="border-slate-200 bg-slate-50 text-slate-700">
+                    Class: {{ row.building_class }}
+                  </Badge>
+                  <Badge variant="outline" class="border-slate-200 bg-slate-50 text-slate-700">
+                    {{ row.storey_label }}
+                  </Badge>
+                </div>
               </div>
             </template>
 
-            <template #cell-building_type="{ row }">
-              {{ row.building_type || '-' }}
-            </template>
-
-            <template #cell-building_class="{ row }">
-              <Badge variant="outline">{{ row.building_class || 'DEFAULT' }}</Badge>
-            </template>
-
-            <template #cell-storey_label="{ row }">
-              {{ row.storey_label }}
-            </template>
-
             <template #cell-economic_life="{ row }">
-              <Badge variant="outline" class="font-mono">{{ row.economic_life }}</Badge>
+              <Badge variant="outline" class="font-mono">{{ row.economic_life }} th</Badge>
             </template>
 
             <template #cell-updated_at="{ row }">
@@ -224,7 +220,7 @@ const submitImport = () => {
               <AdminEntityActions
                 :edit-href="row.edit_url"
                 :delete-url="row.destroy_url"
-                entity-label="BEL"
+                entity-label="umur ekonomis bangunan"
                 :entity-name="row.category"
               />
             </template>
@@ -236,7 +232,7 @@ const submitImport = () => {
     <Dialog :open="importDialogOpen" @update:open="importDialogOpen = $event">
       <DialogContent class="sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Import BEL</DialogTitle>
+          <DialogTitle>Import Umur Ekonomis Bangunan</DialogTitle>
           <DialogDescription>
             Upload file `.xlsx`, `.xls`, atau `.csv` dengan header `category`, `sub_category`, `building_type`, `building_class`, `storey_min`, `storey_max`, dan `economic_life`.
           </DialogDescription>
@@ -278,7 +274,7 @@ const submitImport = () => {
 
           <DialogFooter class="gap-2 sm:justify-end">
             <Button type="button" variant="outline" @click="importDialogOpen = false">Batal</Button>
-            <Button type="submit" :disabled="importForm.processing">Import BEL</Button>
+            <Button type="submit" :disabled="importForm.processing">Import Umur Ekonomis</Button>
           </DialogFooter>
         </form>
       </DialogContent>

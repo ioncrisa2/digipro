@@ -357,7 +357,8 @@ it('renders the admin payment detail in the vue workspace', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Payments/Show')
             ->where('record.invoice_number', 'INV-2026-90002')
-            ->where('record.external_payment_id', 'MID-ADMIN-SHOW-001'));
+            ->where('record.external_payment_id', 'MID-ADMIN-SHOW-001')
+            ->where('record.edit_url', null));
 });
 
 it('renders the admin office bank accounts index in the vue workspace', function () {
@@ -526,6 +527,47 @@ it('renders the admin payment edit page in the vue workspace', function () {
             ->component('Admin/Payments/Edit')
             ->where('record.invoice_number', 'INV-2026-90003')
             ->where('record.external_payment_id', 'MID-ADMIN-EDIT-001'));
+});
+
+it('blocks editing a paid payment from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $requester = User::factory()->create(['email_verified_at' => now()]);
+
+    $record = AppraisalRequest::create([
+        'user_id' => $requester->id,
+        'request_number' => 'REQ-PAID-LOCKED',
+        'status' => AppraisalStatusEnum::ContractSigned->value,
+        'company_name' => 'PT Uji',
+        'contact_person' => 'Ari',
+        'phone_number' => '081111111111',
+        'email' => 'request@example.com',
+        'client_type' => 'company',
+        'client_name' => 'PT Uji',
+        'fee_amount' => 1000000,
+        'payment_method' => 'gateway',
+        'payment_status' => 'paid',
+        'contract_status' => ContractStatusEnum::ContractSigned->value,
+        'report_type' => 'terinci',
+        'purpose' => PurposeEnum::PenjaminanUtang->value,
+        'property_type' => 'ruko',
+        'bank_name' => 'Bank Test',
+    ]);
+
+    $payment = Payment::query()->create([
+        'appraisal_request_id' => $record->id,
+        'amount' => 1000000,
+        'method' => 'gateway',
+        'gateway' => 'midtrans',
+        'external_payment_id' => 'MID-PAID-LOCKED-001',
+        'status' => 'paid',
+        'paid_at' => now(),
+        'metadata' => ['invoice_number' => 'INV-2026-PAID-LOCKED'],
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.finance.payments.edit', $payment))
+        ->assertForbidden();
 });
 
 it('updates a payment from the vue admin workspace', function () {
@@ -809,6 +851,32 @@ it('deletes an article category from the vue admin workspace', function () {
     expect(ArticleCategory::find($category->id))->toBeNull();
 });
 
+it('reorders article categories from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $first = ArticleCategory::create([
+        'name' => 'Kategori 1',
+        'slug' => 'kategori-1',
+        'sort_order' => 1,
+        'is_active' => true,
+    ]);
+    $second = ArticleCategory::create([
+        'name' => 'Kategori 2',
+        'slug' => 'kategori-2',
+        'sort_order' => 2,
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.content.categories.reorder'), [
+            'ids' => [$second->id, $first->id],
+        ])
+        ->assertRedirect(route('admin.content.categories.index'));
+
+    expect($first->fresh()->sort_order)->toBe(2);
+    expect($second->fresh()->sort_order)->toBe(1);
+});
+
 it('stores and updates a tag from the vue admin workspace', function () {
     $admin = createAdminUser();
 
@@ -855,6 +923,32 @@ it('deletes a tag from the vue admin workspace', function () {
     expect(Tag::find($tag->id))->toBeNull();
 });
 
+it('reorders tags from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $first = Tag::create([
+        'name' => 'Tag 1',
+        'slug' => 'tag-1',
+        'sort_order' => 1,
+        'is_active' => true,
+    ]);
+    $second = Tag::create([
+        'name' => 'Tag 2',
+        'slug' => 'tag-2',
+        'sort_order' => 2,
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.content.tags.reorder'), [
+            'ids' => [$second->id, $first->id],
+        ])
+        ->assertRedirect(route('admin.content.tags.index'));
+
+    expect($first->fresh()->sort_order)->toBe(2);
+    expect($second->fresh()->sort_order)->toBe(1);
+});
+
 it('stores and updates an faq from the vue admin workspace', function () {
     $admin = createAdminUser();
 
@@ -885,6 +979,32 @@ it('stores and updates an faq from the vue admin workspace', function () {
 
     expect($faq->question)->toBe('Apa itu DigiPro Final?');
     expect($faq->is_active)->toBeFalse();
+});
+
+it('reorders faqs from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $first = Faq::create([
+        'question' => 'FAQ 1',
+        'answer' => 'Jawaban 1',
+        'sort_order' => 1,
+        'is_active' => true,
+    ]);
+    $second = Faq::create([
+        'question' => 'FAQ 2',
+        'answer' => 'Jawaban 2',
+        'sort_order' => 2,
+        'is_active' => true,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.content.legal.faqs.reorder'), [
+            'ids' => [$second->id, $first->id],
+        ])
+        ->assertRedirect(route('admin.content.legal.faqs.index'));
+
+    expect($first->fresh()->sort_order)->toBe(2);
+    expect($second->fresh()->sort_order)->toBe(1);
 });
 
 it('stores and updates a feature from the vue admin workspace', function () {
@@ -2240,6 +2360,83 @@ it('stores, updates, and deletes a village from the vue admin workspace', functi
     expect(Village::query()->find('3578010001'))->toBeNull();
 });
 
+it('renders the village create and edit forms with workspace-aware location option urls', function () {
+    $admin = createAdminUser();
+    $province = Province::query()->create([
+        'id' => '35',
+        'name' => 'Jawa Timur',
+    ]);
+    $regency = Regency::query()->create([
+        'id' => '3578',
+        'province_id' => $province->id,
+        'name' => 'Kota Surabaya',
+    ]);
+    $district = District::query()->create([
+        'id' => '3578010',
+        'regency_id' => $regency->id,
+        'name' => 'Tegalsari',
+    ]);
+    $village = Village::query()->create([
+        'id' => '3578010001',
+        'district_id' => $district->id,
+        'name' => 'Kedungdoro',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.master-data.villages.create', ['district_id' => $district->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Locations/Form')
+            ->where('resource.key', 'villages')
+            ->where('showIdField', false)
+            ->where('optionsUrl', route('admin.master-data.locations.options'))
+            ->where('record.province_id', $province->id)
+            ->where('record.regency_id', $regency->id)
+            ->where('record.district_id', $district->id)
+        );
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.master-data.villages.edit', $village))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Locations/Form')
+            ->where('resource.key', 'villages')
+            ->where('optionsUrl', route('admin.master-data.locations.options'))
+            ->where('record.id', $village->id)
+            ->where('record.name', 'Kedungdoro')
+        );
+});
+
+it('renders the reviewer village create form with reviewer-scoped location option url', function () {
+    $reviewer = createReviewerUser();
+    $province = Province::query()->create([
+        'id' => '35',
+        'name' => 'Jawa Timur',
+    ]);
+    $regency = Regency::query()->create([
+        'id' => '3578',
+        'province_id' => $province->id,
+        'name' => 'Kota Surabaya',
+    ]);
+    $district = District::query()->create([
+        'id' => '3578010',
+        'regency_id' => $regency->id,
+        'name' => 'Tegalsari',
+    ]);
+
+    $this
+        ->actingAs($reviewer)
+        ->get(route('reviewer.master-data.villages.create', ['district_id' => $district->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Locations/Form')
+            ->where('resource.key', 'villages')
+            ->where('optionsUrl', route('reviewer.master-data.locations.options'))
+        );
+});
+
 it('returns a generated location id preview for nested location resources', function () {
     $admin = createAdminUser();
     $province = Province::query()->create([
@@ -2323,6 +2520,12 @@ it('renders the admin users index in the vue workspace', function () {
         'email_verified_at' => now(),
     ]);
     $user->assignRole('customer');
+    $superAdmin = User::factory()->create([
+        'name' => 'Hidden Super Admin',
+        'email' => 'superhidden@example.com',
+        'email_verified_at' => now(),
+    ]);
+    $superAdmin->assignRole('super_admin');
 
     $this
         ->actingAs($admin)
@@ -2352,11 +2555,11 @@ it('renders the admin user detail page in the vue workspace', function () {
             ->where('record.email', 'detail@example.com'));
 });
 
-it('allows super admin to create a user from the vue admin workspace', function () {
-    $superAdmin = createSuperAdminUser();
+it('allows admin to create a customer user from the vue admin workspace', function () {
+    $admin = createAdminUser();
 
     $this
-        ->actingAs($superAdmin)
+        ->actingAs($admin)
         ->post(route('admin.master-data.users.store'), [
             'name' => 'New Managed User',
             'email' => 'managed@example.com',
@@ -2373,13 +2576,36 @@ it('allows super admin to create a user from the vue admin workspace', function 
     expect($user->email_verified_at)->not->toBeNull();
 });
 
-it('blocks normal admin from opening the create user page', function () {
+it('blocks normal admin from assigning non-customer roles when creating users', function () {
+    $admin = createAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->from(route('admin.master-data.users.create'))
+        ->post(route('admin.master-data.users.store'), [
+            'name' => 'Escalation Attempt',
+            'email' => 'escalation@example.com',
+            'password' => 'password123',
+            'email_verified_at' => now()->format('Y-m-d H:i:s'),
+            'roles' => ['Reviewer'],
+        ])
+        ->assertRedirect(route('admin.master-data.users.create'))
+        ->assertSessionHasErrors('roles.0');
+
+    expect(User::query()->where('email', 'escalation@example.com')->exists())->toBeFalse();
+});
+
+it('allows admin to open the create user page with customer-only role options', function () {
     $admin = createAdminUser();
 
     $this
         ->actingAs($admin)
         ->get(route('admin.master-data.users.create'))
-        ->assertForbidden();
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Users/Form')
+            ->where('roleOptions', [['value' => 'customer', 'label' => 'customer']])
+            ->where('record.roles', ['customer']));
 });
 
 it('updates a managed user from the vue admin workspace', function () {
@@ -2398,7 +2624,7 @@ it('updates a managed user from the vue admin workspace', function () {
             'email' => 'managed-update@example.com',
             'password' => 'password999',
             'email_verified_at' => now()->format('Y-m-d H:i:s'),
-            'roles' => ['Reviewer'],
+            'roles' => ['customer'],
         ])
         ->assertRedirect(route('admin.master-data.users.show', $user));
 
@@ -2406,8 +2632,47 @@ it('updates a managed user from the vue admin workspace', function () {
 
     expect($user->name)->toBe('Managed User Final');
     expect($user->email_verified_at)->not->toBeNull();
-    expect($user->hasRole('Reviewer'))->toBeTrue();
-    expect($user->hasRole('customer'))->toBeFalse();
+    expect($user->hasRole('customer'))->toBeTrue();
+});
+
+it('blocks normal admin from accessing a super admin user detail page', function () {
+    $admin = createAdminUser();
+    $superAdmin = createSuperAdminUser();
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.master-data.users.show', $superAdmin))
+        ->assertForbidden();
+});
+
+it('allows super admin to delete a managed user from the vue admin workspace', function () {
+    $superAdmin = createSuperAdminUser();
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    $user->assignRole('customer');
+
+    $this
+        ->actingAs($superAdmin)
+        ->delete(route('admin.master-data.users.destroy', $user))
+        ->assertRedirect(route('admin.master-data.users.index'));
+
+    expect(User::query()->whereKey($user->id)->exists())->toBeFalse();
+});
+
+it('blocks normal admin from deleting a user from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    $user->assignRole('customer');
+
+    $this
+        ->actingAs($admin)
+        ->delete(route('admin.master-data.users.destroy', $user))
+        ->assertForbidden();
+
+    expect(User::query()->whereKey($user->id)->exists())->toBeTrue();
 });
 
 it('blocks normal admin from accessing the access control role index', function () {

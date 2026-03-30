@@ -17,6 +17,7 @@ use App\Models\Testimonial;
 use App\Models\TermsDocument;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Response;
 
 class ContentLegalController extends Controller
@@ -52,6 +53,7 @@ class ContentLegalController extends Controller
             ],
             'records' => $records,
             'createUrl' => route('admin.content.legal.faqs.create'),
+            'reorderUrl' => route('admin.content.legal.faqs.reorder'),
             'links' => $this->legalModuleLinks(),
         ]);
     }
@@ -110,6 +112,24 @@ class ContentLegalController extends Controller
         $faq->delete();
 
         return redirect()->route('admin.content.legal.faqs.index')->with('success', 'FAQ berhasil dihapus.');
+    }
+
+    public function faqsReorder(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:faqs,id'],
+        ]);
+
+        DB::transaction(function () use ($validated): void {
+            foreach (array_values($validated['ids']) as $index => $id) {
+                Faq::query()
+                    ->whereKey($id)
+                    ->update(['sort_order' => $index + 1]);
+            }
+        });
+
+        return redirect()->route('admin.content.legal.faqs.index')->with('success', 'Urutan FAQ berhasil diperbarui.');
     }
 
     public function featuresIndex(Request $request): Response

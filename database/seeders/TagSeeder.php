@@ -23,13 +23,14 @@ class TagSeeder extends Seeder
             'insight',
         ];
 
-        foreach ($tags as $tag) {
+        foreach ($tags as $index => $tag) {
             $slug = Str::slug($tag);
             Tag::updateOrCreate(
                 ['slug' => $slug],
                 [
                     'name' => Str::title($tag),
                     'is_active' => true,
+                    'sort_order' => $index + 1,
                 ]
             );
         }

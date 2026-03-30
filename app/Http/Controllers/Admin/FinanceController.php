@@ -101,11 +101,16 @@ class FinanceController extends Controller
                 'proof_type' => $payment->proof_type,
                 'proof_url' => $proofFileUrl,
                 'metadata_lines' => $this->paymentMetadataLines($payment->metadata),
+                'metadata_json' => $this->formatPaymentMetadataJson($payment->metadata),
                 'request_number' => $payment->appraisalRequest?->request_number ?? ('REQ-' . $payment->appraisal_request_id),
                 'requester_name' => $payment->appraisalRequest?->user?->name ?? '-',
                 'client_name' => $payment->appraisalRequest?->client_name ?: ($payment->appraisalRequest?->user?->name ?? '-'),
                 'request_show_url' => $payment->appraisalRequest
                     ? route('admin.appraisal-requests.show', $payment->appraisalRequest)
+                    : null,
+                'can_edit' => $this->canEditPayment($payment),
+                'edit_url' => $this->canEditPayment($payment)
+                    ? route('admin.finance.payments.edit', $payment)
                     : null,
                 'created_at' => $payment->created_at?->toIso8601String(),
                 'updated_at' => $payment->updated_at?->toIso8601String(),
@@ -118,6 +123,8 @@ class FinanceController extends Controller
 
     public function paymentsEdit(Payment $payment): Response
     {
+        abort_unless($this->canEditPayment($payment), 403);
+
         $payment->loadMissing(['appraisalRequest.user']);
 
         return inertia('Admin/Payments/Edit', [
@@ -154,6 +161,8 @@ class FinanceController extends Controller
 
     public function paymentsUpdate(UpdatePaymentRequest $request, Payment $payment): RedirectResponse
     {
+        abort_unless($this->canEditPayment($payment), 403);
+
         $validated = $request->validated();
 
         $payment->forceFill([
@@ -304,9 +313,16 @@ class FinanceController extends Controller
             'paid_at' => $payment->paid_at?->toIso8601String(),
             'updated_at' => $payment->updated_at?->toIso8601String(),
             'show_url' => route('admin.finance.payments.show', $payment),
-            'edit_url' => route('admin.finance.payments.edit', $payment),
+            'edit_url' => $this->canEditPayment($payment)
+                ? route('admin.finance.payments.edit', $payment)
+                : null,
             'request_show_url' => $requestRecord ? route('admin.appraisal-requests.show', $requestRecord) : null,
         ];
+    }
+
+    private function canEditPayment(Payment $payment): bool
+    {
+        return in_array($payment->status, ['pending', 'failed', 'expired', 'rejected', 'refunded'], true);
     }
 
     private function transformOfficeBankAccountRow(OfficeBankAccount $account): array

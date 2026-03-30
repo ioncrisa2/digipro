@@ -261,11 +261,9 @@ const columns = [
 
             <template #cell-paid="{ row }">
               <p>{{ formatDateTime(row.paid_at) }}</p>
-              <Button variant="link" class="mt-1 h-auto px-0 text-xs" as-child>
+              <Button v-if="row.edit_url" variant="link" class="mt-1 h-auto px-0 text-xs" as-child>
                 <Link :href="row.edit_url">Edit pembayaran</Link>
               </Button>
-
-
             </template>
           </AdminDataTable>
         </CardContent>

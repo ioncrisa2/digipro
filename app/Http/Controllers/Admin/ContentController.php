@@ -10,6 +10,7 @@ use App\Http\Requests\Admin\StoreTagRequest;
 use App\Models\Article;
 use App\Models\ArticleCategory;
 use App\Models\Tag;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -189,6 +190,7 @@ class ContentController extends Controller
             ],
             'records' => $records,
             'createUrl' => route('admin.content.categories.create'),
+            'reorderUrl' => route('admin.content.categories.reorder'),
             'articlesUrl' => route('admin.content.articles.index'),
         ]);
     }
@@ -257,6 +259,20 @@ class ContentController extends Controller
             ->with('success', 'Kategori artikel berhasil dihapus.');
     }
 
+    public function articleCategoriesReorder(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:article_categories,id'],
+        ]);
+
+        $this->syncSortOrder(ArticleCategory::query(), $validated['ids']);
+
+        return redirect()
+            ->route('admin.content.categories.index')
+            ->with('success', 'Urutan kategori artikel berhasil diperbarui.');
+    }
+
     public function tagsIndex(Request $request): Response
     {
         $filters = [
@@ -275,6 +291,7 @@ class ContentController extends Controller
             })
             ->when($filters['status'] === 'active', fn ($query) => $query->where('is_active', true))
             ->when($filters['status'] === 'inactive', fn ($query) => $query->where('is_active', false))
+            ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
             ->map(fn (Tag $tag) => $this->transformTagRow($tag))
@@ -294,6 +311,7 @@ class ContentController extends Controller
             ],
             'records' => $records,
             'createUrl' => route('admin.content.tags.create'),
+            'reorderUrl' => route('admin.content.tags.reorder'),
             'articlesUrl' => route('admin.content.articles.index'),
         ]);
     }
@@ -306,6 +324,7 @@ class ContentController extends Controller
                 'name' => '',
                 'slug' => '',
                 'is_active' => true,
+                'sort_order' => 0,
             ],
             'indexUrl' => route('admin.content.tags.index'),
             'submitUrl' => route('admin.content.tags.store'),
@@ -314,7 +333,10 @@ class ContentController extends Controller
 
     public function tagsStore(StoreTagRequest $request): RedirectResponse
     {
-        Tag::query()->create($request->validated());
+        Tag::query()->create([
+            ...$request->validated(),
+            'sort_order' => $this->nextSortOrder(Tag::query()),
+        ]);
 
         return redirect()
             ->route('admin.content.tags.index')
@@ -330,6 +352,7 @@ class ContentController extends Controller
                 'name' => $tag->name,
                 'slug' => $tag->slug,
                 'is_active' => (bool) $tag->is_active,
+                'sort_order' => (int) $tag->sort_order,
             ],
             'indexUrl' => route('admin.content.tags.index'),
             'submitUrl' => route('admin.content.tags.update', $tag),
@@ -352,6 +375,20 @@ class ContentController extends Controller
         return redirect()
             ->route('admin.content.tags.index')
             ->with('success', 'Tag artikel berhasil dihapus.');
+    }
+
+    public function tagsReorder(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:tags,id'],
+        ]);
+
+        $this->syncSortOrder(Tag::query(), $validated['ids']);
+
+        return redirect()
+            ->route('admin.content.tags.index')
+            ->with('success', 'Urutan tag artikel berhasil diperbarui.');
     }
 
     private function transformArticleRow(Article $article): array
@@ -398,6 +435,7 @@ class ContentController extends Controller
             'id' => $tag->id,
             'name' => $tag->name,
             'slug' => $tag->slug,
+            'sort_order' => (int) $tag->sort_order,
             'is_active' => (bool) $tag->is_active,
             'articles_count' => (int) ($tag->articles_count ?? 0),
             'updated_at' => $tag->updated_at?->toIso8601String(),
@@ -445,6 +483,7 @@ class ContentController extends Controller
     private function tagSelectOptions(): array
     {
         return Tag::query()
+            ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (Tag $tag) => [
@@ -492,6 +531,22 @@ class ContentController extends Controller
         ]);
         $article->save();
         $article->tags()->sync($validated['tag_ids'] ?? []);
+    }
+
+    private function nextSortOrder($query): int
+    {
+        return ((int) $query->max('sort_order')) + 1;
+    }
+
+    private function syncSortOrder($query, array $ids): void
+    {
+        DB::transaction(function () use ($query, $ids): void {
+            foreach (array_values($ids) as $index => $id) {
+                (clone $query)
+                    ->whereKey($id)
+                    ->update(['sort_order' => $index + 1]);
+            }
+        });
     }
 
     protected function paginatedRecordsPayload(object $records): array

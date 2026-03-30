@@ -72,13 +72,21 @@ const activeFilterCount = computed(() => (
   ), 0)
 ));
 
-const columns = [
-  { key: 'code', label: 'Kode', cellClass: 'w-[130px]', sortable: true },
-  { key: 'name', label: 'Nama', cellClass: 'min-w-[220px]', sortable: true },
-  { key: 'details', label: 'Relasi', cellClass: 'min-w-[260px]' },
-  { key: 'stats', label: 'Stat', cellClass: 'min-w-[180px]' },
-  { key: 'actions', label: 'Aksi', cellClass: 'min-w-[200px]' },
-];
+const columns = computed(() => {
+  const baseColumns = [
+    { key: 'code', label: 'Kode', cellClass: 'w-[130px]', sortable: true },
+    { key: 'name', label: 'Nama', cellClass: 'min-w-[220px]', sortable: true },
+    { key: 'details', label: 'Relasi', cellClass: 'min-w-[260px]' },
+  ];
+
+  if (props.resource.key !== 'villages') {
+    baseColumns.push({ key: 'stats', label: 'Stat', cellClass: 'min-w-[180px]' });
+  }
+
+  baseColumns.push({ key: 'actions', label: 'Aksi', cellClass: 'min-w-[200px]' });
+
+  return baseColumns;
+});
 </script>
 
 <template>
@@ -123,7 +131,7 @@ const columns = [
             @apply-filters="submitFilters"
             @reset-filters="resetFilters"
           >
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-4">
               <div
                 v-for="option in filterOptions"
                 :key="option.key"
@@ -131,7 +139,7 @@ const columns = [
               >
                 <Label :for="`${resource.key}_${option.key}_filter`">{{ option.label }}</Label>
                 <Select v-model="form[option.key]">
-                  <SelectTrigger :id="`${resource.key}_${option.key}_filter`">
+                  <SelectTrigger :id="`${resource.key}_${option.key}_filter`" class="w-full">
                     <SelectValue :placeholder="`Pilih ${option.label.toLowerCase()}`" />
                   </SelectTrigger>
                   <SelectContent>

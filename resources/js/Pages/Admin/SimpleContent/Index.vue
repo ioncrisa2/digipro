@@ -1,8 +1,10 @@
 <script setup>
+import { computed } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Pencil, Trash2 } from 'lucide-vue-next';
 import AdminCardList from '@/components/admin/AdminCardList.vue';
 import AdminEntityCard from '@/components/admin/AdminEntityCard.vue';
+import AdminSortableOrderingPanel from '@/components/admin/AdminSortableOrderingPanel.vue';
 import { useAdminConfirmDialog } from '@/composables/useAdminConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,6 +21,7 @@ const props = defineProps({
   summary: { type: Object, default: () => ({ total: 0, active: 0 }) },
   records: { type: Array, default: () => [] },
   createUrl: { type: String, required: true },
+  reorderUrl: { type: String, default: '' },
   links: { type: Array, default: () => [] },
 });
 
@@ -52,6 +55,13 @@ const destroyRecord = async (item) => {
   if (!confirmed) return;
   router.delete(item.destroy_url, { preserveScroll: true });
 };
+
+const reorderItems = computed(() => props.records.map((item) => ({
+  id: item.id,
+  title: item.title || item.question || item.name,
+  subtitle: plainText(item.description || item.answer || item.quote),
+  is_active: item.is_active,
+})));
 </script>
 
 <template>
@@ -72,6 +82,14 @@ const destroyRecord = async (item) => {
         <Card><CardContent class="p-5"><p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total</p><p class="mt-3 text-4xl font-semibold text-slate-950">{{ summary.total }}</p></CardContent></Card>
         <Card><CardContent class="p-5"><p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Aktif</p><p class="mt-3 text-4xl font-semibold text-slate-950">{{ summary.active }}</p></CardContent></Card>
       </section>
+
+      <AdminSortableOrderingPanel
+        v-if="reorderUrl && records.length > 1"
+        :title="`Urutkan ${resource.title}`"
+        description="Drag and drop urutan item agar tampilan konten publik lebih mudah diatur dari UI."
+        :items="reorderItems"
+        :save-url="reorderUrl"
+      />
 
       <Card>
         <CardHeader><CardTitle>Filter</CardTitle><CardDescription>Kelola {{ resource.title.toLowerCase() }} dari admin Vue.</CardDescription></CardHeader>

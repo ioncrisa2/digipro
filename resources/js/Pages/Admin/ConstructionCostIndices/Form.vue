@@ -135,7 +135,7 @@ const submit = () => {
             <div class="space-y-2">
               <Label for="ikk_guideline_set_id">Guideline Set</Label>
               <Select v-model="form.guideline_set_id">
-                <SelectTrigger id="ikk_guideline_set_id"><SelectValue placeholder="Pilih guideline set" /></SelectTrigger>
+                <SelectTrigger id="ikk_guideline_set_id" class="w-full"><SelectValue placeholder="Pilih guideline set" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
                 </SelectContent>
@@ -152,7 +152,7 @@ const submit = () => {
             <div class="space-y-2">
               <Label for="ikk_province_id">Provinsi</Label>
               <Select v-model="form.province_id">
-                <SelectTrigger id="ikk_province_id"><SelectValue placeholder="Pilih provinsi" /></SelectTrigger>
+                <SelectTrigger id="ikk_province_id" class="w-full"><SelectValue placeholder="Pilih provinsi" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="option in provinceOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
                 </SelectContent>
@@ -162,7 +162,7 @@ const submit = () => {
             <div class="space-y-2">
               <Label for="ikk_region_code">Kabupaten/Kota</Label>
               <Select v-model="form.region_code">
-                <SelectTrigger id="ikk_region_code"><SelectValue placeholder="Pilih kabupaten/kota" /></SelectTrigger>
+                <SelectTrigger id="ikk_region_code" class="w-full"><SelectValue placeholder="Pilih kabupaten/kota" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="option in regencyOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
                 </SelectContent>

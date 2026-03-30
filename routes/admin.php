@@ -72,6 +72,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::get('/kategori-artikel', [ContentController::class, 'articleCategoriesIndex'])->name('categories.index');
                 Route::get('/kategori-artikel/buat', [ContentController::class, 'articleCategoriesCreate'])->name('categories.create');
                 Route::post('/kategori-artikel', [ContentController::class, 'articleCategoriesStore'])->name('categories.store');
+                Route::put('/kategori-artikel/reorder', [ContentController::class, 'articleCategoriesReorder'])->name('categories.reorder');
                 Route::get('/kategori-artikel/{articleCategory}/edit', [ContentController::class, 'articleCategoriesEdit'])->name('categories.edit');
                 Route::put('/kategori-artikel/{articleCategory}', [ContentController::class, 'articleCategoriesUpdate'])->name('categories.update');
                 Route::delete('/kategori-artikel/{articleCategory}', [ContentController::class, 'articleCategoriesDestroy'])->name('categories.destroy');
@@ -79,6 +80,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::get('/tag', [ContentController::class, 'tagsIndex'])->name('tags.index');
                 Route::get('/tag/buat', [ContentController::class, 'tagsCreate'])->name('tags.create');
                 Route::post('/tag', [ContentController::class, 'tagsStore'])->name('tags.store');
+                Route::put('/tag/reorder', [ContentController::class, 'tagsReorder'])->name('tags.reorder');
                 Route::get('/tag/{tag}/edit', [ContentController::class, 'tagsEdit'])->name('tags.edit');
                 Route::put('/tag/{tag}', [ContentController::class, 'tagsUpdate'])->name('tags.update');
                 Route::delete('/tag/{tag}', [ContentController::class, 'tagsDestroy'])->name('tags.destroy');
@@ -89,6 +91,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                         Route::get('/faq', [ContentLegalController::class, 'faqsIndex'])->name('faqs.index');
                         Route::get('/faq/buat', [ContentLegalController::class, 'faqsCreate'])->name('faqs.create');
                         Route::post('/faq', [ContentLegalController::class, 'faqsStore'])->name('faqs.store');
+                        Route::put('/faq/reorder', [ContentLegalController::class, 'faqsReorder'])->name('faqs.reorder');
                         Route::get('/faq/{faq}/edit', [ContentLegalController::class, 'faqsEdit'])->name('faqs.edit');
                         Route::put('/faq/{faq}', [ContentLegalController::class, 'faqsUpdate'])->name('faqs.update');
                         Route::delete('/faq/{faq}', [ContentLegalController::class, 'faqsDestroy'])->name('faqs.destroy');
@@ -149,6 +152,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                         Route::get('/users/{user}', [MasterDataController::class, 'usersShow'])->name('users.show');
                         Route::get('/users/{user}/edit', [MasterDataController::class, 'usersEdit'])->name('users.edit');
                         Route::put('/users/{user}', [MasterDataController::class, 'usersUpdate'])->name('users.update');
+                        Route::delete('/users/{user}', [MasterDataController::class, 'usersDestroy'])->name('users.destroy');
                     });
 
                 Route::get('/provinsi', [MasterDataController::class, 'provincesIndex'])->name('provinces.index');

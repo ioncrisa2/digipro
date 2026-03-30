@@ -168,6 +168,7 @@ const columns = [
               <AdminEntityActions
                 :detail-href="row.show_url"
                 :edit-href="row.edit_url"
+                :delete-url="row.destroy_url"
                 entity-label="user"
                 :entity-name="row.name"
               />

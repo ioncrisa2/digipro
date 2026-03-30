@@ -9,7 +9,18 @@ class UpdatePaymentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAdminAccess() ?? false;
+        $user = $this->user();
+        $payment = $this->route('payment');
+
+        if (! ($user?->hasAdminAccess() ?? false)) {
+            return false;
+        }
+
+        if ($payment === null) {
+            return true;
+        }
+
+        return in_array($payment->status, ['pending', 'failed', 'expired', 'rejected', 'refunded'], true);
     }
 
     protected function prepareForValidation(): void

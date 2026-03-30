@@ -148,28 +148,28 @@ const submitImport = () => {
             @apply-filters="submitFilters"
             @reset-filters="resetFilters"
           >
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-4">
               <div class="space-y-2">
                 <Label for="ikk_guideline_filter">Guideline</Label>
                 <Select v-model="form.guideline_set_id">
-                  <SelectTrigger id="ikk_guideline_filter"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
+                  <SelectTrigger id="ikk_guideline_filter" class="w-full"><SelectValue placeholder="Pilih guideline" /></SelectTrigger>
                   <SelectContent><SelectItem v-for="option in guidelineSetOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
                 </Select>
               </div>
               <div class="space-y-2">
                 <Label for="ikk_year_filter">Tahun</Label>
                 <Select v-model="form.year">
-                  <SelectTrigger id="ikk_year_filter"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
+                  <SelectTrigger id="ikk_year_filter" class="w-full"><SelectValue placeholder="Pilih tahun" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Tahun</SelectItem>
                     <SelectItem v-for="option in yearOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div class="space-y-2 sm:col-span-2">
+              <div class="space-y-2">
                 <Label for="ikk_province_filter">Provinsi</Label>
                 <Select v-model="form.province_id">
-                  <SelectTrigger id="ikk_province_filter"><SelectValue placeholder="Pilih provinsi" /></SelectTrigger>
+                  <SelectTrigger id="ikk_province_filter" class="w-full"><SelectValue placeholder="Pilih provinsi" /></SelectTrigger>
                   <SelectContent><SelectItem v-for="option in provinceOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem></SelectContent>
                 </Select>
               </div>
