@@ -18,6 +18,8 @@ enum AppraisalStatusEnum: string
     case ContractSigned         = 'contract_signed';
     case ValuationOnProgress    = 'valuation_in_progress';
     case ValuationCompleted     = 'valuation_completed';
+    case PreviewReady           = 'preview_ready';
+    case ReportPreparation      = 'report_preparation';
     case ReportReady            = 'report_ready';
     case Completed              = 'completed';
     case Cancelled               = 'cancelled';
@@ -35,6 +37,8 @@ enum AppraisalStatusEnum: string
             self::ContractSigned        => 'Kontrak Ditandatangani',
             self::ValuationOnProgress   => 'Proses Valuasi Berjalan',
             self::ValuationCompleted    => 'Proses Valuasi Selesai',
+            self::PreviewReady          => 'Preview Kajian Siap',
+            self::ReportPreparation     => 'Laporan Sedang Disiapkan',
             self::ReportReady           => 'Laporan Siap',
             self::Completed             => 'Selesai',
             self::Cancelled             => 'Dibatalkan',
