@@ -127,6 +127,10 @@
         <td class="label">ID Permohonan</td>
         <td>: {{ $doc['request_id'] ?? '-' }}</td>
     </tr>
+    <tr>
+        <td class="label">Tujuan Penilaian</td>
+        <td colspan="3">: {{ $doc['valuation_objective_label'] ?? '-' }}</td>
+    </tr>
 </table>
 
 <p>

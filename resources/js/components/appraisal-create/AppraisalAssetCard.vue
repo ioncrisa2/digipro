@@ -186,7 +186,7 @@ defineProps({
       <div class="space-y-8 pt-4">
         <section class="space-y-4">
           <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">
-            Informasi Fisik
+            Informasi Objek
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -239,135 +239,9 @@ defineProps({
           </div>
         </section>
 
-        <section class="rounded-xl border bg-muted/10 p-5 space-y-4">
-          <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Data Umum Properti
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="grid gap-2">
-              <Label>Peruntukan <span class="text-destructive">*</span></Label>
-              <Select v-model="asset.peruntukan">
-                <SelectTrigger class="w-full">
-                  <SelectValue placeholder="Pilih peruntukan" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in usageOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="grid gap-2">
-              <Label>Dokumen Tanah <span class="text-destructive">*</span></Label>
-              <Select v-model="asset.titleDocument">
-                <SelectTrigger class="w-full">
-                  <SelectValue placeholder="Pilih dokumen tanah" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in titleDocumentOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="grid gap-2">
-              <Label>Bentuk Tanah <span class="text-destructive">*</span></Label>
-              <Select v-model="asset.landShape">
-                <SelectTrigger class="w-full">
-                  <SelectValue placeholder="Pilih bentuk tanah" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in landShapeOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="grid gap-2">
-              <Label>Posisi Tanah <span class="text-destructive">*</span></Label>
-              <Select v-model="asset.landPosition">
-                <SelectTrigger class="w-full">
-                  <SelectValue placeholder="Pilih posisi tanah" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in landPositionOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="grid gap-2">
-              <Label>Kondisi Tanah <span class="text-destructive">*</span></Label>
-              <Select v-model="asset.landCondition">
-                <SelectTrigger class="w-full">
-                  <SelectValue placeholder="Pilih kondisi tanah" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in landConditionOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="grid gap-2">
-              <Label>Topografi <span class="text-destructive">*</span></Label>
-              <Select v-model="asset.topography">
-                <SelectTrigger class="w-full">
-                  <SelectValue placeholder="Pilih topografi" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in topographyOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="grid gap-2">
-              <Label>Lebar Muka (meter) <span class="text-destructive">*</span></Label>
-              <Input type="number" v-model="asset.frontageWidth" placeholder="Cth: 12" />
-            </div>
-
-            <div class="grid gap-2">
-              <Label>Lebar Akses Jalan (meter) <span class="text-destructive">*</span></Label>
-              <Input type="number" v-model="asset.accessRoadWidth" placeholder="Cth: 6" />
-            </div>
-          </div>
-        </section>
-
         <section class="rounded-xl border bg-muted/20 p-5 space-y-4">
           <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Lokasi Aset
+            Lokasi Objek
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -488,9 +362,42 @@ defineProps({
           </div>
         </section>
 
-        <section class="space-y-4">
-          <div class="text-sm font-semibold border-b pb-2">
-            Dokumen Legalitas & Foto
+        <section class="rounded-xl border bg-muted/10 p-5 space-y-4">
+          <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Legalitas & Dokumen
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid gap-2">
+              <Label>Jenis Dokumen Tanah <span class="text-destructive">*</span></Label>
+              <Select v-model="asset.titleDocument">
+                <SelectTrigger class="w-full">
+                  <SelectValue placeholder="Pilih dokumen tanah" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in titleDocumentOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="pt-1">
+              <BaseFileUpload
+                label="FC Sertifikat Tanah *"
+                v-model="asset.docCerts"
+                accept=".pdf,.jpg,.jpeg,.png"
+                multiple
+                :max-files="10"
+                :max-file-size-mb="10"
+                :max-total-size-mb="60"
+                helper-text="Pilih jenis dokumen tanah terlebih dahulu, lalu upload scan sertifikat lengkap."
+              />
+            </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -498,7 +405,7 @@ defineProps({
               <BaseFileUpload
                 label="FC PBB Tahun Terakhir *"
                 v-model="asset.docPbb"
-                accept=".pdf"
+                accept=".pdf,.jpg,.jpeg,.png"
                 :max-file-size-mb="10"
                 helper-text="Wajib. Pastikan PBB adalah tahun terakhir yang tersedia."
               />
@@ -508,24 +415,17 @@ defineProps({
               <BaseFileUpload
                 label="FC IMB / PBG *"
                 v-model="asset.docImb"
-                accept=".pdf"
+                accept=".pdf,.jpg,.jpeg,.png"
                 :max-file-size-mb="10"
                 helper-text="Wajib untuk aset yang memiliki bangunan."
               />
             </div>
           </div>
+        </section>
 
-          <div class="pt-1">
-            <BaseFileUpload
-              label="FC Sertifikat Tanah (SHM/HGB) *"
-              v-model="asset.docCerts"
-              accept=".pdf"
-              multiple
-              :max-files="10"
-              :max-file-size-mb="10"
-              :max-total-size-mb="60"
-              helper-text="Wajib. Upload sertifikat lengkap (bisa multi halaman / multi file)."
-            />
+        <section class="rounded-xl border bg-muted/20 p-5 space-y-4">
+          <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Foto Objek
           </div>
 
           <div class="space-y-6">
@@ -568,6 +468,16 @@ defineProps({
               />
             </div>
           </div>
+        </section>
+
+        <section class="rounded-xl border border-dashed bg-muted/10 p-5 space-y-3">
+          <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Data Penilaian Internal
+          </div>
+          <p class="text-sm text-muted-foreground">
+            Peruntukan, bentuk tanah, posisi tanah, kondisi tanah, topografi, lebar muka, dan lebar akses
+            jalan akan dilengkapi oleh reviewer setelah dokumen dan foto objek diperiksa.
+          </p>
         </section>
       </div>
     </div>

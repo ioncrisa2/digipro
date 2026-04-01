@@ -296,9 +296,12 @@ trait InteractsWithAppraisalRequests
     private function requestFileTypeLabel(?string $type): string
     {
         return match ((string) $type) {
+            'agreement_pdf' => 'Agreement DigiPro',
             'contract_signed_pdf' => 'PDF Kontrak Ditandatangani',
+            'disclaimer_pdf' => 'Disclaimer DigiPro',
             'npwp' => 'NPWP',
             'representative' => 'Surat Kuasa',
+            'representative_letter_pdf' => 'Surat Representatif DigiPro',
             'permission' => 'Surat Izin',
             'other_request_document' => 'Lampiran Request',
             default => Arr::headline((string) $type),

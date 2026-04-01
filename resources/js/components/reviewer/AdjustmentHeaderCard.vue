@@ -90,18 +90,20 @@ defineEmits(['preview', 'save']);
         <AlertDescription class="text-sm">{{ feedback }}</AlertDescription>
       </Alert>
 
-      <div class="grid gap-3 sm:grid-cols-3">
+      <div class="grid gap-3 sm:grid-cols-2">
         <div class="rounded-lg border border-border/50 bg-muted/20 px-4 py-3 transition-colors hover:bg-muted/40">
-          <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Unit Low</p>
+          <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Low</p>
+          <p class="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Per Meter</p>
           <p class="mt-1.5 text-xl font-semibold tabular-nums">{{ rangeSummary.unit_low_text || '-' }}</p>
-        </div>
-        <div class="rounded-lg border border-border/50 bg-muted/20 px-4 py-3 transition-colors hover:bg-muted/40">
-          <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Unit High</p>
-          <p class="mt-1.5 text-xl font-semibold tabular-nums">{{ rangeSummary.unit_high_text || '-' }}</p>
+          <p class="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Value</p>
+          <p class="mt-1.5 text-xl font-semibold tabular-nums">{{ rangeSummary.value_low_text || '-' }}</p>
         </div>
         <div class="rounded-lg border border-border/50 bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50">
-          <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Value Mid</p>
-          <p class="mt-1.5 text-xl font-semibold tabular-nums">{{ rangeSummary.value_mid_text || '-' }}</p>
+          <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">High</p>
+          <p class="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Per Meter</p>
+          <p class="mt-1.5 text-xl font-semibold tabular-nums">{{ rangeSummary.unit_high_text || '-' }}</p>
+          <p class="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Value</p>
+          <p class="mt-1.5 text-xl font-semibold tabular-nums">{{ rangeSummary.value_high_text || '-' }}</p>
         </div>
       </div>
     </CardContent>

@@ -8,8 +8,11 @@ use Illuminate\Validation\Rule;
 class StoreAppraisalRequestFileRequest extends FormRequest
 {
     public const ALLOWED_TYPES = [
+        'agreement_pdf',
+        'disclaimer_pdf',
         'npwp',
         'representative',
+        'representative_letter_pdf',
         'permission',
         'other_request_document',
     ];

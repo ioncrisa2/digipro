@@ -1,11 +1,12 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { Link } from "@inertiajs/vue3";
 import UserDashboardLayout from "@/layouts/UserDashboardLayout.vue";
+import AdminDataTable from "@/components/admin/AdminDataTable.vue";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -15,14 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  FileText,
-  FileDown,
-  MapPin,
-  Calendar,
   ArrowRight,
+  Calendar,
+  MapPin,
   Search,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-vue-next";
 
 const props = defineProps({
@@ -35,19 +32,32 @@ const statusFilter = ref("all");
 const fromDate = ref("");
 const toDate = ref("");
 
-const statusOptions = [
-  { value: "all", label: "Semua Status" },
-  { value: "siap", label: "Laporan Siap" },
-  { value: "menunggu", label: "Menunggu" },
-  { value: "selesai", label: "Selesai" },
+const columns = [
+  { key: "request_number", label: "Request", sortable: true, cellClass: "min-w-[180px]" },
+  { key: "client", label: "Client", sortable: true, cellClass: "min-w-[180px]" },
+  { key: "address", label: "Alamat", sortable: true, cellClass: "min-w-[240px]" },
+  { key: "status", label: "Status", sortable: true, cellClass: "min-w-[160px]" },
+  { key: "total_documents_count", label: "Arsip", sortable: true, cellClass: "min-w-[120px]" },
+  { key: "readiness", label: "Kesiapan Dokumen", cellClass: "min-w-[280px]" },
+  { key: "updated_at", label: "Update", sortable: true, cellClass: "min-w-[140px]" },
+  { key: "actions", label: "Aksi", cellClass: "min-w-[120px] text-right" },
 ];
 
-const statusTone = (status) => {
-  const s = String(status || "").toLowerCase();
-  if (s.includes("siap") || s.includes("selesai")) return "default";
-  if (s.includes("menunggu")) return "secondary";
-  return "outline";
-};
+const statusOptions = computed(() => {
+  const seen = new Set();
+  const options = [{ value: "all", label: "Semua Status" }];
+
+  items.value.forEach((item) => {
+    const value = String(item.status_key || "").trim();
+    const label = String(item.status || "").trim();
+
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    options.push({ value, label: label || value });
+  });
+
+  return options;
+});
 
 const toDateValue = (value) => {
   if (!value) return null;
@@ -55,27 +65,54 @@ const toDateValue = (value) => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
+const formatDate = (value) => {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+};
+
+const statusTone = (statusKey) => {
+  const status = String(statusKey || "").toLowerCase();
+
+  if (["completed", "report_ready"].includes(status)) return "default";
+  if (["cancelled"].includes(status)) return "destructive";
+  if (["contract_signed", "valuation_in_progress", "valuation_completed", "preview_ready", "report_preparation"].includes(status)) return "secondary";
+  return "outline";
+};
+
+const readinessItems = (item) => [
+  { key: "contract", label: "Kontrak", ready: Boolean(item.ready_contract) },
+  { key: "invoice", label: "Invoice", ready: Boolean(item.ready_invoice) },
+  { key: "report", label: "Laporan", ready: Boolean(item.ready_report) },
+  { key: "legal", label: "Legal Final", ready: Boolean(item.ready_legal_documents) },
+];
+
 const filteredItems = computed(() => {
   let rows = [...items.value];
   const q = searchQuery.value.trim().toLowerCase();
+
   if (q) {
-    rows = rows.filter((item) => {
-      return [
+    rows = rows.filter((item) =>
+      [
         item.request_number,
         item.client,
         item.report_type,
-        item.property,
         item.address,
       ]
         .filter(Boolean)
-        .some((val) => String(val).toLowerCase().includes(q));
-    });
+        .some((value) => String(value).toLowerCase().includes(q))
+    );
   }
 
   if (statusFilter.value !== "all") {
-    rows = rows.filter((item) =>
-      String(item.status || "").toLowerCase().includes(statusFilter.value)
-    );
+    rows = rows.filter((item) => String(item.status_key || "") === statusFilter.value);
   }
 
   const from = toDateValue(fromDate.value);
@@ -93,11 +130,17 @@ const filteredItems = computed(() => {
   return rows;
 });
 
+const hasActiveFilters = computed(() => {
+  return Boolean(searchQuery.value || statusFilter.value !== "all" || fromDate.value || toDate.value);
+});
+
 const applyPreset = (days) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
   const from = new Date(today);
   from.setDate(from.getDate() - days);
+
   fromDate.value = from.toISOString().slice(0, 10);
   toDate.value = today.toISOString().slice(0, 10);
 };
@@ -110,60 +153,42 @@ const applyThisMonth = () => {
   toDate.value = end.toISOString().slice(0, 10);
 };
 
-const hasActiveFilters = computed(() => {
-  return Boolean(searchQuery.value || statusFilter.value !== "all" || fromDate.value || toDate.value);
-});
-
 const resetFilters = () => {
   searchQuery.value = "";
   statusFilter.value = "all";
   fromDate.value = "";
   toDate.value = "";
 };
-
-const pageSizes = [6, 9, 12];
-const pageSize = ref(6);
-const currentPage = ref(1);
-
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredItems.value.length / pageSize.value)));
-
-const pagedItems = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value;
-  return filteredItems.value.slice(start, start + pageSize.value);
-});
-
-watch([searchQuery, statusFilter, fromDate, toDate, pageSize], () => {
-  currentPage.value = 1;
-});
 </script>
 
 <template>
   <UserDashboardLayout>
-    <template #title>Laporan Penilaian</template>
+    <template #title>Dokumen</template>
 
     <div class="w-full space-y-6">
       <div class="flex flex-col gap-2">
-        <h1 class="text-2xl font-semibold text-slate-900">Laporan Penilaian</h1>
-        <p class="text-sm text-slate-500">
-          Unduh dokumen penawaran, laporan penilaian, dan invoice pembayaran.
+        <h1 class="text-2xl font-semibold text-slate-900">Dokumen</h1>
+        <p class="max-w-3xl text-sm text-slate-500">
+          Arsip seluruh file permohonan Anda. Halaman ini menampilkan upload customer, foto aset,
+          kontrak, invoice, laporan penilaian, serta dokumen legal final yang tersedia.
         </p>
       </div>
 
       <Card class="shadow-sm">
-        <CardContent class="p-4 space-y-4">
+        <CardContent class="space-y-4 p-4">
           <div class="space-y-3">
             <div class="relative w-full">
-              <Search class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 v-model="searchQuery"
-                placeholder="Cari request, client, atau properti..."
-                class="pl-10 h-10 bg-white border-slate-200"
+                placeholder="Cari nomor request, client, jenis laporan, atau alamat..."
+                class="h-10 border-slate-200 bg-white pl-10"
               />
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-[220px_1fr] gap-3 items-center">
+            <div class="grid grid-cols-1 gap-3 lg:grid-cols-[220px_1fr_1fr]">
               <Select v-model="statusFilter">
-                <SelectTrigger class="w-full h-10">
+                <SelectTrigger class="h-10">
                   <SelectValue placeholder="Semua Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,28 +197,17 @@ watch([searchQuery, statusFilter, fromDate, toDate, pageSize], () => {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <div class="text-xs text-slate-500">
-                Filter status untuk melihat laporan tertentu.
-              </div>
-            </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input v-model="fromDate" type="date" class="h-10 bg-white border-slate-200" />
-              <Input v-model="toDate" type="date" class="h-10 bg-white border-slate-200" />
+              <Input v-model="fromDate" type="date" class="h-10 border-slate-200 bg-white" />
+              <Input v-model="toDate" type="date" class="h-10 border-slate-200 bg-white" />
             </div>
           </div>
 
           <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span>Preset:</span>
-            <Button variant="outline" size="sm" class="h-8 px-3" @click="applyPreset(7)">
-              7 Hari
-            </Button>
-            <Button variant="outline" size="sm" class="h-8 px-3" @click="applyPreset(30)">
-              30 Hari
-            </Button>
-            <Button variant="outline" size="sm" class="h-8 px-3" @click="applyThisMonth">
-              Bulan Ini
-            </Button>
+            <Button variant="outline" size="sm" class="h-8 px-3" @click="applyPreset(7)">7 Hari</Button>
+            <Button variant="outline" size="sm" class="h-8 px-3" @click="applyPreset(30)">30 Hari</Button>
+            <Button variant="outline" size="sm" class="h-8 px-3" @click="applyThisMonth">Bulan Ini</Button>
             <Button v-if="hasActiveFilters" variant="ghost" size="sm" class="h-8 px-2" @click="resetFilters">
               Reset Filter
             </Button>
@@ -201,85 +215,77 @@ watch([searchQuery, statusFilter, fromDate, toDate, pageSize], () => {
         </CardContent>
       </Card>
 
-      <div v-if="!pagedItems.length" class="rounded-xl border p-6 text-sm text-slate-500">
-        Belum ada laporan sesuai filter.
+      <div v-if="!filteredItems.length" class="rounded-xl border border-dashed bg-white p-8 text-sm text-slate-500">
+        Belum ada dokumen yang cocok dengan filter aktif.
       </div>
 
-      <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Card v-for="item in pagedItems" :key="item.id" class="shadow-sm">
-          <CardHeader>
-            <div class="flex flex-wrap items-start justify-between gap-3">
+      <Card v-else class="shadow-sm">
+        <CardContent class="p-4">
+          <AdminDataTable
+            :columns="columns"
+            :rows="filteredItems"
+            :default-per-page="10"
+            empty-text="Belum ada dokumen yang cocok dengan filter aktif."
+          >
+            <template #cell-request_number="{ row }">
               <div>
-                <CardTitle class="text-base">{{ item.request_number }}</CardTitle>
-                <CardDescription class="text-sm text-slate-500">
-                  {{ item.client }} • {{ item.report_type }}
-                </CardDescription>
+                <div class="font-medium text-slate-900">{{ row.request_number }}</div>
+                <div class="text-xs text-slate-500">{{ row.report_type }}</div>
               </div>
-              <Badge :variant="statusTone(item.status)">{{ item.status }}</Badge>
-            </div>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-3 text-sm">
-              <div class="flex items-center gap-2 text-slate-600">
-                <FileText class="h-4 w-4 text-slate-400" />
-                <span class="font-medium text-slate-900">{{ item.property }}</span>
-              </div>
-              <div class="flex items-start gap-2 text-slate-600">
-                <MapPin class="h-4 w-4 text-slate-400 mt-0.5" />
-                <span class="text-slate-700">{{ item.address }}</span>
-              </div>
-              <div class="flex items-center gap-2 text-slate-600">
-                <Calendar class="h-4 w-4 text-slate-400" />
-                <span class="text-slate-700">Update: {{ item.updated_at }}</span>
-              </div>
-            </div>
+            </template>
 
-            <div class="rounded-lg border p-3 text-xs text-slate-500">
-              Dokumen tersedia: Penawaran, Laporan Penilaian, Invoice Pembayaran.
-            </div>
+            <template #cell-address="{ row }">
+              <div class="flex items-start gap-2 text-slate-700">
+                <MapPin class="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                <span class="line-clamp-2">{{ row.address || "-" }}</span>
+              </div>
+            </template>
 
-            <div class="flex items-center justify-between">
-              <Button variant="outline" size="sm" disabled>
-                <FileDown class="mr-2 h-4 w-4" />
-                Unduh Semua
-              </Button>
-              <Link
-                :href="route('reports.show', item.id)"
-                class="text-sm text-slate-700 hover:text-slate-900 flex items-center gap-1"
-              >
-                Lihat Detail <ArrowRight class="h-4 w-4" />
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <template #cell-status="{ row }">
+              <Badge :variant="statusTone(row.status_key)">{{ row.status }}</Badge>
+            </template>
 
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="text-xs text-slate-500">
-          Menampilkan {{ pagedItems.length }} dari {{ filteredItems.length }} laporan
-        </div>
-        <div class="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            :disabled="currentPage === 1"
-            @click="currentPage = Math.max(1, currentPage - 1)"
-          >
-            <ChevronLeft class="h-4 w-4" />
-            Sebelumnya
-          </Button>
-          <div class="text-xs text-slate-600">Hal {{ currentPage }} dari {{ totalPages }}</div>
-          <Button
-            variant="outline"
-            size="sm"
-            :disabled="currentPage === totalPages"
-            @click="currentPage = Math.min(totalPages, currentPage + 1)"
-          >
-            Selanjutnya
-            <ChevronRight class="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+            <template #cell-total_documents_count="{ row }">
+              <div class="space-y-1 text-sm text-slate-700">
+                <div>Upload: {{ row.customer_documents_count }}</div>
+                <div>Foto: {{ row.customer_photos_count }}</div>
+                <div>Sistem: {{ row.system_documents_count }}</div>
+                <div class="font-medium text-slate-900">Total: {{ row.total_documents_count }}</div>
+              </div>
+            </template>
+
+            <template #cell-readiness="{ row }">
+              <div class="flex flex-wrap gap-2">
+                <Badge
+                  v-for="flag in readinessItems(row)"
+                  :key="flag.key"
+                  :variant="flag.ready ? 'default' : 'outline'"
+                >
+                  {{ flag.label }} {{ flag.ready ? "Siap" : "Belum" }}
+                </Badge>
+              </div>
+            </template>
+
+            <template #cell-updated_at="{ row }">
+              <div class="flex items-center gap-2 text-slate-700">
+                <Calendar class="h-4 w-4 shrink-0 text-slate-400" />
+                <span>{{ formatDate(row.updated_at) }}</span>
+              </div>
+            </template>
+
+            <template #cell-actions="{ row }">
+              <div class="flex justify-end">
+                <Button as-child variant="outline" size="sm">
+                  <Link :href="route('reports.show', row.id)">
+                    Lihat
+                    <ArrowRight class="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </template>
+          </AdminDataTable>
+        </CardContent>
+      </Card>
     </div>
   </UserDashboardLayout>
-</template>
+</template>

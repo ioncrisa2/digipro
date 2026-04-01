@@ -11,6 +11,7 @@ class Feature extends Model
         'icon',
         'title',
         'description',
+        'image_path',
         'is_active',
         'sort_order',
     ];

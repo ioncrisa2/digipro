@@ -25,6 +25,7 @@ class StoreTestimonialRequest extends FormRequest
             'name' => ['required', 'string', 'max:150'],
             'role' => ['nullable', 'string', 'max:150'],
             'quote' => ['required', 'string'],
+            'photo' => ['nullable', 'image', 'max:4096'],
             'is_active' => ['required', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0'],
         ];

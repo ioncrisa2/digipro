@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Enums\AppraisalStatusEnum;
 use App\Enums\AssetTypeEnum;
+use App\Enums\ValuationObjectiveEnum;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetFile;
 use App\Models\AppraisalRequest;
+use App\Models\AppraisalUserConsent;
 use App\Models\GuidelineSet;
 use App\Models\User;
 use App\Notifications\AppraisalRequestCreated;
@@ -54,6 +56,7 @@ class AppraisalRequestService
         $clientNameInput = trim((string) ($validated['client_name'] ?? ''));
         $clientName = $clientNameInput !== '' ? $clientNameInput : ($submitter?->name ?? null);
         $guidelineSetId = $this->resolveGuidelineSetId();
+        $consentSnapshot = $this->resolveConsentSnapshot($request, $submitter);
 
         if (! $guidelineSetId) {
             throw ValidationException::withMessages([
@@ -61,17 +64,28 @@ class AppraisalRequestService
             ]);
         }
 
-        return DB::transaction(function () use ($request, $validated, $format, $copies, $reportType, $purpose, $clientName, $submitter, $guardName, $guidelineSetId) {
+        return DB::transaction(function () use ($request, $validated, $format, $copies, $reportType, $purpose, $clientName, $submitter, $guardName, $guidelineSetId, $consentSnapshot) {
 
             $appraisalRequest = AppraisalRequest::create([
                 'user_id' => $submitter?->getKey() ?? Auth::id(),
                 'guideline_set_id' => $guidelineSetId,
                 'purpose' => $purpose,
+                'valuation_objective' => ValuationObjectiveEnum::KajianNilaiPasarRange,
                 'client_name' => $clientName,
+                'sertifikat_on_hand_confirmed' => (bool) ($validated['sertifikat_on_hand_confirmed'] ?? false),
+                'certificate_not_encumbered_confirmed' => (bool) ($validated['certificate_not_encumbered_confirmed'] ?? false),
+                'certificate_statements_accepted_at' => now(),
+                'certificate_statement_ip' => (string) $request->ip(),
+                'certificate_statement_user_agent' => substr((string) $request->userAgent(), 0, 255),
                 'report_type' => $reportType,
                 'report_format' => $format,
                 'physical_copies_count' => $copies,
                 'requested_at' => now(),
+                'consent_accepted_at' => $consentSnapshot['accepted_at'],
+                'consent_version' => $consentSnapshot['version'],
+                'consent_hash' => $consentSnapshot['hash'],
+                'consent_ip' => $consentSnapshot['ip'],
+                'consent_user_agent' => $consentSnapshot['user_agent'],
                 'status' => AppraisalStatusEnum::Submitted,
             ]);
 
@@ -239,6 +253,42 @@ class AppraisalRequestService
             ->value('id');
 
         return $latestId ? (int) $latestId : null;
+    }
+
+    private function resolveConsentSnapshot(Request $request, ?User $submitter): array
+    {
+        $sessionVersion = $request->session()->get('appraisal_consent.version');
+        $sessionHash = $request->session()->get('appraisal_consent.hash');
+        $sessionDocumentId = $request->session()->get('appraisal_consent.document_id');
+
+        $consent = null;
+
+        if ($submitter?->getKey()) {
+            $consentQuery = AppraisalUserConsent::query()
+                ->where('user_id', $submitter->getKey())
+                ->latest('accepted_at');
+
+            if ($sessionDocumentId) {
+                $consent = (clone $consentQuery)
+                    ->where('consent_document_id', $sessionDocumentId)
+                    ->first();
+            }
+
+            if (! $consent && $sessionVersion && $sessionHash) {
+                $consent = (clone $consentQuery)
+                    ->where('version', $sessionVersion)
+                    ->where('hash', $sessionHash)
+                    ->first();
+            }
+        }
+
+        return [
+            'accepted_at' => $consent?->accepted_at ?? now(),
+            'version' => $sessionVersion ?: ($consent?->version ?: null),
+            'hash' => $sessionHash ?: ($consent?->hash ?: null),
+            'ip' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+        ];
     }
 
     private function normalizeAssetRow(array $row): array

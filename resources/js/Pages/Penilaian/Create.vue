@@ -12,6 +12,7 @@ import AppraisalCreateHeader from "@/components/appraisal-create/AppraisalCreate
 import AppraisalAssetListHeader from "@/components/appraisal-create/AppraisalAssetListHeader.vue";
 import AppraisalAssetEmptyState from "@/components/appraisal-create/AppraisalAssetEmptyState.vue";
 import AppraisalAssetCard from "@/components/appraisal-create/AppraisalAssetCard.vue";
+import AppraisalLegalGateCard from "@/components/appraisal-create/AppraisalLegalGateCard.vue";
 import AppraisalSubmitBar from "@/components/appraisal-create/AppraisalSubmitBar.vue";
 import SubmittingOverlay from "@/components/appraisal-create/SubmittingOverlay.vue";
 
@@ -30,6 +31,8 @@ const props = defineProps({
     topographyOptions: { type: Array, default: () => [] },
     needsConsent: { type: Boolean, default: false },
     consentData: { type: Object, default: null },
+    valuationObjective: { type: Object, default: null },
+    representativeLetterNotice: { type: Object, default: null },
     uploadLimits: {
         type: Object,
         default: () => ({
@@ -44,6 +47,8 @@ const { notify } = useNotification();
 const dialog = useDialogStore();
 
 const consentSubmitting = ref(false);
+const sertifikatOnHandConfirmed = ref(false);
+const certificateNotEncumberedConfirmed = ref(false);
 
 const assets = ref([]);
 const submitting = ref(false);
@@ -298,17 +303,8 @@ const isAssetComplete = (asset) => {
     isFilled(asset.regency) &&
     isFilled(asset.address)
 
-  const hasGeneralData =
-    isFilled(asset.peruntukan) &&
-    isFilled(asset.titleDocument) &&
-    isFilled(asset.landShape) &&
-    isFilled(asset.landPosition) &&
-    isFilled(asset.landCondition) &&
-    isFilled(asset.topography) &&
-    isFilled(asset.frontageWidth) &&
-    isFilled(asset.accessRoadWidth)
-
   const hasDocs =
+    isFilled(asset.titleDocument) &&
     isFilled(asset.docPbb) &&
     (asset.docCerts?.length ?? 0) > 0 &&
     hasImb
@@ -320,7 +316,6 @@ const isAssetComplete = (asset) => {
 
   if (isLandOnly(asset)) {
     return isFilled(asset.landArea) &&
-      hasGeneralData &&
       hasLocation &&
       (hasCoords || hasMaps) &&
       hasDocs &&
@@ -331,7 +326,6 @@ const isAssetComplete = (asset) => {
     isFilled(asset.buildingArea) &&
     isFilled(asset.floors) &&
     isFilled(asset.buildYear) &&
-    hasGeneralData &&
     hasLocation &&
     (hasCoords || hasMaps) &&
     hasDocs &&
@@ -393,6 +387,7 @@ const normalizeKeyLabel = (key) => {
   if (fieldPath.startsWith('photos_front')) return `Aset #${assetNumber} - foto tampak depan`
   if (fieldPath.startsWith('photos_interior')) return `Aset #${assetNumber} - foto tampak dalam`
   if (fieldPath.startsWith('doc_certs')) return `Aset #${assetNumber} - sertifikat tanah`
+  if (fieldPath.startsWith('title_document')) return `Aset #${assetNumber} - jenis dokumen tanah`
   if (fieldPath.startsWith('doc_pbb')) return `Aset #${assetNumber} - FC PBB`
   if (fieldPath.startsWith('doc_imb')) return `Aset #${assetNumber} - FC IMB/PBG`
   if (fieldPath.startsWith('coordinates')) return `Aset #${assetNumber} - lokasi presisi`
@@ -500,7 +495,8 @@ async function handleSubmit() {
         }
     });
 
-    console.log(formData);
+    formData.append('sertifikat_on_hand_confirmed', sertifikatOnHandConfirmed.value ? '1' : '0');
+    formData.append('certificate_not_encumbered_confirmed', certificateNotEncumberedConfirmed.value ? '1' : '0');
 
     router.post(route('appraisal.store'), formData, {
         forceFormData: true,
@@ -514,7 +510,12 @@ async function handleSubmit() {
             entries[0] ||
             []
           const firstMessage = normalizeFirstErrorMessage(firstValue)
-          const fallbackLabel = normalizeKeyLabel(firstKey)
+          const fallbackLabel =
+            firstKey === 'sertifikat_on_hand_confirmed'
+              ? 'Pernyataan sertifikat on hand'
+              : firstKey === 'certificate_not_encumbered_confirmed'
+                ? 'Pernyataan sertifikat tidak dijaminkan'
+                : normalizeKeyLabel(firstKey)
 
           const message = firstMessage
             ? (fallbackLabel ? `${fallbackLabel}: ${firstMessage}` : firstMessage)
@@ -596,6 +597,15 @@ async function handleSubmit() {
                         />
                     </div>
                 </div>
+
+                <AppraisalLegalGateCard
+                    :sertifikat-on-hand-confirmed="sertifikatOnHandConfirmed"
+                    :certificate-not-encumbered-confirmed="certificateNotEncumberedConfirmed"
+                    :valuation-objective="props.valuationObjective"
+                    :representative-letter-notice="props.representativeLetterNotice"
+                    @update:sertifikat-on-hand-confirmed="sertifikatOnHandConfirmed = $event"
+                    @update:certificate-not-encumbered-confirmed="certificateNotEncumberedConfirmed = $event"
+                />
 
                 <AppraisalSubmitBar
                     :can-submit="canSubmit"

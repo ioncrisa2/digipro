@@ -23,6 +23,8 @@ export const AppraisalStatus = {
   VALUATION_IN_PROGRESS: "valuation_in_progress",
   VALUATION_ON_PROGRESS: "valuation_on_progress", // Legacy alias
   VALUATION_COMPLETED: "valuation_completed",
+  PREVIEW_READY: "preview_ready",
+  REPORT_PREPARATION: "report_preparation",
   REPORT_READY: "report_ready",
   COMPLETED: "completed",
   CANCELLED: "cancelled",
@@ -130,6 +132,22 @@ const statusConfigMap = {
     bgColor: "bg-teal-50",
     borderColor: "border-teal-200",
   },
+  [AppraisalStatus.PREVIEW_READY]: {
+    label: "Preview Kajian Siap",
+    variant: "default",
+    icon: FileText,
+    color: "text-fuchsia-600",
+    bgColor: "bg-fuchsia-50",
+    borderColor: "border-fuchsia-200",
+  },
+  [AppraisalStatus.REPORT_PREPARATION]: {
+    label: "Laporan Sedang Disiapkan",
+    variant: "default",
+    icon: Clock,
+    color: "text-cyan-700",
+    bgColor: "bg-cyan-50",
+    borderColor: "border-cyan-200",
+  },
   [AppraisalStatus.REPORT_READY]: {
     label: "Laporan Siap",
     variant: "default",
@@ -198,6 +216,16 @@ export const getStatusFilterOptions = () => [
     value: AppraisalStatus.VALUATION_IN_PROGRESS,
     label: statusConfigMap[AppraisalStatus.VALUATION_IN_PROGRESS].label,
     dotColor: "bg-orange-400",
+  },
+  {
+    value: AppraisalStatus.PREVIEW_READY,
+    label: statusConfigMap[AppraisalStatus.PREVIEW_READY].label,
+    dotColor: "bg-fuchsia-400",
+  },
+  {
+    value: AppraisalStatus.REPORT_PREPARATION,
+    label: statusConfigMap[AppraisalStatus.REPORT_PREPARATION].label,
+    dotColor: "bg-cyan-400",
   },
   {
     value: AppraisalStatus.COMPLETED,

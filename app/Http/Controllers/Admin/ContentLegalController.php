@@ -12,12 +12,14 @@ use App\Models\AppraisalUserConsent;
 use App\Models\ConsentDocument;
 use App\Models\Faq;
 use App\Models\Feature;
+use App\Models\LandingMediaSetting;
 use App\Models\PrivacyPolicy;
 use App\Models\Testimonial;
 use App\Models\TermsDocument;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Response;
 
 class ContentLegalController extends Controller
@@ -147,6 +149,7 @@ class ContentLegalController extends Controller
                 'icon' => $feature->icon,
                 'title' => $feature->title,
                 'description' => $feature->description,
+                'image_url' => filled($feature->image_path) ? Storage::disk('public')->url($feature->image_path) : null,
                 'sort_order' => (int) $feature->sort_order,
                 'is_active' => (bool) $feature->is_active,
                 'edit_url' => route('admin.content.legal.features.edit', $feature),
@@ -164,6 +167,9 @@ class ContentLegalController extends Controller
             ],
             'records' => $records,
             'createUrl' => route('admin.content.legal.features.create'),
+            'heroMedia' => $this->heroMediaPayload(),
+            'heroUploadUrl' => route('admin.content.legal.features.hero-background.update'),
+            'platformPreviewMedia' => $this->platformPreviewMediaPayload(),
             'links' => $this->legalModuleLinks(),
         ]);
     }
@@ -177,6 +183,7 @@ class ContentLegalController extends Controller
                 'icon' => '__none',
                 'title' => '',
                 'description' => '',
+                'image_url' => null,
                 'sort_order' => 0,
                 'is_active' => true,
             ],
@@ -189,7 +196,15 @@ class ContentLegalController extends Controller
 
     public function featuresStore(StoreFeatureRequest $request): RedirectResponse
     {
-        Feature::query()->create($request->validated());
+        $validated = $request->validated();
+        $imagePath = $request->hasFile('image')
+            ? $request->file('image')->store('features', 'public')
+            : null;
+
+        Feature::query()->create([
+            ...$validated,
+            'image_path' => $imagePath,
+        ]);
 
         return redirect()->route('admin.content.legal.features.index')->with('success', 'Fitur berhasil ditambahkan.');
     }
@@ -204,6 +219,7 @@ class ContentLegalController extends Controller
                 'icon' => $feature->icon ?? '__none',
                 'title' => $feature->title,
                 'description' => $feature->description,
+                'image_url' => filled($feature->image_path) ? Storage::disk('public')->url($feature->image_path) : null,
                 'sort_order' => (int) $feature->sort_order,
                 'is_active' => (bool) $feature->is_active,
             ],
@@ -216,16 +232,87 @@ class ContentLegalController extends Controller
 
     public function featuresUpdate(StoreFeatureRequest $request, Feature $feature): RedirectResponse
     {
-        $feature->update($request->validated());
+        $validated = $request->validated();
+        $imagePath = $feature->image_path;
+
+        if ($request->hasFile('image')) {
+            $newImagePath = $request->file('image')->store('features', 'public');
+
+            if (filled($imagePath) && Storage::disk('public')->exists($imagePath)) {
+                Storage::disk('public')->delete($imagePath);
+            }
+
+            $imagePath = $newImagePath;
+        }
+
+        $feature->update([
+            ...$validated,
+            'image_path' => $imagePath,
+        ]);
 
         return redirect()->route('admin.content.legal.features.index')->with('success', 'Fitur berhasil diperbarui.');
     }
 
     public function featuresDestroy(Feature $feature): RedirectResponse
     {
+        if (filled($feature->image_path) && Storage::disk('public')->exists($feature->image_path)) {
+            Storage::disk('public')->delete($feature->image_path);
+        }
+
         $feature->delete();
 
         return redirect()->route('admin.content.legal.features.index')->with('success', 'Fitur berhasil dihapus.');
+    }
+
+    public function featuresHeroBackgroundUpdate(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'image' => ['required', 'image', 'max:20480'],
+        ]);
+
+        $setting = LandingMediaSetting::query()->firstOrNew([
+            'key' => 'hero_background',
+        ]);
+
+        $oldPath = $setting->file_path;
+        $newPath = $request->file('image')->store('landing/hero', 'public');
+
+        $setting->forceFill([
+            'file_path' => $newPath,
+        ])->save();
+
+        if (filled($oldPath) && $oldPath !== $newPath && Storage::disk('public')->exists($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        return redirect()->route('admin.content.legal.features.index')->with('success', 'Background hero landing berhasil diperbarui.');
+    }
+
+    public function featuresPlatformPreviewUpdate(Request $request, int $slot): RedirectResponse
+    {
+        abort_unless(in_array($slot, [1, 2, 3], true), 404);
+
+        $request->validate([
+            'image' => ['required', 'image', 'max:6144'],
+        ]);
+
+        $key = 'platform_preview_slide_' . $slot;
+        $setting = LandingMediaSetting::query()->firstOrNew([
+            'key' => $key,
+        ]);
+
+        $oldPath = $setting->file_path;
+        $newPath = $request->file('image')->store('landing/platform-preview', 'public');
+
+        $setting->forceFill([
+            'file_path' => $newPath,
+        ])->save();
+
+        if (filled($oldPath) && $oldPath !== $newPath && Storage::disk('public')->exists($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        return redirect()->route('admin.content.legal.features.index')->with('success', 'Gambar platform preview berhasil diperbarui.');
     }
 
     public function testimonialsIndex(Request $request): Response
@@ -243,6 +330,7 @@ class ContentLegalController extends Controller
                 'name' => $testimonial->name,
                 'role' => $testimonial->role,
                 'quote' => $testimonial->quote,
+                'photo_url' => filled($testimonial->photo_path) ? Storage::disk('public')->url($testimonial->photo_path) : null,
                 'sort_order' => (int) $testimonial->sort_order,
                 'is_active' => (bool) $testimonial->is_active,
                 'edit_url' => route('admin.content.legal.testimonials.edit', $testimonial),
@@ -273,6 +361,7 @@ class ContentLegalController extends Controller
                 'name' => '',
                 'role' => '',
                 'quote' => '',
+                'photo_url' => null,
                 'sort_order' => 0,
                 'is_active' => true,
             ],
@@ -284,7 +373,15 @@ class ContentLegalController extends Controller
 
     public function testimonialsStore(StoreTestimonialRequest $request): RedirectResponse
     {
-        Testimonial::query()->create($request->validated());
+        $validated = $request->validated();
+        $photoPath = $request->hasFile('photo')
+            ? $request->file('photo')->store('testimonials', 'public')
+            : null;
+
+        Testimonial::query()->create([
+            ...$validated,
+            'photo_path' => $photoPath,
+        ]);
 
         return redirect()->route('admin.content.legal.testimonials.index')->with('success', 'Testimoni berhasil ditambahkan.');
     }
@@ -299,6 +396,7 @@ class ContentLegalController extends Controller
                 'name' => $testimonial->name,
                 'role' => $testimonial->role,
                 'quote' => $testimonial->quote,
+                'photo_url' => filled($testimonial->photo_path) ? Storage::disk('public')->url($testimonial->photo_path) : null,
                 'sort_order' => (int) $testimonial->sort_order,
                 'is_active' => (bool) $testimonial->is_active,
             ],
@@ -310,13 +408,33 @@ class ContentLegalController extends Controller
 
     public function testimonialsUpdate(StoreTestimonialRequest $request, Testimonial $testimonial): RedirectResponse
     {
-        $testimonial->update($request->validated());
+        $validated = $request->validated();
+        $photoPath = $testimonial->photo_path;
+
+        if ($request->hasFile('photo')) {
+            $newPhotoPath = $request->file('photo')->store('testimonials', 'public');
+
+            if (filled($photoPath) && Storage::disk('public')->exists($photoPath)) {
+                Storage::disk('public')->delete($photoPath);
+            }
+
+            $photoPath = $newPhotoPath;
+        }
+
+        $testimonial->update([
+            ...$validated,
+            'photo_path' => $photoPath,
+        ]);
 
         return redirect()->route('admin.content.legal.testimonials.index')->with('success', 'Testimoni berhasil diperbarui.');
     }
 
     public function testimonialsDestroy(Testimonial $testimonial): RedirectResponse
     {
+        if (filled($testimonial->photo_path) && Storage::disk('public')->exists($testimonial->photo_path)) {
+            Storage::disk('public')->delete($testimonial->photo_path);
+        }
+
         $testimonial->delete();
 
         return redirect()->route('admin.content.legal.testimonials.index')->with('success', 'Testimoni berhasil dihapus.');
@@ -663,6 +781,36 @@ class ContentLegalController extends Controller
             ['label' => 'Consent', 'url' => route('admin.content.legal.consent.index')],
             ['label' => 'Audit Consent', 'url' => route('admin.content.legal.user-consents.index')],
         ];
+    }
+
+    private function heroMediaPayload(): array
+    {
+        $setting = LandingMediaSetting::query()
+            ->where('key', 'hero_background')
+            ->first();
+
+        return [
+            'image_url' => filled($setting?->file_path) ? Storage::disk('public')->url($setting->file_path) : null,
+        ];
+    }
+
+    private function platformPreviewMediaPayload(): array
+    {
+        return collect([1, 2, 3])
+            ->map(function (int $slot): array {
+                $setting = LandingMediaSetting::query()
+                    ->where('key', 'platform_preview_slide_' . $slot)
+                    ->first();
+
+                return [
+                    'slot' => $slot,
+                    'label' => 'Slide ' . $slot,
+                    'image_url' => filled($setting?->file_path) ? Storage::disk('public')->url($setting->file_path) : null,
+                    'upload_url' => route('admin.content.legal.features.platform-preview.update', ['slot' => $slot]),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function featureIconOptions(): array

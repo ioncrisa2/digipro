@@ -6,13 +6,18 @@ use App\Enums\AppraisalStatusEnum;
 use App\Enums\ContractStatusEnum;
 use Illuminate\Http\Request;
 use App\Models\AppraisalRequest;
+use App\Models\User;
+use App\Notifications\AdminActionNotification;
+use App\Notifications\AppraisalStatusUpdated;
 use App\Services\Admin\AdminNotificationService;
+use App\Services\AppraisalMarketPreviewService;
 use App\Services\AppraisalService;
 use App\Services\AppraisalRequestService;
 use App\Services\AppraisalRequestRevisionSubmissionService;
 use App\Http\Requests\StoreAppraisalRequest;
 use App\Http\Requests\SubmitAppraisalRevisionBatchRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -78,6 +83,14 @@ class AppraisalController extends Controller
         $payload = $appraisalService->buildShowPayload($userId, $id);
 
         return inertia('Penilaian/Show', $payload);
+    }
+
+    public function marketPreviewPage(Request $request, int $id, AppraisalService $appraisalService)
+    {
+        $userId = $request->user()->id;
+        $payload = $appraisalService->buildMarketPreviewPayload($userId, $id);
+
+        return inertia('Penilaian/MarketPreview', $payload);
     }
 
     public function revisionPage(
@@ -350,7 +363,11 @@ class AppraisalController extends Controller
         return inertia('Penilaian/ContractSign', $payload);
     }
 
-    public function signContract(Request $request, int $id, AppraisalService $appraisalService)
+    public function signContract(
+        Request $request,
+        int $id,
+        AppraisalService $appraisalService
+    )
     {
         $record = $this->resolveUserAppraisalRequest($request, $id);
 
@@ -406,6 +423,106 @@ class AppraisalController extends Controller
         return redirect()
             ->route('appraisal.payment.page', ['id' => $record->id])
             ->with('success', 'Kontrak berhasil ditandatangani. Lanjutkan ke proses pembayaran.');
+    }
+
+    public function approveMarketPreview(
+        Request $request,
+        int $id,
+        AppraisalMarketPreviewService $previewService
+    ) {
+        $record = $this->resolveUserAppraisalRequest($request, $id);
+        $oldStatus = $record->status?->label() ?? 'Preview Kajian Siap';
+
+        try {
+            $previewService->approvePreview($record);
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.market-preview.page', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
+
+        $freshRecord = $record->fresh(['user']);
+        $requestNumber = $freshRecord->request_number ?? ('REQ-' . $freshRecord->id);
+
+        if ($freshRecord->user) {
+            $freshRecord->user->notify(new AppraisalStatusUpdated(
+                appraisalId: (int) $freshRecord->id,
+                requestNumber: (string) $requestNumber,
+                oldStatus: $oldStatus,
+                newStatus: AppraisalStatusEnum::ReportPreparation->label(),
+            ));
+        }
+
+        $this->notifyAdmins(
+            $request,
+            $freshRecord,
+            'Preview kajian disetujui customer',
+            "{$requestNumber} disetujui customer dan masuk tahap persiapan laporan final.",
+            'heroicon-o-document-check'
+        );
+
+        return redirect()
+            ->route('appraisal.show', ['id' => $freshRecord->id])
+            ->with('success', 'Preview hasil kajian disetujui. Admin sedang menyiapkan laporan final.');
+    }
+
+    public function submitMarketPreviewAppeal(
+        Request $request,
+        int $id,
+        AppraisalMarketPreviewService $previewService
+    ) {
+        $record = $this->resolveUserAppraisalRequest($request, $id);
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $previewService->submitAppeal($record, (string) $validated['reason']);
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.market-preview.page', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
+
+        $freshRecord = $record->fresh(['user']);
+        $requestNumber = $freshRecord->request_number ?? ('REQ-' . $freshRecord->id);
+
+        if ($freshRecord->user) {
+            $freshRecord->user->notify(new AppraisalStatusUpdated(
+                appraisalId: (int) $freshRecord->id,
+                requestNumber: (string) $requestNumber,
+                oldStatus: AppraisalStatusEnum::PreviewReady->label(),
+                newStatus: AppraisalStatusEnum::ValuationOnProgress->label(),
+            ));
+        }
+
+        $reviewerUrl = route('reviewer.reviews.show', ['review' => $freshRecord->id]);
+        $reviewerMessage = "{$requestNumber} menerima banding customer dan kembali ke antrian valuasi.";
+        $this->notifyAdmins(
+            $request,
+            $freshRecord,
+            'Banding preview diajukan customer',
+            $reviewerMessage,
+            'heroicon-o-exclamation-circle'
+        );
+
+        $reviewers = User::query()->role('Reviewer')->get();
+        if ($reviewers->isNotEmpty()) {
+            Notification::send(
+                $reviewers,
+                new AdminActionNotification(
+                    'Banding preview customer',
+                    $reviewerMessage,
+                    $reviewerUrl,
+                    'Lihat Review',
+                    'heroicon-o-arrow-path'
+                )
+            );
+        }
+
+        return redirect()
+            ->route('appraisal.show', ['id' => $freshRecord->id])
+            ->with('success', 'Banding berhasil dikirim. Reviewer akan memperbarui hasil preview Anda.');
     }
 
     public function downloadContractPdf(Request $request, int $id, AppraisalService $appraisalService)
@@ -489,6 +606,8 @@ class AppraisalController extends Controller
             AppraisalStatusEnum::ContractSigned->value,
             AppraisalStatusEnum::ValuationOnProgress->value,
             AppraisalStatusEnum::ValuationCompleted->value,
+            AppraisalStatusEnum::PreviewReady->value,
+            AppraisalStatusEnum::ReportPreparation->value,
             AppraisalStatusEnum::ReportReady->value,
             AppraisalStatusEnum::Completed->value,
         ], true);

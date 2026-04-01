@@ -27,7 +27,7 @@ import { Building2, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-vue-next'
           <CheckCircle2 class="w-5 h-5 text-emerald-300 mt-0.5" />
           <div>
             <div class="text-sm font-semibold">Proses lebih ringkas</div>
-            <div class="text-xs text-white/70">Request, desk appraisal, dan laporan terhubung dalam satu alur kilat.</div>
+            <div class="text-xs text-white/70">Request, Appraisal Review, dan laporan terhubung dalam satu alur kilat.</div>
           </div>
         </div>
         <div class="flex items-start gap-3">

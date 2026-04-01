@@ -11,7 +11,7 @@ return new class extends Migration
             ->where('title', 'Accurate Valuations')
             ->where('description', 'Certified surveyors providing precise appraisals based on real-time market data.')
             ->update([
-                'description' => 'Certified KJPP valuers delivering precise desk appraisals based on real-time market data.',
+                'description' => 'Certified KJPP valuers delivering precise Appraisal Reviews based on real-time market data.',
                 'updated_at' => now(),
             ]);
 
@@ -19,7 +19,7 @@ return new class extends Migration
             ->where('question', 'Is the appraisal officially recognized?')
             ->where('answer', 'Yes, all appraisals are conducted by licensed KJPP surveyors (MAPPI Cert.). Our reports are recognized by financial institutions and courts.')
             ->update([
-                'answer' => 'Yes, all appraisals are conducted by licensed KJPP valuers (MAPPI Cert.) through a desk appraisal approach. Our reports are recognized by financial institutions and courts.',
+                'answer' => 'Yes, all appraisals are conducted by licensed KJPP valuers (MAPPI Cert.) through an Appraisal Review approach. Our reports are recognized by financial institutions and courts.',
                 'updated_at' => now(),
             ]);
     }
@@ -28,7 +28,7 @@ return new class extends Migration
     {
         DB::table('features')
             ->where('title', 'Accurate Valuations')
-            ->where('description', 'Certified KJPP valuers delivering precise desk appraisals based on real-time market data.')
+            ->where('description', 'Certified KJPP valuers delivering precise Appraisal Reviews based on real-time market data.')
             ->update([
                 'description' => 'Certified surveyors providing precise appraisals based on real-time market data.',
                 'updated_at' => now(),
@@ -36,7 +36,7 @@ return new class extends Migration
 
         DB::table('faqs')
             ->where('question', 'Is the appraisal officially recognized?')
-            ->where('answer', 'Yes, all appraisals are conducted by licensed KJPP valuers (MAPPI Cert.) through a desk appraisal approach. Our reports are recognized by financial institutions and courts.')
+            ->where('answer', 'Yes, all appraisals are conducted by licensed KJPP valuers (MAPPI Cert.) through an Appraisal Review approach. Our reports are recognized by financial institutions and courts.')
             ->update([
                 'answer' => 'Yes, all appraisals are conducted by licensed KJPP surveyors (MAPPI Cert.). Our reports are recognized by financial institutions and courts.',
                 'updated_at' => now(),

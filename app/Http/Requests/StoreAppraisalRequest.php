@@ -47,6 +47,8 @@ class StoreAppraisalRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'sertifikat_on_hand_confirmed' => ['accepted'],
+            'certificate_not_encumbered_confirmed' => ['accepted'],
             'assets' => ['required', 'array', 'min:1'],
             'assets.*.type' => ['required', 'string'],
 
@@ -55,14 +57,14 @@ class StoreAppraisalRequest extends FormRequest
             'assets.*.floors' => ['nullable', 'integer', 'min:0', 'max:200'],
             'assets.*.build_year' => ['nullable', 'integer', 'min:1900', 'max:' . now()->year],
             'assets.*.renovation_year' => ['nullable', 'integer', 'min:1900', 'max:' . now()->year],
-            'assets.*.peruntukan' => ['required', 'string', 'max:100'],
+            'assets.*.peruntukan' => ['nullable', 'string', 'max:100'],
             'assets.*.title_document' => ['required', 'string', 'max:100'],
-            'assets.*.land_shape' => ['required', 'string', 'max:100'],
-            'assets.*.land_position' => ['required', 'string', 'max:100'],
-            'assets.*.land_condition' => ['required', 'string', 'max:100'],
-            'assets.*.topography' => ['required', 'string', 'max:100'],
-            'assets.*.frontage_width' => ['required', 'numeric', 'min:0'],
-            'assets.*.access_road_width' => ['required', 'numeric', 'min:0'],
+            'assets.*.land_shape' => ['nullable', 'string', 'max:100'],
+            'assets.*.land_position' => ['nullable', 'string', 'max:100'],
+            'assets.*.land_condition' => ['nullable', 'string', 'max:100'],
+            'assets.*.topography' => ['nullable', 'string', 'max:100'],
+            'assets.*.frontage_width' => ['nullable', 'numeric', 'min:0'],
+            'assets.*.access_road_width' => ['nullable', 'numeric', 'min:0'],
 
             'assets.*.province_id' => ['nullable', 'string'],
             'assets.*.regency_id' => ['nullable', 'string'],
@@ -209,6 +211,8 @@ class StoreAppraisalRequest extends FormRequest
         return [
             'assets.required' => 'Mohon tambahkan minimal satu aset.',
             'assets.min' => 'Mohon tambahkan minimal satu aset.',
+            'sertifikat_on_hand_confirmed.accepted' => 'Anda harus menyatakan bahwa sertifikat fisik tersedia / on hand.',
+            'certificate_not_encumbered_confirmed.accepted' => 'Permohonan tidak dapat dilanjutkan jika sertifikat sedang dijaminkan. Centang pernyataan bahwa sertifikat tidak sedang dijaminkan.',
 
             'assets.*.land_area.required' => 'Luas tanah wajib diisi.',
             'assets.*.land_area.numeric' => 'Luas tanah harus berupa angka.',
@@ -222,16 +226,9 @@ class StoreAppraisalRequest extends FormRequest
             'assets.*.build_year.integer' => 'Tahun bangun harus berupa angka bulat.',
             'assets.*.build_year.min' => 'Tahun bangun tidak valid.',
             'assets.*.build_year.max' => 'Tahun bangun tidak boleh melebihi tahun berjalan.',
-            'assets.*.peruntukan.required' => 'Peruntukan properti wajib dipilih.',
             'assets.*.title_document.required' => 'Jenis dokumen tanah wajib dipilih.',
-            'assets.*.land_shape.required' => 'Bentuk tanah wajib dipilih.',
-            'assets.*.land_position.required' => 'Posisi tanah wajib dipilih.',
-            'assets.*.land_condition.required' => 'Kondisi tanah wajib dipilih.',
-            'assets.*.topography.required' => 'Topografi tanah wajib dipilih.',
-            'assets.*.frontage_width.required' => 'Lebar muka tanah wajib diisi.',
             'assets.*.frontage_width.numeric' => 'Lebar muka tanah harus berupa angka.',
             'assets.*.frontage_width.min' => 'Lebar muka tanah tidak boleh kurang dari 0.',
-            'assets.*.access_road_width.required' => 'Lebar akses jalan wajib diisi.',
             'assets.*.access_road_width.numeric' => 'Lebar akses jalan harus berupa angka.',
             'assets.*.access_road_width.min' => 'Lebar akses jalan tidak boleh kurang dari 0.',
 

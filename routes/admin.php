@@ -39,6 +39,8 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::post('/{appraisalRequest}/verify-payment', [AppraisalRequestWorkflowController::class, 'verifyPayment'])->name('actions.verify-payment');
                 Route::post('/{appraisalRequest}/send-offer', [AppraisalRequestWorkflowController::class, 'sendOffer'])->name('actions.send-offer');
                 Route::post('/{appraisalRequest}/approve-latest-negotiation', [AppraisalRequestWorkflowController::class, 'approveLatestNegotiation'])->name('actions.approve-latest-negotiation');
+                Route::get('/{appraisalRequest}/report-draft', [AppraisalRequestWorkflowController::class, 'downloadReportDraft'])->name('actions.report-draft');
+                Route::post('/{appraisalRequest}/report-final', [AppraisalRequestWorkflowController::class, 'uploadFinalReport'])->name('actions.report-final');
             });
 
         Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_FINANCE)
@@ -93,6 +95,8 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                         Route::get('/fitur', [ContentLegalController::class, 'featuresIndex'])->name('features.index');
                         Route::get('/fitur/buat', [ContentLegalController::class, 'featuresCreate'])->name('features.create');
                         Route::post('/fitur', [ContentLegalController::class, 'featuresStore'])->name('features.store');
+                        Route::post('/fitur/hero-background', [ContentLegalController::class, 'featuresHeroBackgroundUpdate'])->name('features.hero-background.update');
+                        Route::post('/fitur/platform-preview/{slot}', [ContentLegalController::class, 'featuresPlatformPreviewUpdate'])->name('features.platform-preview.update');
                         Route::get('/fitur/{feature}/edit', [ContentLegalController::class, 'featuresEdit'])->name('features.edit');
                         Route::put('/fitur/{feature}', [ContentLegalController::class, 'featuresUpdate'])->name('features.update');
                         Route::delete('/fitur/{feature}', [ContentLegalController::class, 'featuresDestroy'])->name('features.destroy');

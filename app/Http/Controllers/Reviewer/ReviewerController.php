@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetComparable;
 use App\Models\AppraisalRequest;
+use App\Notifications\AppraisalStatusUpdated;
+use App\Services\AppraisalMarketPreviewService;
 use App\Services\ComparableDataApi;
 use App\Services\Reviewer\BtbWorksheetEngine;
 use App\Services\Reviewer\BtbValuationPersistenceService;
@@ -41,7 +43,13 @@ class ReviewerController extends Controller
                 ->where('status', AppraisalStatusEnum::ValuationOnProgress)
                 ->count(),
             'completed' => AppraisalRequest::query()
-                ->where('status', AppraisalStatusEnum::ValuationCompleted)
+                ->whereIn('status', [
+                    AppraisalStatusEnum::ValuationCompleted,
+                    AppraisalStatusEnum::PreviewReady,
+                    AppraisalStatusEnum::ReportPreparation,
+                    AppraisalStatusEnum::ReportReady,
+                    AppraisalStatusEnum::Completed,
+                ])
                 ->count(),
             'assets_need_adjustment' => AppraisalAsset::query()
                 ->whereHas('request', function (Builder $query): void {
@@ -372,11 +380,29 @@ class ReviewerController extends Controller
     public function finishReview(AppraisalRequest $review): JsonResponse
     {
         if (($review->status?->value ?? (string) $review->status) === AppraisalStatusEnum::ValuationOnProgress->value) {
-            $review->update(['status' => AppraisalStatusEnum::ValuationCompleted]);
+            $oldStatus = $review->status?->label() ?? AppraisalStatusEnum::ValuationOnProgress->label();
+
+            try {
+                app(AppraisalMarketPreviewService::class)->publishPreview($review);
+            } catch (Throwable $exception) {
+                return response()->json([
+                    'message' => $exception->getMessage() ?: 'Gagal mempublikasikan preview kajian pasar.',
+                ], 422);
+            }
+
+            $freshReview = $review->fresh(['user']);
+            if ($freshReview?->user) {
+                $freshReview->user->notify(new AppraisalStatusUpdated(
+                    appraisalId: (int) $freshReview->id,
+                    requestNumber: (string) ($freshReview->request_number ?? ('REQ-' . $freshReview->id)),
+                    oldStatus: $oldStatus,
+                    newStatus: AppraisalStatusEnum::PreviewReady->label(),
+                ));
+            }
         }
 
         return response()->json([
-            'message' => 'Status request berubah menjadi Proses Valuasi Selesai.',
+            'message' => 'Preview hasil kajian pasar berhasil dikirim ke customer.',
             'review' => [
                 'id' => $review->id,
                 'status' => $this->workspace->statusPayload($review->fresh()->status),

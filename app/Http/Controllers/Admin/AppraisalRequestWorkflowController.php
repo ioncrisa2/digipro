@@ -2,16 +2,21 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\AppraisalStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreAppraisalRequestRevisionBatchRequest;
 use App\Http\Requests\Admin\StoreAppraisalOfferRequest;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestRevisionItem;
+use App\Notifications\AppraisalStatusUpdated;
 use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestRevisionReviewService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
+use App\Services\AppraisalReportPdfService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AppraisalRequestWorkflowController extends Controller
 {
@@ -121,6 +126,56 @@ class AppraisalRequestWorkflowController extends Controller
         } catch (\RuntimeException $exception) {
             return back()->with('error', $exception->getMessage());
         }
+    }
+
+    public function downloadReportDraft(AppraisalRequest $appraisalRequest): StreamedResponse|RedirectResponse
+    {
+        if (($appraisalRequest->status?->value ?? (string) $appraisalRequest->status) !== AppraisalStatusEnum::ReportPreparation->value) {
+            return back()->with('error', 'Draft laporan hanya tersedia saat request berada pada tahap persiapan laporan final.');
+        }
+
+        $path = (string) ($appraisalRequest->report_draft_pdf_path ?? '');
+        if ($path === '' || ! Storage::disk('public')->exists($path)) {
+            return back()->with('error', 'Draft laporan belum tersedia untuk diunduh.');
+        }
+
+        $requestNumber = preg_replace('/[^A-Za-z0-9\\-_.]/', '-', (string) ($appraisalRequest->request_number ?? ('REQ-' . $appraisalRequest->id)));
+
+        return Storage::disk('public')->download($path, "Draft-Laporan-{$requestNumber}.pdf");
+    }
+
+    public function uploadFinalReport(
+        Request $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalReportPdfService $reportPdfService
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'report_pdf' => ['required', 'file', 'mimes:pdf', 'max:20480'],
+        ]);
+
+        $oldStatus = $appraisalRequest->status?->label() ?? AppraisalStatusEnum::ReportPreparation->label();
+
+        try {
+            $reportPdfService->storeFinalUploadedPdf(
+                $appraisalRequest,
+                $validated['report_pdf'],
+                (int) $request->user()->id
+            );
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        $freshRecord = $appraisalRequest->fresh(['user']);
+        if ($freshRecord?->user) {
+            $freshRecord->user->notify(new AppraisalStatusUpdated(
+                appraisalId: (int) $freshRecord->id,
+                requestNumber: (string) ($freshRecord->request_number ?? ('REQ-' . $freshRecord->id)),
+                oldStatus: $oldStatus,
+                newStatus: AppraisalStatusEnum::ReportReady->label(),
+            ));
+        }
+
+        return back()->with('success', 'PDF laporan final berhasil diunggah dan request berubah menjadi laporan siap.');
     }
 
     public function approveRevisionItem(

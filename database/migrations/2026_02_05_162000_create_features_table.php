@@ -23,7 +23,7 @@ return new class extends Migration
             [
                 'icon' => 'TrendingUp',
                 'title' => 'Accurate Valuations',
-                'description' => 'Certified KJPP valuers delivering precise desk appraisals based on real-time market data.',
+                'description' => 'Certified KJPP valuers delivering precise Appraisal Reviews based on real-time market data.',
                 'is_active' => true,
                 'sort_order' => 1,
                 'created_at' => now(),

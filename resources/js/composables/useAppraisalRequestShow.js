@@ -49,9 +49,13 @@ export function useAppraisalRequestShow(props) {
   function docTypeLabel(type) {
     const t = String(type || "").trim();
     const map = {
+      agreement_pdf: "Agreement DigiPro",
       npwp: "NPWP",
       representative: "Surat Kuasa / Perwakilan",
+      representative_letter_pdf: "Surat Representatif DigiPro",
+      disclaimer_pdf: "Disclaimer DigiPro",
       permission: "Surat Izin Aset",
+      contract_signed_pdf: "PDF Kontrak Ditandatangani",
       doc_pbb: "PBB",
       doc_imb: "IMB",
       doc_old_report: "Laporan Lama",
@@ -91,6 +95,8 @@ export function useAppraisalRequestShow(props) {
       contract_signed: "Kontrak Ditandatangani",
       valuation_in_progress: "Penilaian Berjalan",
       valuation_completed: "Penilaian Selesai",
+      preview_ready: "Preview Kajian Siap",
+      report_preparation: "Laporan Sedang Disiapkan",
       report_ready: "Laporan Siap",
       completed: "Selesai",
       cancelled: "Dibatalkan",
@@ -108,7 +114,7 @@ export function useAppraisalRequestShow(props) {
     const s = req.value.status;
     if (["completed"].includes(s)) return "default";
     if (["rejected", "cancelled"].includes(s)) return "destructive";
-    if (["paid", "in_progress", "valuation_in_progress", "valuation_completed", "report_ready"].includes(s)) {
+    if (["paid", "in_progress", "valuation_in_progress", "valuation_completed", "preview_ready", "report_preparation", "report_ready"].includes(s)) {
       return "secondary";
     }
     return "outline";
@@ -138,7 +144,8 @@ export function useAppraisalRequestShow(props) {
       "waiting_signature",
       "contract_signed",
       "valuation_in_progress",
-      "valuation_completed",
+      "preview_ready",
+      "report_preparation",
       "report_ready",
       "completed",
     ];
@@ -160,7 +167,8 @@ export function useAppraisalRequestShow(props) {
       waiting_signature: "TTD",
       contract_signed: "Kontrak",
       valuation_in_progress: "Dikerjakan",
-      valuation_completed: "Selesai",
+      preview_ready: "Preview",
+      report_preparation: "Finalisasi",
       report_ready: "Laporan",
       completed: "Completed",
     };
@@ -171,11 +179,12 @@ export function useAppraisalRequestShow(props) {
     const all = stepOrder.value;
     const pick = [
       all[1],
-      all[4],
-      all[5],
       all[6],
       all[7],
-      all[10] ?? "report_ready",
+      all[8],
+      all[9],
+      all[10],
+      all[11] ?? "report_ready",
     ].filter(Boolean);
 
     return pick.map((key) => {
@@ -220,7 +229,10 @@ export function useAppraisalRequestShow(props) {
   }
 
   const documentsSummary = computed(() => {
-    const docs = Array.isArray(req.value.documents) ? req.value.documents : [];
+    const docs = [
+      ...(Array.isArray(req.value.request_files) ? req.value.request_files : []),
+      ...(Array.isArray(req.value.documents) ? req.value.documents : []),
+    ];
     const totalBytes = docs.reduce((sum, d) => sum + (Number(d.size) || 0), 0);
 
     const typeCounts = {};
@@ -241,18 +253,32 @@ export function useAppraisalRequestShow(props) {
   });
 
   const documentsShortList = computed(() => {
-    const docs = Array.isArray(req.value.documents) ? req.value.documents : [];
+    const docs = [
+      ...(Array.isArray(req.value.request_files) ? req.value.request_files : []),
+      ...(Array.isArray(req.value.documents) ? req.value.documents : []),
+    ];
     return docs.filter((d) => !isImageDoc(d));
   });
 
   const documentsImages = computed(() => {
-    const docs = Array.isArray(req.value.documents) ? req.value.documents : [];
+    const docs = [
+      ...(Array.isArray(req.value.request_files) ? req.value.request_files : []),
+      ...(Array.isArray(req.value.documents) ? req.value.documents : []),
+    ];
     return docs.filter((d) => isImageDoc(d));
+  });
+
+  const requestDocuments = computed(() => {
+    const docs = Array.isArray(req.value.request_files) ? req.value.request_files : [];
+    return docs.filter((d) => !isImageDoc(d));
   });
 
   const documentsByAssetSections = computed(() => {
     const assets = Array.isArray(req.value.assets) ? req.value.assets : [];
-    const docs = Array.isArray(req.value.documents) ? req.value.documents : [];
+    const docs = [
+      ...(Array.isArray(req.value.request_files) ? req.value.request_files : []),
+      ...(Array.isArray(req.value.documents) ? req.value.documents : []),
+    ];
 
     const groupedDocs = new Map();
     for (const doc of docs) {
@@ -279,7 +305,7 @@ export function useAppraisalRequestShow(props) {
     if (unlinkedDocs.length) {
       sections.push({
         key: "asset-unlinked",
-        title: "Berkas Tanpa Referensi Aset",
+        title: "Dokumen Permohonan",
         asset: null,
         documents: unlinkedDocs.filter((doc) => !isImageDoc(doc)),
         images: unlinkedDocs.filter((doc) => isImageDoc(doc)),
@@ -308,6 +334,7 @@ export function useAppraisalRequestShow(props) {
     documentsSummary,
     documentsShortList,
     documentsImages,
+    requestDocuments,
     documentsByAssetSections,
     statusTimeline,
     canDownloadReport,

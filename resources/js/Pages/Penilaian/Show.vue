@@ -26,6 +26,7 @@ const {
     documentsSummary,
     documentsShortList,
     documentsImages,
+    requestDocuments,
     documentsByAssetSections,
     statusTimeline,
     canDownloadReport,
@@ -66,6 +67,9 @@ const paymentSummary = computed(() => {
     return req.value?.payment_summary ?? {};
 });
 const revisionSummary = computed(() => req.value?.revision_summary ?? {});
+const previewState = computed(() => req.value?.preview_state ?? {});
+
+const canOpenPreviewPage = computed(() => previewState.value?.status === "preview_ready" && Boolean(previewState.value?.page_url));
 
 const canOpenPaymentPage = computed(() => {
     const status = String(req.value?.status ?? "").toLowerCase();
@@ -73,6 +77,8 @@ const canOpenPaymentPage = computed(() => {
         "contract_signed",
         "valuation_in_progress",
         "valuation_completed",
+        "preview_ready",
+        "report_preparation",
         "report_ready",
         "completed",
     ].includes(status);
@@ -109,6 +115,11 @@ const goRevisionPage = () => {
     router.visit(revisionSummary.value.page_url);
 };
 
+const goPreviewPage = () => {
+    if (!previewState.value?.page_url) return;
+    router.visit(previewState.value.page_url);
+};
+
 const downloadIfReady = () => {
     if (!canDownloadReport.value) return;
     downloadReport();
@@ -119,7 +130,7 @@ const timelineDotClass = (type) => {
     if (["success"].includes(key)) return "bg-emerald-500";
     if (["danger"].includes(key)) return "bg-red-500";
     if (["warning"].includes(key)) return "bg-amber-500";
-    if (["offer", "payment", "submitted"].includes(key)) return "bg-sky-500";
+    if (["offer", "payment", "submitted", "info"].includes(key)) return "bg-sky-500";
     return "bg-slate-400";
 };
 </script>
@@ -147,6 +158,11 @@ const timelineDotClass = (type) => {
                     <Button variant="outline" @click="goOfferPage">
                         <FileText class="mr-2 h-4 w-4" />
                         Halaman Penawaran
+                    </Button>
+
+                    <Button v-if="canOpenPreviewPage" @click="goPreviewPage">
+                        <FileText class="mr-2 h-4 w-4" />
+                        Review Preview Kajian
                     </Button>
 
                     <Button v-if="canOpenPaymentPage" variant="outline" @click="goPaymentPage">
@@ -193,6 +209,48 @@ const timelineDotClass = (type) => {
                 </CardContent>
             </Card>
 
+            <Card v-if="previewState.has_preview">
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-base">Preview Hasil Kajian Pasar</CardTitle>
+                    <CardDescription>Ringkasan hasil kajian pasar dalam bentuk range sebelum laporan final diterbitkan.</CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div class="rounded-lg border p-3">
+                            <div class="text-xs text-muted-foreground">Estimasi Bawah</div>
+                            <div class="mt-1 font-semibold">{{ formatIDR(previewState.summary?.estimated_value_low) }}</div>
+                        </div>
+                        <div class="rounded-lg border p-3">
+                            <div class="text-xs text-muted-foreground">Estimasi Atas</div>
+                            <div class="mt-1 font-semibold">{{ formatIDR(previewState.summary?.estimated_value_high) }}</div>
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="previewState.status === 'report_preparation'"
+                        class="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900"
+                    >
+                        Customer sudah menyetujui preview. Admin sedang menyiapkan laporan final lengkap dengan barcode/QR dan tanda tangan.
+                    </div>
+
+                    <div
+                        v-else-if="previewState.status === 'preview_ready'"
+                        class="flex flex-col gap-3 rounded-lg border border-fuchsia-200 bg-fuchsia-50 p-3 text-sm text-fuchsia-900 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <div>
+                            Preview versi {{ previewState.version || 1 }} sudah siap ditinjau customer.
+                            <span v-if="previewState.appeal_remaining === 0" class="block mt-1 text-fuchsia-800">
+                                Kesempatan banding sudah digunakan, sehingga preview revisi ini hanya bisa disetujui.
+                            </span>
+                        </div>
+                        <Button @click="goPreviewPage">
+                            <FileText class="mr-2 h-4 w-4" />
+                            Buka Preview
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
             <Card v-if="revisionSummary.has_open_batch">
                 <CardHeader class="pb-2">
                     <CardTitle class="text-base">Revisi Dokumen Dibutuhkan</CardTitle>
@@ -229,6 +287,10 @@ const timelineDotClass = (type) => {
                                     <div class="font-medium">{{ req.report_type_label ?? "-" }}</div>
                                 </div>
                                 <div>
+                                    <div class="text-xs text-muted-foreground">Tujuan Penilaian</div>
+                                    <div class="font-medium">{{ req.valuation_objective_label ?? "-" }}</div>
+                                </div>
+                                <div>
                                     <div class="text-xs text-muted-foreground">Tanggal Request</div>
                                     <div class="font-medium flex items-center gap-1">
                                         <Calendar class="h-4 w-4" />
@@ -244,8 +306,16 @@ const timelineDotClass = (type) => {
                                     <div class="font-medium">{{ req.contract_number ?? "-" }}</div>
                                 </div>
                                 <div>
+                                    <div class="text-xs text-muted-foreground">Sertifikat On Hand</div>
+                                    <div class="font-medium">{{ req.sertifikat_on_hand_confirmed ? "Ya" : "Tidak" }}</div>
+                                </div>
+                                <div>
                                     <div class="text-xs text-muted-foreground">Fee</div>
                                     <div class="font-medium">{{ req.fee_total != null ? formatIDR(req.fee_total) : "-" }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-xs text-muted-foreground">Tidak Dijaminkan</div>
+                                    <div class="font-medium">{{ req.certificate_not_encumbered_confirmed ? "Ya" : "Tidak" }}</div>
                                 </div>
                             </div>
 
@@ -287,6 +357,33 @@ const timelineDotClass = (type) => {
                                 <Badge v-for="item in documentsSummary.byType.slice(0, 4)" :key="item.label" variant="outline">
                                     {{ item.label }}: {{ item.count }}
                                 </Badge>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-base">Dokumen Permohonan</CardTitle>
+                    <CardDescription>Dokumen request level umum, termasuk surat representatif dan file kontrak digital.</CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-3">
+                    <div v-if="!requestDocuments.length" class="rounded-lg border p-3 text-sm text-muted-foreground">
+                        Dokumen permohonan belum tersedia.
+                    </div>
+
+                    <div v-for="file in requestDocuments" :key="file.id" class="rounded-lg border p-3">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div class="space-y-1">
+                                <div class="text-xs text-muted-foreground">{{ docTypeLabel(file.type) }}</div>
+                                <div class="font-medium">{{ file.original_name ?? '-' }}</div>
+                                <div class="text-xs text-muted-foreground">{{ formatBytes(file.size ?? 0) }} | {{ file.created_at ?? "-" }}</div>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <Button v-if="file.url" variant="outline" size="sm" as-child>
+                                    <a :href="file.url" target="_blank" rel="noreferrer">Buka Dokumen</a>
+                                </Button>
                             </div>
                         </div>
                     </div>

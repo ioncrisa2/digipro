@@ -43,7 +43,7 @@ const navItems = [
     pathPrefixes: ["/permohonan-penilaian", "/buat-permohonan"],
   },
   {
-    label: "Laporan Penilaian",
+    label: "Dokumen",
     icon: FileDown,
     routeName: "reports.index",
     activePatterns: ["reports.*"],

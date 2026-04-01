@@ -29,7 +29,7 @@ return new class extends Migration
             ],
             [
                 'question' => 'Is the appraisal officially recognized?',
-                'answer' => 'Yes, all appraisals are conducted by licensed KJPP valuers (MAPPI Cert.) through a desk appraisal approach. Our reports are recognized by financial institutions and courts.',
+                'answer' => 'Yes, all appraisals are conducted by licensed KJPP valuers (MAPPI Cert.) through an Appraisal Review approach. Our reports are recognized by financial institutions and courts.',
                 'is_active' => true,
                 'sort_order' => 2,
                 'created_at' => now(),

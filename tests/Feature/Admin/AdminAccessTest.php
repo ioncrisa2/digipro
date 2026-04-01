@@ -22,6 +22,7 @@ use App\Models\Faq;
 use App\Models\Feature;
 use App\Models\FloorIndex;
 use App\Models\GuidelineSet;
+use App\Models\LandingMediaSetting;
 use App\Models\Payment;
 use App\Models\PrivacyPolicy;
 use App\Models\Province;
@@ -877,6 +878,8 @@ it('reorders faqs from the vue admin workspace', function () {
 
 it('stores and updates a feature from the vue admin workspace', function () {
     $admin = createAdminUser();
+    Storage::fake('public');
+    $initialImage = UploadedFile::fake()->image('feature-a.jpg', 1200, 800);
 
     $this
         ->actingAs($admin)
@@ -884,6 +887,7 @@ it('stores and updates a feature from the vue admin workspace', function () {
             'icon' => 'ShieldCheck',
             'title' => 'Aman',
             'description' => 'Proses aman',
+            'image' => $initialImage,
             'sort_order' => 1,
             'is_active' => true,
         ])
@@ -891,6 +895,11 @@ it('stores and updates a feature from the vue admin workspace', function () {
 
     $feature = Feature::query()->where('title', 'Aman')->first();
     expect($feature)->not->toBeNull();
+    expect($feature->image_path)->not->toBeNull();
+    Storage::disk('public')->assertExists($feature->image_path);
+
+    $oldImagePath = $feature->image_path;
+    $replacementImage = UploadedFile::fake()->image('feature-b.jpg', 1400, 900);
 
     $this
         ->actingAs($admin)
@@ -898,6 +907,7 @@ it('stores and updates a feature from the vue admin workspace', function () {
             'icon' => 'Star',
             'title' => 'Aman Final',
             'description' => 'Proses aman final',
+            'image' => $replacementImage,
             'sort_order' => 3,
             'is_active' => false,
         ])
@@ -907,10 +917,67 @@ it('stores and updates a feature from the vue admin workspace', function () {
 
     expect($feature->icon)->toBe('Star');
     expect($feature->is_active)->toBeFalse();
+    expect($feature->image_path)->not->toBeNull()->and($feature->image_path)->not->toBe($oldImagePath);
+    Storage::disk('public')->assertMissing($oldImagePath);
+    Storage::disk('public')->assertExists($feature->image_path);
+});
+
+it('updates landing hero background from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    Storage::fake('public');
+    $heroImage = UploadedFile::fake()->image('landing-hero.jpg', 1800, 1000);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.legal.features.hero-background.update'), [
+            'image' => $heroImage,
+        ])
+        ->assertRedirect(route('admin.content.legal.features.index'));
+
+    $setting = LandingMediaSetting::query()->where('key', 'hero_background')->first();
+
+    expect($setting)->not->toBeNull();
+    expect($setting->file_path)->not->toBeNull();
+    Storage::disk('public')->assertExists($setting->file_path);
+
+    $this
+        ->get(route('landing'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Landing/LandingPage')
+            ->where('heroBackgroundUrl', Storage::disk('public')->url($setting->file_path)));
+});
+
+it('updates platform preview slide media from the vue admin workspace', function () {
+    $admin = createAdminUser();
+    Storage::fake('public');
+    $slideImage = UploadedFile::fake()->image('preview-slide-2.jpg', 1600, 900);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.content.legal.features.platform-preview.update', ['slot' => 2]), [
+            'image' => $slideImage,
+        ])
+        ->assertRedirect(route('admin.content.legal.features.index'));
+
+    $setting = LandingMediaSetting::query()->where('key', 'platform_preview_slide_2')->first();
+
+    expect($setting)->not->toBeNull();
+    expect($setting->file_path)->not->toBeNull();
+    Storage::disk('public')->assertExists($setting->file_path);
+
+    $this
+        ->get(route('landing'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Landing/LandingPage')
+            ->where('platformPreviewImages.1', Storage::disk('public')->url($setting->file_path)));
 });
 
 it('stores and updates a testimonial from the vue admin workspace', function () {
     $admin = createAdminUser();
+    Storage::fake('public');
+    $initialPhoto = UploadedFile::fake()->image('testimonial-a.jpg', 800, 800);
 
     $this
         ->actingAs($admin)
@@ -918,6 +985,7 @@ it('stores and updates a testimonial from the vue admin workspace', function () 
             'name' => 'Budi',
             'role' => 'Direktur',
             'quote' => 'Sangat membantu',
+            'photo' => $initialPhoto,
             'sort_order' => 1,
             'is_active' => true,
         ])
@@ -925,6 +993,11 @@ it('stores and updates a testimonial from the vue admin workspace', function () 
 
     $testimonial = Testimonial::query()->where('name', 'Budi')->first();
     expect($testimonial)->not->toBeNull();
+    expect($testimonial->photo_path)->not->toBeNull();
+    Storage::disk('public')->assertExists($testimonial->photo_path);
+
+    $oldPhotoPath = $testimonial->photo_path;
+    $replacementPhoto = UploadedFile::fake()->image('testimonial-b.jpg', 900, 900);
 
     $this
         ->actingAs($admin)
@@ -932,6 +1005,7 @@ it('stores and updates a testimonial from the vue admin workspace', function () 
             'name' => 'Budi Final',
             'role' => 'CEO',
             'quote' => 'Sangat membantu final',
+            'photo' => $replacementPhoto,
             'sort_order' => 4,
             'is_active' => false,
         ])
@@ -941,6 +1015,9 @@ it('stores and updates a testimonial from the vue admin workspace', function () 
 
     expect($testimonial->name)->toBe('Budi Final');
     expect($testimonial->is_active)->toBeFalse();
+    expect($testimonial->photo_path)->not->toBeNull()->and($testimonial->photo_path)->not->toBe($oldPhotoPath);
+    Storage::disk('public')->assertMissing($oldPhotoPath);
+    Storage::disk('public')->assertExists($testimonial->photo_path);
 });
 
 it('stores a terms document from the vue admin workspace', function () {

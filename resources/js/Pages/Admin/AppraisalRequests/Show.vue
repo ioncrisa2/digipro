@@ -82,6 +82,29 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  marketPreview: {
+    type: Object,
+    default: () => ({
+      version: 0,
+      published_at: null,
+      approved_at: null,
+      appeal_count: 0,
+      appeal_reason: null,
+      appeal_submitted_at: null,
+      summary: null,
+      assets: [],
+    }),
+  },
+  reportPreparation: {
+    type: Object,
+    default: () => ({
+      status: null,
+      draft_available: false,
+      draft_generated_at: null,
+      draft_download_url: null,
+      final_upload_url: null,
+    }),
+  },
   approveLatestNegotiationAction: {
     type: Object,
     default: null,
@@ -115,6 +138,8 @@ const {
   negotiationActionOptions,
   negotiationSummary,
   offerAction,
+  marketPreview,
+  reportPreparation,
   approveLatestNegotiationAction,
   paymentVerification,
   revisionWorkspace,
@@ -126,6 +151,9 @@ const offerForm = useForm({
   fee_total: offerAction.value?.defaults?.fee_total ?? '',
   contract_sequence: offerAction.value?.defaults?.contract_sequence ?? '',
   offer_validity_days: offerAction.value?.defaults?.offer_validity_days ?? '',
+});
+const finalReportForm = useForm({
+  report_pdf: null,
 });
 
 const negotiationFilters = reactive({
@@ -176,6 +204,11 @@ const statusTone = (value) => {
       return 'bg-amber-100 text-amber-900 border-amber-200';
     case 'offer_sent':
       return 'bg-indigo-100 text-indigo-900 border-indigo-200';
+    case 'preview_ready':
+      return 'bg-fuchsia-100 text-fuchsia-900 border-fuchsia-200';
+    case 'report_preparation':
+    case 'report_ready':
+      return 'bg-cyan-100 text-cyan-900 border-cyan-200';
     default:
   return 'bg-slate-100 text-slate-800 border-slate-200';
   }
@@ -326,6 +359,24 @@ const submitOffer = () => {
 
   offerForm.post(offerAction.value.url, {
     preserveScroll: true,
+  });
+};
+
+const onFinalReportSelected = (event) => {
+  finalReportForm.report_pdf = event?.target?.files?.[0] ?? null;
+};
+
+const submitFinalReport = () => {
+  if (!reportPreparation.value?.final_upload_url || !finalReportForm.report_pdf) {
+    return;
+  }
+
+  finalReportForm.post(reportPreparation.value.final_upload_url, {
+    preserveScroll: true,
+    forceFormData: true,
+    onSuccess: () => {
+      finalReportForm.reset();
+    },
   });
 };
 
@@ -627,6 +678,10 @@ const submitRevisionItem = () => {
                 <p class="mt-2 text-sm text-slate-900">{{ record.purpose_label }}</p>
               </div>
               <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Tujuan Penilaian</p>
+                <p class="mt-2 text-sm text-slate-900">{{ record.valuation_objective_label }}</p>
+              </div>
+              <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Jenis Laporan</p>
                 <p class="mt-2 text-sm text-slate-900">{{ record.report_type_label }}</p>
               </div>
@@ -647,12 +702,24 @@ const submitRevisionItem = () => {
                 <p class="mt-2 text-sm text-slate-900">{{ record.client_name }}</p>
               </div>
               <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Sertifikat On Hand</p>
+                <p class="mt-2 text-sm text-slate-900">{{ record.sertifikat_on_hand_confirmed ? 'Ya' : 'Tidak' }}</p>
+              </div>
+              <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nomor Kontrak</p>
                 <p class="mt-2 text-sm text-slate-900">{{ record.contract_number }}</p>
               </div>
               <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Tidak Dijaminkan</p>
+                <p class="mt-2 text-sm text-slate-900">{{ record.certificate_not_encumbered_confirmed ? 'Ya' : 'Tidak' }}</p>
+              </div>
+              <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Tanggal Kontrak</p>
                 <p class="mt-2 text-sm text-slate-900">{{ formatDateTime(record.contract_date) }}</p>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Pernyataan Dibuat</p>
+                <p class="mt-2 text-sm text-slate-900">{{ formatDateTime(record.certificate_statements_accepted_at) }}</p>
               </div>
               <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Durasi Valuasi</p>
@@ -677,6 +744,75 @@ const submitRevisionItem = () => {
               <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Catatan Negosiasi Terakhir</p>
                 <p class="mt-2 text-sm text-slate-900">{{ record.latest_negotiation_reason || '-' }}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card v-if="activeTab === 'ringkasan' && marketPreview.version">
+            <CardHeader>
+              <CardTitle>Preview Kajian Pasar</CardTitle>
+              <CardDescription>Snapshot preview yang sedang atau terakhir ditinjau customer sebelum laporan final diupload.</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <div class="grid gap-3 md:grid-cols-3">
+                <div class="rounded-2xl border p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Estimasi Bawah</p>
+                  <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(marketPreview.summary?.estimated_value_low) }}</p>
+                </div>
+                <div class="rounded-2xl border p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Tengah</p>
+                  <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(marketPreview.summary?.market_value_final) }}</p>
+                </div>
+                <div class="rounded-2xl border p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Estimasi Atas</p>
+                  <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(marketPreview.summary?.estimated_value_high) }}</p>
+                </div>
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-2">
+                <div class="rounded-2xl border bg-slate-50 p-4 text-sm">
+                  <p><span class="font-medium">Versi preview:</span> {{ marketPreview.version }}</p>
+                  <p class="mt-2"><span class="font-medium">Dipublikasikan:</span> {{ formatDateTime(marketPreview.published_at) }}</p>
+                  <p class="mt-2"><span class="font-medium">Disetujui customer:</span> {{ formatDateTime(marketPreview.approved_at) }}</p>
+                </div>
+                <div
+                  :class="[
+                    'rounded-2xl border p-4 text-sm',
+                    marketPreview.appeal_count > 0
+                      ? 'border-amber-200 bg-amber-50 text-amber-900'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+                  ]"
+                >
+                  <p class="font-medium">Status banding</p>
+                  <p class="mt-2">
+                    {{ marketPreview.appeal_count > 0 ? 'Customer sudah menggunakan 1x kesempatan banding.' : 'Belum ada banding customer.' }}
+                  </p>
+                  <p v-if="marketPreview.appeal_reason" class="mt-2">{{ marketPreview.appeal_reason }}</p>
+                  <p v-if="marketPreview.appeal_submitted_at" class="mt-2 text-xs">
+                    Diajukan pada {{ formatDateTime(marketPreview.appeal_submitted_at) }}
+                  </p>
+                </div>
+              </div>
+
+              <div v-if="marketPreview.assets?.length" class="rounded-2xl border">
+                <div class="border-b px-4 py-3">
+                  <p class="text-sm font-semibold text-slate-950">Breakdown per aset</p>
+                </div>
+                <div class="divide-y">
+                  <div
+                    v-for="asset in marketPreview.assets"
+                    :key="asset.asset_id"
+                    class="grid gap-3 px-4 py-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]"
+                  >
+                    <div>
+                      <p class="font-medium text-slate-950">{{ asset.asset_type_label }}</p>
+                      <p class="text-xs text-slate-500">{{ asset.address }}</p>
+                    </div>
+                    <div class="text-sm text-slate-700">{{ formatCurrency(asset.estimated_value_low) }}</div>
+                    <div class="text-sm text-slate-700">{{ formatCurrency(asset.market_value_final) }}</div>
+                    <div class="text-sm text-slate-700">{{ formatCurrency(asset.estimated_value_high) }}</div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1447,6 +1583,57 @@ const submitRevisionItem = () => {
               </div>
               <div v-if="!payments.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
                 Belum ada data pembayaran.
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card v-if="activeTab === 'pembayaran' && (record.status_value === 'report_preparation' || reportPreparation.draft_available)">
+            <CardHeader>
+              <CardTitle>Persiapan Laporan Final</CardTitle>
+              <CardDescription>Admin download draft, lengkapi barcode/QR dan tanda tangan di luar sistem, lalu upload PDF final.</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <div class="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900">
+                Draft report hanya untuk kebutuhan internal admin. Customer baru mendapat akses ketika PDF final sudah diupload dan status berubah ke laporan siap.
+              </div>
+
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="rounded-2xl border p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Draft Laporan</p>
+                  <p class="mt-2 text-sm text-slate-700">
+                    {{ reportPreparation.draft_available ? 'Draft tersedia untuk diunduh.' : 'Draft belum tersedia.' }}
+                  </p>
+                  <p class="mt-2 text-xs text-slate-500">
+                    Dibuat: {{ formatDateTime(reportPreparation.draft_generated_at) }}
+                  </p>
+                  <div v-if="reportPreparation.draft_download_url" class="mt-4">
+                    <Button as-child>
+                      <a :href="reportPreparation.draft_download_url">
+                        <Download class="mr-2 h-4 w-4" />
+                        Download Draft Report
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+
+                <div class="rounded-2xl border p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Upload PDF Final</p>
+                  <p class="mt-2 text-sm text-slate-700">
+                    Upload file final yang sudah diberi QR/barcode P2PK/ELSA dan tanda tangan reviewer serta penilai publik.
+                  </p>
+                  <div class="mt-4 space-y-3">
+                    <Input type="file" accept="application/pdf" @change="onFinalReportSelected" />
+                    <p v-if="finalReportForm.errors.report_pdf" class="text-sm text-rose-600">
+                      {{ finalReportForm.errors.report_pdf }}
+                    </p>
+                    <Button
+                      :disabled="finalReportForm.processing || !finalReportForm.report_pdf || !reportPreparation.final_upload_url"
+                      @click="submitFinalReport"
+                    >
+                      Upload Laporan Final
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

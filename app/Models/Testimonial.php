@@ -11,6 +11,7 @@ class Testimonial extends Model
         'name',
         'role',
         'quote',
+        'photo_path',
         'is_active',
         'sort_order',
     ];

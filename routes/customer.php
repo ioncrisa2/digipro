@@ -24,6 +24,9 @@ Route::middleware(['auth', 'verified', 'customer.role'])
         Route::get('/permohonan-penilaian/{id}/kontrak', [AppraisalController::class, 'contractSignaturePage'])->name('appraisal.contract.page');
         Route::get('/permohonan-penilaian/{id}/kontrak/pdf', [AppraisalController::class, 'downloadContractPdf'])->name('appraisal.contract.pdf');
         Route::post('/permohonan-penilaian/{id}/kontrak/sign', [AppraisalController::class, 'signContract'])->name('appraisal.contract.sign');
+        Route::get('/permohonan-penilaian/{id}/preview-kajian-pasar', [AppraisalController::class, 'marketPreviewPage'])->name('appraisal.market-preview.page');
+        Route::post('/permohonan-penilaian/{id}/preview-kajian-pasar/approve', [AppraisalController::class, 'approveMarketPreview'])->name('appraisal.market-preview.approve');
+        Route::post('/permohonan-penilaian/{id}/preview-kajian-pasar/appeal', [AppraisalController::class, 'submitMarketPreviewAppeal'])->name('appraisal.market-preview.appeal');
         Route::get('/permohonan-penilaian/{id}/pembayaran', [PaymentController::class, 'appraisalPage'])->name('appraisal.payment.page');
         Route::get('/permohonan-penilaian/{id}/invoice', [PaymentController::class, 'invoicePage'])->name('appraisal.invoice.page');
         Route::get('/permohonan-penilaian/{id}/invoice/pdf', [PaymentController::class, 'downloadInvoicePdf'])->name('appraisal.invoice.pdf');

@@ -27,6 +27,7 @@ class StoreFeatureRequest extends FormRequest
             'icon' => ['nullable', Rule::in(['TrendingUp', 'Zap', 'ShieldCheck', 'Smartphone', 'CheckCircle2', 'Star'])],
             'title' => ['required', 'string', 'max:150'],
             'description' => ['required', 'string'],
+            'image' => ['nullable', 'image', 'max:4096'],
             'is_active' => ['required', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0'],
         ];

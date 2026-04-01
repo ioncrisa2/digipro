@@ -22,15 +22,17 @@ const props = defineProps({
 });
 
 const isEditMode = computed(() => props.mode === 'edit');
-  const form = useForm({
+const form = useForm({
   question: props.record.question ?? '',
   answer: props.record.answer ?? '',
   icon: props.record.icon ?? '__none',
   title: props.record.title ?? '',
   description: props.record.description ?? '',
+  image: null,
   name: props.record.name ?? '',
   role: props.record.role ?? '',
   quote: props.record.quote ?? '',
+  photo: null,
   sort_order: props.record.sort_order ?? 0,
   is_active: Boolean(props.record.is_active ?? true),
   _method: isEditMode.value ? 'put' : 'post',
@@ -85,6 +87,18 @@ const submit = () => form.post(props.submitUrl, { preserveScroll: true });
                 </Select>
                 <p v-if="form.errors.icon" class="text-xs text-rose-600">{{ form.errors.icon }}</p>
               </div>
+              <div class="space-y-2">
+                <Label for="image">Gambar Fitur</Label>
+                <Input id="image" type="file" accept="image/*" @input="form.image = $event.target.files?.[0] ?? null" />
+                <p class="text-xs text-slate-500">Gunakan gambar landscape agar tampil lebih baik di landing page.</p>
+                <p v-if="form.errors.image" class="text-xs text-rose-600">{{ form.errors.image }}</p>
+              </div>
+              <div v-if="record.image_url" class="space-y-2 md:col-span-2">
+                <Label>Preview Gambar Saat Ini</Label>
+                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                  <img :src="record.image_url" alt="Preview fitur" class="h-56 w-full object-cover" />
+                </div>
+              </div>
               <div class="space-y-2 md:col-span-2"><Label for="title">Judul</Label><Input id="title" v-model="form.title" /><p v-if="form.errors.title" class="text-xs text-rose-600">{{ form.errors.title }}</p></div>
               <div class="space-y-2 md:col-span-2"><Label for="description">Deskripsi</Label><Textarea id="description" v-model="form.description" rows="5" /><p v-if="form.errors.description" class="text-xs text-rose-600">{{ form.errors.description }}</p></div>
             </template>
@@ -92,6 +106,18 @@ const submit = () => form.post(props.submitUrl, { preserveScroll: true });
             <template v-else>
               <div class="space-y-2"><Label for="name">Nama</Label><Input id="name" v-model="form.name" /><p v-if="form.errors.name" class="text-xs text-rose-600">{{ form.errors.name }}</p></div>
               <div class="space-y-2"><Label for="role">Peran</Label><Input id="role" v-model="form.role" /><p v-if="form.errors.role" class="text-xs text-rose-600">{{ form.errors.role }}</p></div>
+              <div class="space-y-2 md:col-span-2">
+                <Label for="photo">Foto Testimoni</Label>
+                <Input id="photo" type="file" accept="image/*" @input="form.photo = $event.target.files?.[0] ?? null" />
+                <p class="text-xs text-slate-500">Gunakan foto portrait atau square agar tampil baik di section testimonial landing.</p>
+                <p v-if="form.errors.photo" class="text-xs text-rose-600">{{ form.errors.photo }}</p>
+              </div>
+              <div v-if="record.photo_url" class="space-y-2 md:col-span-2">
+                <Label>Preview Foto Saat Ini</Label>
+                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                  <img :src="record.photo_url" alt="Preview testimoni" class="h-64 w-full object-cover" />
+                </div>
+              </div>
               <div class="md:col-span-2">
                 <AdminRichTextEditor
                   id="quote"

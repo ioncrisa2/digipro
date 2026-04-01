@@ -7,6 +7,7 @@ use App\Models\AppraisalRequest;
 use App\Models\Payment;
 use App\Notifications\AppraisalPaymentStatusNotification;
 use App\Services\Admin\AdminNotificationService;
+use App\Services\AppraisalFinalDocumentService;
 use App\Services\Payments\MidtransSnapService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,8 @@ class PaymentController extends Controller
                 AppraisalStatusEnum::ContractSigned->value,
                 AppraisalStatusEnum::ValuationOnProgress->value,
                 AppraisalStatusEnum::ValuationCompleted->value,
+                AppraisalStatusEnum::PreviewReady->value,
+                AppraisalStatusEnum::ReportPreparation->value,
                 AppraisalStatusEnum::ReportReady->value,
                 AppraisalStatusEnum::Completed->value,
             ])
@@ -487,6 +490,8 @@ class PaymentController extends Controller
             AppraisalStatusEnum::ContractSigned->value,
             AppraisalStatusEnum::ValuationOnProgress->value,
             AppraisalStatusEnum::ValuationCompleted->value,
+            AppraisalStatusEnum::PreviewReady->value,
+            AppraisalStatusEnum::ReportPreparation->value,
             AppraisalStatusEnum::ReportReady->value,
             AppraisalStatusEnum::Completed->value,
         ], true);
@@ -620,6 +625,16 @@ class PaymentController extends Controller
                 $appraisal->update([
                     'status' => AppraisalStatusEnum::ValuationOnProgress,
                 ]);
+            }
+
+            if ($appraisal) {
+                app(AppraisalFinalDocumentService::class)->generateAfterPayment($appraisal->fresh([
+                    'payments',
+                    'offerNegotiations.user',
+                    'files',
+                    'user',
+                    'assets',
+                ]));
             }
 
             $requestNumber = $appraisal?->request_number ?? ('REQ-' . ($appraisal?->id ?? '-'));

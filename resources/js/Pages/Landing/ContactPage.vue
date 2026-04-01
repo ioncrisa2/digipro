@@ -44,52 +44,6 @@ const submitForm = () => {
 
     <main class="flex-1 py-12 px-6">
       <div class="max-w-6xl mx-auto space-y-12">
-        <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/70 p-8 md:p-12 shadow-sm">
-          <div class="absolute -top-16 right-0 h-56 w-56 rounded-full bg-amber-200/40 blur-3xl"></div>
-          <div class="absolute -bottom-10 left-0 h-48 w-48 rounded-full bg-sky-200/40 blur-3xl"></div>
-
-          <div class="relative grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
-            <div class="space-y-5">
-              <div class="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-sm font-medium text-slate-600">
-                Hubungi DigiPro
-              </div>
-              <h1 class="text-3xl md:text-4xl font-semibold tracking-tight text-slate-900">
-                Butuh bantuan atau ingin demo langsung?
-              </h1>
-              <p class="text-lg text-slate-600">
-                Tim DigiPro siap menjawab pertanyaan appraisal, akses laporan, atau kerja sama enterprise.
-              </p>
-              <div class="flex flex-wrap items-center gap-4 text-sm text-slate-600">
-                <div class="flex items-center gap-2">
-                  <CheckCircle2 class="h-4 w-4 text-emerald-600" />
-                  Respons cepat tim support
-                </div>
-                <div class="flex items-center gap-2">
-                  <CheckCircle2 class="h-4 w-4 text-emerald-600" />
-                  Konsultasi penilaian properti
-                </div>
-                <div class="flex items-center gap-2">
-                  <CheckCircle2 class="h-4 w-4 text-emerald-600" />
-                  Jadwal demo fleksibel
-                </div>
-              </div>
-            </div>
-
-            <div class="relative">
-              <div class="rounded-2xl border border-slate-200 bg-white/85 p-6 shadow-sm">
-                <div class="text-xs uppercase tracking-wide text-slate-500">Highlight</div>
-                <div class="text-lg font-semibold text-slate-900 mt-2">Jam operasional</div>
-                <p class="text-sm text-slate-600 mt-2">Senin-Jumat, 08:00-17:00 WIB</p>
-                <div class="mt-4 text-sm text-slate-500">Rata-rata respon kurang dari 2 jam kerja.</div>
-              </div>
-              <img
-                src="/images/valuation-hero.svg"
-                alt="DigiPro Illustration"
-                class="w-full max-w-[320px] mx-auto mt-6 drop-shadow-lg"
-              />
-            </div>
-          </div>
-        </section>
 
         <section class="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div class="lg:col-span-1 space-y-6">

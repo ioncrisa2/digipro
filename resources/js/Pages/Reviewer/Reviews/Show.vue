@@ -154,7 +154,7 @@ const feedbackClasses = computed(() => {
               @click="finishReview"
             >
               <CheckCheck class="mr-2 h-4 w-4" />
-              Finalisasi Review
+              Kirim Preview ke Customer
             </Button>
           </div>
 

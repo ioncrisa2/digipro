@@ -22,6 +22,7 @@ use App\Enums\AssetTypeEnum;
 use App\Enums\ReportTypeEnum;
 use App\Enums\ContractStatusEnum;
 use App\Enums\AppraisalStatusEnum;
+use App\Enums\ValuationObjectiveEnum;
 use App\Services\AppraisalRequestRevisionSubmissionService;
 use App\Services\AppraisalRevisionFileResolver;
 
@@ -50,6 +51,8 @@ class AppraisalService
             AppraisalStatusEnum::ContractSigned->value ?? null,
             AppraisalStatusEnum::ValuationOnProgress->value ?? null,
             AppraisalStatusEnum::ValuationCompleted->value ?? null,
+            AppraisalStatusEnum::PreviewReady->value ?? null,
+            AppraisalStatusEnum::ReportPreparation->value ?? null,
             AppraisalStatusEnum::ReportReady->value ?? null,
         ]);
 
@@ -190,10 +193,102 @@ class AppraisalService
             'topographyOptions' => AppraisalAssetFieldOptions::topographyOptions(),
             'needsConsent' => $needsConsent,
             'consentData' => $consentData,
+            'representativeLetterNotice' => [
+                'title' => 'Surat Representatif DigiPro',
+                'description' => 'Setelah request dilanjutkan dan kontrak ditandatangani, DigiPro akan menyiapkan surat representatif berdasarkan data permohonan dan dokumen yang Anda kirim.',
+            ],
+            'valuationObjective' => [
+                'value' => ValuationObjectiveEnum::KajianNilaiPasarRange->value,
+                'label' => ValuationObjectiveEnum::KajianNilaiPasarRange->label(),
+            ],
             'uploadLimits' => [
                 'maxFileUploads' => $maxFileUploads > 0 ? $maxFileUploads : null,
                 'uploadMaxFilesize' => ini_get('upload_max_filesize'),
                 'postMaxSize' => ini_get('post_max_size'),
+            ],
+        ];
+    }
+
+    public function buildDocumentsIndexPayload(int $userId): array
+    {
+        $records = AppraisalRequest::query()
+            ->where('user_id', $userId)
+            ->with([
+                'user:id,name,email',
+                'assets:id,appraisal_request_id,asset_type,address',
+                'assets.files:id,appraisal_asset_id,type,path,original_name,mime,size,created_at',
+                'files:id,appraisal_request_id,type,path,original_name,mime,size,created_at',
+                'payments:id,appraisal_request_id,amount,method,gateway,external_payment_id,status,paid_at,metadata,updated_at,created_at',
+            ])
+            ->latest('requested_at')
+            ->get();
+
+        $reports = $records->map(function (AppraisalRequest $record): array {
+            $collections = $this->resolveDocumentCollections($record);
+            $reportTypeEnum = $this->asEnum(ReportTypeEnum::class, $record->report_type);
+            $statusEnum = $this->asEnum(AppraisalStatusEnum::class, $record->status);
+            $statusValue = $statusEnum?->value ?? $this->enumValue($record->status);
+            $summary = $this->buildDocumentSummary($collections);
+
+            return [
+                'id' => $record->id,
+                'request_number' => $record->request_number ?? ('REQ-' . $record->id),
+                'client' => $record->client_name ?: ($record->user?->name ?? '-'),
+                'report_type' => $reportTypeEnum?->label() ?? $this->headlineOrDash($record->report_type),
+                'status' => $statusEnum?->label() ?? $this->headlineOrDash($statusValue),
+                'status_key' => $statusValue,
+                'address' => $collections['first_asset_address'],
+                'updated_at' => optional($record->updated_at)->toDateString(),
+                'customer_documents_count' => $summary['customer_documents_count'],
+                'customer_photos_count' => $summary['customer_photos_count'],
+                'system_documents_count' => $summary['system_documents_count'],
+                'ready_contract' => $summary['ready_contract'],
+                'ready_report' => $summary['ready_report'],
+                'ready_invoice' => $summary['ready_invoice'],
+                'ready_legal_documents' => $summary['ready_legal_documents'],
+                'total_documents_count' => $summary['total_documents_count'],
+            ];
+        })->values()->all();
+
+        return [
+            'reports' => $reports,
+        ];
+    }
+
+    public function buildDocumentsShowPayload(int $userId, int $id): array
+    {
+        $record = AppraisalRequest::query()
+            ->where('user_id', $userId)
+            ->with([
+                'user:id,name,email',
+                'assets:id,appraisal_request_id,asset_type,address',
+                'assets.files:id,appraisal_asset_id,type,path,original_name,mime,size,created_at',
+                'files:id,appraisal_request_id,type,path,original_name,mime,size,created_at',
+                'payments:id,appraisal_request_id,amount,method,gateway,external_payment_id,status,paid_at,metadata,updated_at,created_at',
+            ])
+            ->findOrFail($id);
+
+        $collections = $this->resolveDocumentCollections($record);
+        $reportTypeEnum = $this->asEnum(ReportTypeEnum::class, $record->report_type);
+        $statusEnum = $this->asEnum(AppraisalStatusEnum::class, $record->status);
+        $summary = $this->buildDocumentSummary($collections);
+
+        return [
+            'report' => [
+                'id' => $record->id,
+                'request_number' => $record->request_number ?? ('REQ-' . $record->id),
+                'client' => $record->client_name ?: ($record->user?->name ?? '-'),
+                'report_type' => $reportTypeEnum?->label() ?? $this->headlineOrDash($record->report_type),
+                'status' => $statusEnum?->label() ?? $this->headlineOrDash($record->status),
+                'status_key' => $statusEnum?->value ?? $this->enumValue($record->status),
+                'address' => $collections['first_asset_address'],
+                'updated_at' => optional($record->updated_at)->toDateTimeString(),
+                'summary' => $summary,
+                'request_upload_documents' => $collections['request_upload_documents'],
+                'asset_sections' => $collections['asset_sections'],
+                'system_documents' => $collections['system_documents'],
+                'legal_documents' => $collections['legal_documents'],
+                'billing_documents' => $collections['billing_documents'],
             ],
         ];
     }
@@ -223,6 +318,8 @@ class AppraisalService
         $reportTypeValue = $reportTypeEnum?->value ?? $this->enumValue($r->report_type);
         $statusValue = $statusEnum?->value ?? $this->enumValue($r->status);
         $contractStatusValue = $contractStatusEnum?->value ?? $this->enumValue($r->contract_status);
+        $valuationObjectiveEnum = $this->asEnum(ValuationObjectiveEnum::class, $r->valuation_objective);
+        $valuationObjectiveValue = $valuationObjectiveEnum?->value ?? (is_string($r->valuation_objective) ? $r->valuation_objective : null);
 
         $assets = $r->assets->map(function ($a) {
             $typeValue = $this->enumValue($a->asset_type);
@@ -237,6 +334,9 @@ class AppraisalService
                 'building_floors' => $a->building_floors,
                 'build_year' => $a->build_year,
                 'renovation_year' => $a->renovation_year,
+                'estimated_value_low' => $a->estimated_value_low,
+                'market_value_final' => $a->market_value_final,
+                'estimated_value_high' => $a->estimated_value_high,
                 'peruntukan' => $a->peruntukan,
                 'title_document' => $a->title_document,
                 'land_shape' => $a->land_shape,
@@ -257,35 +357,10 @@ class AppraisalService
             ];
         })->values();
 
-        $fileResolver = app(AppraisalRevisionFileResolver::class);
-        $approvedRevisionItems = $fileResolver->approvedItemsForRequest($r);
-        $activeAssetFiles = $fileResolver->activeAssetFilesByRequest($r, $approvedRevisionItems);
-
-        $documents = $r->assets
-            ->flatMap(function ($asset) use ($activeAssetFiles) {
-                return collect($activeAssetFiles[$asset->id] ?? [])->map(function ($f) use ($asset) {
-                    $url = null;
-                    if ($f->path && Storage::disk('public')->exists($f->path)) {
-                        $url = Storage::disk('public')->url($f->path);
-                    }
-
-                    return [
-                        'id' => $f->id,
-                        'type' => $f->type,
-                        'original_name' => $f->original_name,
-                        'mime' => $f->mime,
-                        'size' => $f->size,
-                        'created_at' => $f->created_at?->toDateTimeString(),
-                        'url' => $url,
-                        'path' => $f->path,
-                        'asset_id' => $asset->id,
-                        'asset_type' => $asset->asset_type,
-                    ];
-                });
-            })
-            ->values();
-
-        $firstAddress = $assets->first()['address'] ?? '-';
+        $collections = $this->resolveDocumentCollections($r);
+        $documents = collect($collections['documents']);
+        $requestFiles = collect($collections['request_files']);
+        $firstAddress = $collections['first_asset_address'];
 
         $offerNegotiations = $r->offerNegotiations
             ->sortBy('id')
@@ -337,6 +412,7 @@ class AppraisalService
         $statusTimeline = $this->buildStatusTimeline($r);
         $latestPayment = $r->payments->sortByDesc('id')->first();
         $revisionSummary = app(AppraisalRequestRevisionSubmissionService::class)->buildSummary($r);
+        $previewState = $this->buildPreviewStatePayload($r);
         $paymentStatus = $latestPayment?->status;
         $paymentStatusLabel = app(MidtransSnapService::class)->paymentStatusLabel($latestPayment);
         $invoiceNumber = data_get($latestPayment?->metadata, 'invoice_number');
@@ -361,6 +437,11 @@ class AppraisalService
                 'client_name' => $r->client_name,
                 'client_address' => $r->client_address,
                 'client_spk_number' => $r->client_spk_number,
+                'valuation_objective' => $valuationObjectiveValue,
+                'valuation_objective_label' => $valuationObjectiveEnum?->label() ?? $this->headlineOrDash($valuationObjectiveValue),
+                'sertifikat_on_hand_confirmed' => (bool) $r->sertifikat_on_hand_confirmed,
+                'certificate_not_encumbered_confirmed' => (bool) $r->certificate_not_encumbered_confirmed,
+                'certificate_statements_accepted_at' => optional($r->certificate_statements_accepted_at)->toDateTimeString(),
 
                 'contract_number' => $r->contract_number,
                 'contract_date' => optional($r->contract_date)->toDateString(),
@@ -380,11 +461,17 @@ class AppraisalService
 
                 'assets' => $assets,
                 'documents' => $documents,
+                'request_files' => $requestFiles,
 
                 'report_generated_at' => optional($r->report_generated_at)->toDateTimeString(),
                 'report_pdf_path' => $r->report_pdf_path,
                 'report_pdf_url' => $reportPdfUrl,
                 'contract_document' => $contractDocument,
+                'preview_state' => $previewState,
+                'preview_summary' => $previewState['summary'],
+                'preview_page_url' => $previewState['page_url'],
+                'appeal_remaining' => $previewState['appeal_remaining'],
+                'latest_preview_version' => $previewState['version'],
                 'status_timeline' => $statusTimeline,
                 'revision_summary' => $revisionSummary,
                 'payment_summary' => [
@@ -395,6 +482,45 @@ class AppraisalService
                     'invoice_number' => $invoiceNumber,
                     'paid_at' => optional($latestPayment?->paid_at)->toDateTimeString(),
                 ],
+            ],
+        ];
+    }
+
+    public function buildMarketPreviewPayload(int $userId, int $id): array
+    {
+        $record = AppraisalRequest::query()
+            ->where('user_id', $userId)
+            ->with([
+                'user:id,name,email',
+                'assets:id,appraisal_request_id,asset_type,address,land_area,building_area,estimated_value_low,estimated_value_high,market_value_final',
+            ])
+            ->findOrFail($id);
+
+        $previewState = $this->buildPreviewStatePayload($record);
+        $status = $record->status?->value ?? (string) $record->status;
+
+        if ($status !== AppraisalStatusEnum::PreviewReady->value) {
+            abort(404);
+        }
+
+        return [
+            'preview' => [
+                'id' => $record->id,
+                'request_number' => $record->request_number ?? ('REQ-' . $record->id),
+                'client_name' => $record->client_name ?: ($record->user?->name ?? '-'),
+                'status' => $record->status?->value ?? (string) $record->status,
+                'status_label' => $record->status?->label() ?? (string) $record->status,
+                'report_type_label' => $record->report_type?->label() ?? '-',
+                'version' => $previewState['version'],
+                'published_at' => $previewState['published_at'],
+                'summary' => $previewState['summary'],
+                'assets' => $previewState['assets'],
+                'can_approve' => true,
+                'can_appeal' => $previewState['appeal_remaining'] > 0,
+                'appeal_remaining' => $previewState['appeal_remaining'],
+                'appeal_reason' => $record->market_preview_appeal_reason,
+                'approve_url' => route('appraisal.market-preview.approve', ['id' => $record->id]),
+                'appeal_url' => route('appraisal.market-preview.appeal', ['id' => $record->id]),
             ],
         ];
     }
@@ -461,6 +587,7 @@ class AppraisalService
         return [
             'title' => 'PENAWARAN LAYANAN ESTIMASI RENTANG HARGA PROPERTI',
             'subtitle' => '(Tanpa Inspeksi Lapangan - Non-Reliance)',
+            'valuation_objective_label' => $record->valuation_objective?->label() ?? 'Kajian Nilai Pasar dalam Bentuk Range',
             'agr_no' => $record->contract_number ?: '-',
             'date' => optional($record->contract_date)->toDateString() ?: now()->toDateString(),
             'user_name' => $record->user?->name ?: ($record->client_name ?: '-'),
@@ -500,6 +627,55 @@ class AppraisalService
                 'document_hash' => $signatureMeta['document_hash'] ?? '-',
                 'signed_pdf_path' => $signedPdfPath,
                 'signed_pdf_url' => $signedPdfUrl,
+            ],
+        ];
+    }
+
+    public function buildRepresentativeLetterPayload(AppraisalRequest $record, array $signatureMeta = []): array
+    {
+        $record->loadMissing([
+            'user:id,name,email',
+            'assets:id,appraisal_request_id,asset_type,address,land_area,building_area,title_document',
+        ]);
+
+        $assetSummaries = $record->assets
+            ->values()
+            ->map(function (AppraisalAsset $asset, int $index): array {
+                return [
+                    'no' => $index + 1,
+                    'type_label' => $this->assetTypeLabelForContract($this->enumValue($asset->asset_type)),
+                    'address' => $asset->address ?: '-',
+                    'title_document' => $asset->title_document ?: '-',
+                    'land_area' => is_numeric($asset->land_area) ? number_format((float) $asset->land_area, 2, ',', '.') . ' m2' : '-',
+                    'building_area' => is_numeric($asset->building_area) ? number_format((float) $asset->building_area, 2, ',', '.') . ' m2' : '-',
+                ];
+            })
+            ->all();
+
+        return [
+            'title' => 'SURAT REPRESENTATIF',
+            'subtitle' => 'Pernyataan pengguna atas dokumen dan informasi permohonan penilaian digital',
+            'request_number' => $record->request_number ?? ('REQ-' . $record->id),
+            'contract_number' => $record->contract_number ?: '-',
+            'valuation_objective_label' => $record->valuation_objective?->label() ?? 'Kajian Nilai Pasar dalam Bentuk Range',
+            'date' => now()->translatedFormat('d F Y'),
+            'requester_name' => $record->user?->name ?? '-',
+            'requester_email' => $record->user?->email ?? '-',
+            'client_name' => $record->client_name ?: ($record->user?->name ?? '-'),
+            'asset_summaries' => $assetSummaries,
+            'statement_items' => [
+                'Seluruh data, pernyataan, foto, dan dokumen yang saya unggah ke DigiPro adalah benar, lengkap, dan sesuai kondisi objek yang sebenarnya pada saat permohonan dibuat.',
+                'Saya menyatakan dokumen kepemilikan utama tersedia/on hand dan tidak sedang dijaminkan pada saat permohonan diajukan melalui platform DigiPro.',
+                'Saya memahami bahwa hasil layanan dan dokumen turunannya disusun berdasarkan informasi yang saya berikan melalui proses digital DigiPro. Jika di kemudian hari terdapat ketidaksesuaian atau informasi yang tidak benar dari pihak saya, maka tanggung jawab atas akibat yang timbul berada pada pihak saya.',
+                'Saya memberikan pembebasan tanggung jawab kepada DigiPro dan tim operasionalnya atas kerugian, tuntutan, atau sengketa yang timbul akibat data atau dokumen yang saya sampaikan tidak benar, tidak lengkap, atau berubah tanpa pemberitahuan.',
+                'Saya memahami bahwa surat ini dan dokumen yang dihasilkan DigiPro digunakan hanya dalam konteks proses permohonan penilaian digital sesuai ketentuan layanan yang berlaku di platform.',
+            ],
+            'signature' => [
+                'signed_at' => $signatureMeta['signed_at'] ?? '-',
+                'signed_by_name' => $signatureMeta['signed_by_name'] ?? ($record->user?->name ?? '-'),
+                'signed_by_email' => $signatureMeta['signed_by_email'] ?? ($record->user?->email ?? '-'),
+                'signature_id' => $signatureMeta['signature_id'] ?? '-',
+                'document_hash' => $signatureMeta['document_hash'] ?? '-',
             ],
         ];
     }
@@ -625,15 +801,273 @@ class AppraisalService
     private function contractDocumentTypeLabel(?string $type): string
     {
         return match ((string) $type) {
+            'agreement_pdf' => 'Agreement DigiPro',
+            'contract_pdf' => 'Kontrak',
+            'contract_signed_pdf' => 'PDF Kontrak Ditandatangani',
             'doc_certs' => 'Sertifikat',
             'doc_pbb' => 'PBB',
             'doc_imb' => 'IMB/PBG',
+            'disclaimer_pdf' => 'Disclaimer DigiPro',
             'doc_old_report' => 'Laporan Lama',
+            'invoice_pdf' => 'Invoice Pembayaran',
             'npwp' => 'NPWP',
             'representative' => 'Surat Kuasa',
+            'representative_letter_pdf' => 'Surat Representatif DigiPro',
             'permission' => 'Surat Izin',
             default => $this->headlineOrDash((string) $type),
         };
+    }
+
+    private function resolveDocumentCollections(AppraisalRequest $record): array
+    {
+        $record->loadMissing([
+            'user:id,name,email',
+            'assets:id,appraisal_request_id,asset_type,address',
+            'assets.files:id,appraisal_asset_id,type,path,original_name,mime,size,created_at',
+            'files:id,appraisal_request_id,type,path,original_name,mime,size,created_at',
+            'payments:id,appraisal_request_id,amount,method,gateway,external_payment_id,status,paid_at,metadata,updated_at,created_at',
+        ]);
+
+        $fileResolver = app(AppraisalRevisionFileResolver::class);
+        $approvedRevisionItems = $fileResolver->approvedItemsForRequest($record);
+        $activeAssetFiles = $fileResolver->activeAssetFilesByRequest($record, $approvedRevisionItems);
+        $activeRequestFiles = $fileResolver->activeRequestFiles($record, $approvedRevisionItems);
+        $latestPayment = $record->payments->sortByDesc('id')->first();
+
+        $documents = $record->assets
+            ->flatMap(function ($asset) use ($activeAssetFiles) {
+                return collect($activeAssetFiles[$asset->id] ?? [])->map(function ($file) use ($asset) {
+                    return $this->mapStoredFilePayload($file, (int) $asset->id, (string) $asset->asset_type);
+                });
+            })
+            ->values()
+            ->all();
+
+        $requestFiles = $activeRequestFiles
+            ->map(fn ($file) => $this->mapStoredFilePayload($file))
+            ->values()
+            ->all();
+
+        $requestUploadDocuments = array_values(array_filter(
+            $requestFiles,
+            fn ($file) => in_array((string) $file['type'], $this->customerRequestFileTypes(), true)
+        ));
+
+        $assetSections = $record->assets
+            ->sortBy('id')
+            ->values()
+            ->map(function ($asset, $index) use ($documents): array {
+                $assetDocs = array_values(array_filter($documents, fn ($file) => (int) ($file['asset_id'] ?? 0) === (int) $asset->id));
+
+                return [
+                    'id' => $asset->id,
+                    'title' => 'Aset #' . ($index + 1) . ' - ' . ($this->assetTypeLegacyLabel($this->enumValue($asset->asset_type)) ?: 'Aset'),
+                    'address' => $asset->address ?: '-',
+                    'documents' => array_values(array_filter($assetDocs, fn ($file) => ! $this->isPhotoFileType($file['type'] ?? null))),
+                    'photos' => array_values(array_filter($assetDocs, fn ($file) => $this->isPhotoFileType($file['type'] ?? null))),
+                ];
+            })
+            ->all();
+
+        $systemDocuments = $this->buildSystemDocumentEntries($record, $requestFiles, $latestPayment);
+        $legalDocuments = array_values(array_filter(
+            $requestFiles,
+            fn ($file) => in_array((string) $file['type'], $this->legalFinalRequestFileTypes(), true)
+        ));
+        $billingDocuments = $this->buildBillingDocumentEntries($record, $latestPayment);
+
+        return [
+            'documents' => $documents,
+            'request_files' => $requestFiles,
+            'request_upload_documents' => $requestUploadDocuments,
+            'asset_sections' => $assetSections,
+            'system_documents' => $systemDocuments,
+            'legal_documents' => $legalDocuments,
+            'billing_documents' => $billingDocuments,
+            'first_asset_address' => $record->assets->sortBy('id')->first()?->address ?: '-',
+            'latest_payment' => $latestPayment,
+        ];
+    }
+
+    private function buildDocumentSummary(array $collections): array
+    {
+        $requestUploadsCount = count($collections['request_upload_documents'] ?? []);
+        $assetSections = collect($collections['asset_sections'] ?? []);
+        $assetDocumentsCount = $assetSections->sum(fn ($section) => count($section['documents'] ?? []));
+        $assetPhotosCount = $assetSections->sum(fn ($section) => count($section['photos'] ?? []));
+        $systemDocuments = $collections['system_documents'] ?? [];
+        $legalDocuments = $collections['legal_documents'] ?? [];
+        $billingDocuments = $collections['billing_documents'] ?? [];
+        $systemDocumentsCount = count($systemDocuments) + count($legalDocuments) + count($billingDocuments);
+
+        return [
+            'customer_documents_count' => $requestUploadsCount + $assetDocumentsCount,
+            'customer_photos_count' => $assetPhotosCount,
+            'system_documents_count' => $systemDocumentsCount,
+            'ready_contract' => collect($systemDocuments)->contains(fn ($item) => ($item['type'] ?? null) === 'contract_pdf'),
+            'ready_report' => collect($systemDocuments)->contains(fn ($item) => ($item['type'] ?? null) === 'report_pdf'),
+            'ready_invoice' => count($billingDocuments) > 0,
+            'ready_legal_documents' => count($legalDocuments) === count($this->legalFinalRequestFileTypes()),
+            'total_documents_count' => $requestUploadsCount + $assetDocumentsCount + $assetPhotosCount + $systemDocumentsCount,
+        ];
+    }
+
+    private function mapStoredFilePayload(object $file, ?int $assetId = null, ?string $assetType = null): array
+    {
+        $url = null;
+        if ($file->path && Storage::disk('public')->exists($file->path)) {
+            $url = Storage::disk('public')->url($file->path);
+        }
+
+        return [
+            'id' => $file->id,
+            'type' => (string) $file->type,
+            'label' => $this->contractDocumentTypeLabel($file->type),
+            'original_name' => $file->original_name ?: basename((string) $file->path),
+            'mime' => $file->mime,
+            'size' => (int) ($file->size ?? 0),
+            'created_at' => $file->created_at?->toDateTimeString(),
+            'url' => $url,
+            'path' => $file->path,
+            'asset_id' => $assetId,
+            'asset_type' => $assetType,
+        ];
+    }
+
+    private function buildSystemDocumentEntries(AppraisalRequest $record, array $requestFiles, mixed $latestPayment): array
+    {
+        $status = $record->status?->value ?? (string) $record->status;
+        $entries = [];
+        $signedContract = collect($requestFiles)->firstWhere('type', 'contract_signed_pdf');
+
+        if ($this->isContractAccessibleStatus($status)) {
+            $entries[] = [
+                'id' => 'contract-' . $record->id,
+                'type' => 'contract_pdf',
+                'label' => 'Kontrak',
+                'original_name' => $signedContract['original_name'] ?? ('Kontrak-' . ($record->request_number ?? $record->id) . '.pdf'),
+                'mime' => 'application/pdf',
+                'size' => (int) ($signedContract['size'] ?? 0),
+                'created_at' => $signedContract['created_at'] ?? optional($record->contract_date)->toDateString(),
+                'url' => route('appraisal.contract.pdf', ['id' => $record->id]),
+                'path' => $signedContract['path'] ?? null,
+                'asset_id' => null,
+                'asset_type' => null,
+            ];
+        }
+
+        if (
+            $record->report_generated_at
+            && $record->report_pdf_path
+            && Storage::disk('public')->exists($record->report_pdf_path)
+        ) {
+            $entries[] = [
+                'id' => 'report-' . $record->id,
+                'type' => 'report_pdf',
+                'label' => 'Laporan Penilaian',
+                'original_name' => basename((string) $record->report_pdf_path),
+                'mime' => 'application/pdf',
+                'size' => (int) ($record->report_pdf_size ?? 0),
+                'created_at' => optional($record->report_generated_at)->toDateTimeString(),
+                'url' => Storage::disk('public')->url($record->report_pdf_path),
+                'path' => $record->report_pdf_path,
+                'asset_id' => null,
+                'asset_type' => null,
+            ];
+        }
+
+        return $entries;
+    }
+
+    private function buildBillingDocumentEntries(AppraisalRequest $record, mixed $latestPayment): array
+    {
+        if (! $latestPayment || $latestPayment->status !== 'paid') {
+            return [];
+        }
+
+        $invoiceNumber = data_get($latestPayment->metadata, 'invoice_number');
+        if (! filled($invoiceNumber)) {
+            $invoiceNumber = 'INV-' . now()->format('Y') . '-' . str_pad((string) $latestPayment->id, 5, '0', STR_PAD_LEFT);
+        }
+
+        return [[
+            'id' => 'invoice-' . $record->id,
+            'type' => 'invoice_pdf',
+            'label' => 'Invoice Pembayaran',
+            'original_name' => $invoiceNumber . '.pdf',
+            'mime' => 'application/pdf',
+            'size' => 0,
+            'created_at' => optional($latestPayment->paid_at)->toDateTimeString(),
+            'url' => route('appraisal.invoice.pdf', ['id' => $record->id]),
+            'path' => null,
+            'asset_id' => null,
+            'asset_type' => null,
+        ]];
+    }
+
+    private function customerRequestFileTypes(): array
+    {
+        return ['npwp', 'representative', 'permission', 'other_request_document'];
+    }
+
+    private function legalFinalRequestFileTypes(): array
+    {
+        return ['agreement_pdf', 'disclaimer_pdf', 'representative_letter_pdf'];
+    }
+
+    private function isContractAccessibleStatus(string $status): bool
+    {
+        return in_array($status, [
+            AppraisalStatusEnum::WaitingSignature->value,
+            AppraisalStatusEnum::ContractSigned->value,
+            AppraisalStatusEnum::ValuationOnProgress->value,
+            AppraisalStatusEnum::ValuationCompleted->value,
+            AppraisalStatusEnum::PreviewReady->value,
+            AppraisalStatusEnum::ReportPreparation->value,
+            AppraisalStatusEnum::ReportReady->value,
+            AppraisalStatusEnum::Completed->value,
+        ], true);
+    }
+
+    private function buildPreviewStatePayload(AppraisalRequest $record): array
+    {
+        $snapshot = is_array($record->market_preview_snapshot) ? $record->market_preview_snapshot : null;
+        $assets = collect($snapshot['assets'] ?? [])->map(function (array $asset): array {
+            return [
+                'asset_id' => $asset['asset_id'] ?? null,
+                'asset_type' => $asset['asset_type'] ?? null,
+                'asset_type_label' => $asset['asset_type_label'] ?? $this->assetTypeLegacyLabel($asset['asset_type'] ?? null),
+                'address' => $asset['address'] ?? '-',
+                'land_area' => $asset['land_area'] ?? null,
+                'building_area' => $asset['building_area'] ?? null,
+                'estimated_value_low' => $asset['estimated_value_low'] ?? null,
+                'market_value_final' => $asset['market_value_final'] ?? null,
+                'estimated_value_high' => $asset['estimated_value_high'] ?? null,
+            ];
+        })->values()->all();
+
+        return [
+            'has_preview' => $snapshot !== null,
+            'status' => $record->status?->value ?? (string) $record->status,
+            'version' => (int) ($record->market_preview_version ?? ($snapshot['version'] ?? 0)),
+            'published_at' => optional($record->market_preview_published_at)->toDateTimeString()
+                ?: ($snapshot['published_at'] ?? null),
+            'approved_at' => optional($record->market_preview_approved_at)->toDateTimeString(),
+            'appeal_count' => (int) ($record->market_preview_appeal_count ?? 0),
+            'appeal_reason' => $record->market_preview_appeal_reason,
+            'appeal_submitted_at' => optional($record->market_preview_appeal_submitted_at)->toDateTimeString(),
+            'appeal_remaining' => max(0, 1 - (int) ($record->market_preview_appeal_count ?? 0)),
+            'summary' => [
+                'estimated_value_low' => $snapshot['summary']['estimated_value_low'] ?? null,
+                'market_value_final' => $snapshot['summary']['market_value_final'] ?? null,
+                'estimated_value_high' => $snapshot['summary']['estimated_value_high'] ?? null,
+                'assets_count' => $snapshot['summary']['assets_count'] ?? count($assets),
+            ],
+            'assets' => $assets,
+            'page_url' => $snapshot !== null
+                ? route('appraisal.market-preview.page', ['id' => $record->id])
+                : null,
+        ];
     }
 
     private function assetAreaBasisForContract(AppraisalAsset $asset): string
@@ -864,6 +1298,46 @@ class AppraisalService
                 'Laporan penilaian sudah tersedia untuk diunduh.',
                 $record->report_generated_at,
                 'success'
+            );
+        }
+
+        if ($record->market_preview_published_at) {
+            $append(
+                'market_preview_published',
+                'Preview Kajian Dipublikasikan',
+                'Customer dapat meninjau hasil kajian pasar dalam bentuk range sebelum laporan final disiapkan.',
+                $record->market_preview_published_at,
+                'info'
+            );
+        }
+
+        if ($record->market_preview_appeal_submitted_at) {
+            $append(
+                'market_preview_appeal',
+                'Banding Diajukan',
+                'Customer menggunakan kesempatan banding dan meminta reviewer memperbarui hasil preview.',
+                $record->market_preview_appeal_submitted_at,
+                'warning'
+            );
+        }
+
+        if ($record->market_preview_approved_at) {
+            $append(
+                'market_preview_approved',
+                'Preview Disetujui Customer',
+                'Customer menyetujui preview hasil kajian pasar dan request masuk ke tahap persiapan laporan final.',
+                $record->market_preview_approved_at,
+                'success'
+            );
+        }
+
+        if ($record->report_draft_generated_at) {
+            $append(
+                'report_preparation',
+                'Admin Menyiapkan Laporan Final',
+                'Draft laporan sudah disiapkan. Admin akan melengkapi QR/barcode P2PK/ELSA dan tanda tangan sebelum upload final.',
+                $record->report_draft_generated_at,
+                'info'
             );
         }
 

@@ -50,6 +50,11 @@ export const statusToneClass = (statusValue) => {
       return 'bg-sky-100 text-sky-900 border-sky-300';
     case 'valuation_completed':
       return 'bg-emerald-100 text-emerald-900 border-emerald-300';
+    case 'preview_ready':
+      return 'bg-fuchsia-100 text-fuchsia-900 border-fuchsia-300';
+    case 'report_preparation':
+    case 'report_ready':
+      return 'bg-cyan-100 text-cyan-900 border-cyan-300';
     case 'completed':
       return 'bg-emerald-100 text-emerald-900 border-emerald-300';
     case 'cancelled':

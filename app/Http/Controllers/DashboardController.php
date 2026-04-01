@@ -30,6 +30,8 @@ class DashboardController extends Controller
             AppraisalStatusEnum::WaitingSignature,
             AppraisalStatusEnum::ContractSigned,
             AppraisalStatusEnum::ValuationOnProgress,
+            AppraisalStatusEnum::PreviewReady,
+            AppraisalStatusEnum::ReportPreparation,
         ];
 
         $inProgress = AppraisalRequest::where('user_id', $user->id)
@@ -85,6 +87,8 @@ class DashboardController extends Controller
             AppraisalStatusEnum::Cancelled => 'danger',
             AppraisalStatusEnum::ValuationOnProgress,
             AppraisalStatusEnum::ValuationCompleted,
+            AppraisalStatusEnum::PreviewReady,
+            AppraisalStatusEnum::ReportPreparation,
             AppraisalStatusEnum::ReportReady => 'warning',
             AppraisalStatusEnum::Verified,
             AppraisalStatusEnum::WaitingOffer,

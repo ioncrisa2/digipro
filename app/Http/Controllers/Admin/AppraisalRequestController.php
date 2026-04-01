@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\AppraisalStatusEnum;
 use App\Enums\ContractStatusEnum;
 use App\Enums\ReportTypeEnum;
+use App\Enums\ValuationObjectiveEnum;
 use App\Http\Controllers\Admin\Concerns\InteractsWithAppraisalRequests;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateAppraisalRequestBasicRequest;
@@ -114,6 +115,9 @@ class AppraisalRequestController extends Controller
                 'id' => $appraisalRequest->id,
                 'request_number' => $appraisalRequest->request_number ?? ('REQ-' . $appraisalRequest->id),
                 'purpose_label' => $appraisalRequest->purpose?->label() ?? '-',
+                'valuation_objective_label' => $appraisalRequest->valuation_objective instanceof ValuationObjectiveEnum
+                    ? $appraisalRequest->valuation_objective->label()
+                    : '-',
                 'status_label' => $appraisalRequest->status?->label() ?? '-',
                 'status_value' => $appraisalRequest->status?->value ?? null,
                 'contract_status_label' => $appraisalRequest->contract_status?->label() ?? '-',
@@ -122,6 +126,9 @@ class AppraisalRequestController extends Controller
                 'requested_at' => $appraisalRequest->requested_at?->toIso8601String(),
                 'verified_at' => $appraisalRequest->verified_at?->toIso8601String(),
                 'client_name' => $appraisalRequest->client_name ?: '-',
+                'sertifikat_on_hand_confirmed' => (bool) $appraisalRequest->sertifikat_on_hand_confirmed,
+                'certificate_not_encumbered_confirmed' => (bool) $appraisalRequest->certificate_not_encumbered_confirmed,
+                'certificate_statements_accepted_at' => $appraisalRequest->certificate_statements_accepted_at?->toIso8601String(),
                 'contract_number' => $appraisalRequest->contract_number ?: '-',
                 'contract_date' => $appraisalRequest->contract_date?->toIso8601String(),
                 'valuation_duration_days' => $appraisalRequest->valuation_duration_days,
@@ -132,6 +139,42 @@ class AppraisalRequestController extends Controller
                 'notes' => $appraisalRequest->notes,
                 'user_request_note' => $appraisalRequest->user_request_note,
                 'guideline_set' => $appraisalRequest->guidelineSet?->name ?? '-',
+            ],
+            'marketPreview' => [
+                'version' => (int) ($appraisalRequest->market_preview_version ?? 0),
+                'published_at' => $appraisalRequest->market_preview_published_at?->toIso8601String(),
+                'approved_at' => $appraisalRequest->market_preview_approved_at?->toIso8601String(),
+                'appeal_count' => (int) ($appraisalRequest->market_preview_appeal_count ?? 0),
+                'appeal_reason' => $appraisalRequest->market_preview_appeal_reason,
+                'appeal_submitted_at' => $appraisalRequest->market_preview_appeal_submitted_at?->toIso8601String(),
+                'summary' => [
+                    'estimated_value_low' => data_get($appraisalRequest->market_preview_snapshot, 'summary.estimated_value_low'),
+                    'market_value_final' => data_get($appraisalRequest->market_preview_snapshot, 'summary.market_value_final'),
+                    'estimated_value_high' => data_get($appraisalRequest->market_preview_snapshot, 'summary.estimated_value_high'),
+                    'assets_count' => data_get($appraisalRequest->market_preview_snapshot, 'summary.assets_count'),
+                ],
+                'assets' => collect(data_get($appraisalRequest->market_preview_snapshot, 'assets', []))
+                    ->map(fn (array $asset) => [
+                        'asset_id' => $asset['asset_id'] ?? null,
+                        'asset_type_label' => $asset['asset_type_label'] ?? ($asset['asset_type'] ?? '-'),
+                        'address' => $asset['address'] ?? '-',
+                        'estimated_value_low' => $asset['estimated_value_low'] ?? null,
+                        'market_value_final' => $asset['market_value_final'] ?? null,
+                        'estimated_value_high' => $asset['estimated_value_high'] ?? null,
+                    ])
+                    ->values()
+                    ->all(),
+            ],
+            'reportPreparation' => [
+                'status' => $appraisalRequest->status?->value ?? null,
+                'draft_available' => filled($appraisalRequest->report_draft_pdf_path),
+                'draft_generated_at' => $appraisalRequest->report_draft_generated_at?->toIso8601String(),
+                'draft_download_url' => ($appraisalRequest->status?->value ?? null) === AppraisalStatusEnum::ReportPreparation->value
+                    ? route('admin.appraisal-requests.actions.report-draft', $appraisalRequest)
+                    : null,
+                'final_upload_url' => ($appraisalRequest->status?->value ?? null) === AppraisalStatusEnum::ReportPreparation->value
+                    ? route('admin.appraisal-requests.actions.report-final', $appraisalRequest)
+                    : null,
             ],
             'requester' => [
                 'id' => $appraisalRequest->user?->id,
