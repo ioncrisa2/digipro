@@ -170,7 +170,7 @@ export function useAppraisalRequestShow(props) {
       preview_ready: "Preview",
       report_preparation: "Finalisasi",
       report_ready: "Laporan",
-      completed: "Completed",
+      completed: "Selesai",
     };
 
     const idx = currentStepIndex.value;

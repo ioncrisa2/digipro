@@ -248,6 +248,14 @@ class SystemNavigation
                         'requiredPermission' => self::MANAGE_ADMIN_MASTER_DATA_USERS,
                     ],
                     [
+                        'key' => 'admin.master-data.report-signers',
+                        'label' => 'Penandatangan Report',
+                        'icon' => 'FileText',
+                        'routeName' => 'admin.master-data.report-signers.index',
+                        'activePatterns' => ['admin.master-data.report-signers.*'],
+                        'pathPrefixes' => ['/admin/master-data/penandatangan-report'],
+                    ],
+                    [
                         'key' => 'admin.master-data.provinces',
                         'label' => 'Provinsi',
                         'icon' => 'Map',
@@ -573,9 +581,9 @@ class SystemNavigation
                 'key' => 'master-data',
                 'surface' => 'shared',
                 'label' => 'Master Data',
-                'description' => 'Data lokasi untuk provinsi sampai kelurahan/desa.',
+                'description' => 'Data lokasi dan master profile penandatangan report.',
                 'permission' => self::MANAGE_ADMIN_MASTER_DATA,
-                'items' => ['Provinsi', 'Kabupaten/Kota', 'Kecamatan', 'Kelurahan/Desa'],
+                'items' => ['Penandatangan Report', 'Provinsi', 'Kabupaten/Kota', 'Kecamatan', 'Kelurahan/Desa'],
             ],
             [
                 'key' => 'master-data-users',

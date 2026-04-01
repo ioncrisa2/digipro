@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\Concerns\InteractsWithAppraisalRequests;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateAppraisalRequestBasicRequest;
 use App\Models\AppraisalRequest;
+use App\Models\ReportSigner;
 use App\Services\Admin\AppraisalContractNumberService;
 use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
@@ -87,6 +88,8 @@ class AppraisalRequestController extends Controller
         $appraisalRequest->load([
             'guidelineSet',
             'user',
+            'reportReviewerSigner',
+            'reportPublicAppraiserSigner',
             'files',
             'assets.files',
             'payments' => fn ($query) => $query->latest('id'),
@@ -149,7 +152,6 @@ class AppraisalRequestController extends Controller
                 'appeal_submitted_at' => $appraisalRequest->market_preview_appeal_submitted_at?->toIso8601String(),
                 'summary' => [
                     'estimated_value_low' => data_get($appraisalRequest->market_preview_snapshot, 'summary.estimated_value_low'),
-                    'market_value_final' => data_get($appraisalRequest->market_preview_snapshot, 'summary.market_value_final'),
                     'estimated_value_high' => data_get($appraisalRequest->market_preview_snapshot, 'summary.estimated_value_high'),
                     'assets_count' => data_get($appraisalRequest->market_preview_snapshot, 'summary.assets_count'),
                 ],
@@ -159,7 +161,6 @@ class AppraisalRequestController extends Controller
                         'asset_type_label' => $asset['asset_type_label'] ?? ($asset['asset_type'] ?? '-'),
                         'address' => $asset['address'] ?? '-',
                         'estimated_value_low' => $asset['estimated_value_low'] ?? null,
-                        'market_value_final' => $asset['market_value_final'] ?? null,
                         'estimated_value_high' => $asset['estimated_value_high'] ?? null,
                     ])
                     ->values()
@@ -169,12 +170,51 @@ class AppraisalRequestController extends Controller
                 'status' => $appraisalRequest->status?->value ?? null,
                 'draft_available' => filled($appraisalRequest->report_draft_pdf_path),
                 'draft_generated_at' => $appraisalRequest->report_draft_generated_at?->toIso8601String(),
+                'configuration_url' => ($appraisalRequest->status?->value ?? null) === AppraisalStatusEnum::ReportPreparation->value
+                    ? route('admin.appraisal-requests.actions.report-configuration', $appraisalRequest)
+                    : null,
                 'draft_download_url' => ($appraisalRequest->status?->value ?? null) === AppraisalStatusEnum::ReportPreparation->value
                     ? route('admin.appraisal-requests.actions.report-draft', $appraisalRequest)
                     : null,
                 'final_upload_url' => ($appraisalRequest->status?->value ?? null) === AppraisalStatusEnum::ReportPreparation->value
                     ? route('admin.appraisal-requests.actions.report-final', $appraisalRequest)
                     : null,
+                'valuation_date' => $appraisalRequest->market_preview_published_at?->toDateString(),
+                'selected_review_signer_id' => $appraisalRequest->report_reviewer_signer_id,
+                'selected_public_appraiser_signer_id' => $appraisalRequest->report_public_appraiser_signer_id,
+                'signer_snapshot' => $appraisalRequest->report_signer_snapshot,
+                'signer_options' => [
+                    'reviewers' => ReportSigner::query()
+                        ->where('role', 'reviewer')
+                        ->where('is_active', true)
+                        ->orderBy('name')
+                        ->get(['id', 'name', 'position_title', 'title_suffix', 'certification_number'])
+                        ->map(fn (ReportSigner $signer) => [
+                            'value' => $signer->id,
+                            'label' => $signer->name,
+                            'description' => implode(' · ', array_filter([
+                                $signer->position_title,
+                                $signer->certification_number,
+                            ])),
+                        ])
+                        ->values()
+                        ->all(),
+                    'public_appraisers' => ReportSigner::query()
+                        ->where('role', 'public_appraiser')
+                        ->where('is_active', true)
+                        ->orderBy('name')
+                        ->get(['id', 'name', 'position_title', 'title_suffix', 'certification_number'])
+                        ->map(fn (ReportSigner $signer) => [
+                            'value' => $signer->id,
+                            'label' => $signer->name,
+                            'description' => implode(' · ', array_filter([
+                                $signer->position_title,
+                                $signer->certification_number,
+                            ])),
+                        ])
+                        ->values()
+                        ->all(),
+                ],
             ],
             'requester' => [
                 'id' => $appraisalRequest->user?->id,

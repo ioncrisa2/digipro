@@ -31,6 +31,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { formatArea, formatCurrency, formatDateTime, formatNumber } from '@/utils/reviewer';
 
 const ReviewerFilePreview = defineAsyncComponent(() => import('@/components/reviewer/ReviewerFilePreview.vue'));
@@ -101,8 +108,17 @@ const props = defineProps({
       status: null,
       draft_available: false,
       draft_generated_at: null,
+      configuration_url: null,
       draft_download_url: null,
       final_upload_url: null,
+      valuation_date: null,
+      selected_review_signer_id: null,
+      selected_public_appraiser_signer_id: null,
+      signer_snapshot: null,
+      signer_options: {
+        reviewers: [],
+        public_appraisers: [],
+      },
     }),
   },
   approveLatestNegotiationAction: {
@@ -154,6 +170,10 @@ const offerForm = useForm({
 });
 const finalReportForm = useForm({
   report_pdf: null,
+});
+const reportConfigForm = useForm({
+  report_reviewer_signer_id: props.reportPreparation?.selected_review_signer_id ? String(props.reportPreparation.selected_review_signer_id) : '',
+  report_public_appraiser_signer_id: props.reportPreparation?.selected_public_appraiser_signer_id ? String(props.reportPreparation.selected_public_appraiser_signer_id) : '',
 });
 
 const negotiationFilters = reactive({
@@ -380,6 +400,24 @@ const submitFinalReport = () => {
   });
 };
 
+const submitReportConfiguration = () => {
+  if (!reportPreparation.value?.configuration_url) {
+    return;
+  }
+
+  reportConfigForm.post(reportPreparation.value.configuration_url, {
+    preserveScroll: true,
+  });
+};
+
+const downloadReportDraft = () => {
+  if (!reportPreparation.value?.draft_download_url) {
+    return;
+  }
+
+  window.location.assign(reportPreparation.value.draft_download_url);
+};
+
 const approveLatestNegotiation = () => {
   if (!approveLatestNegotiationAction.value?.url) {
     return;
@@ -435,6 +473,14 @@ const showContractTab = computed(() => {
   return record.value?.contract_status_value === 'signed'
     || contractFiles.value.length > 0
     || Boolean(record.value?.contract_number && record.value.contract_number !== '-');
+});
+const showReportTab = computed(() => {
+  return [
+    'preview_ready',
+    'report_preparation',
+    'report_ready',
+    'completed',
+  ].includes(record.value?.status_value) || Boolean(reportPreparation.value?.draft_available);
 });
 
 const filteredNegotiations = computed(() => {
@@ -662,6 +708,7 @@ const submitRevisionItem = () => {
           <Button type="button" :variant="activeTab === 'negosiasi' ? 'default' : 'ghost'" @click="activeTab = 'negosiasi'">Negosiasi</Button>
           <Button v-if="showContractTab" type="button" :variant="activeTab === 'kontrak' ? 'default' : 'ghost'" @click="activeTab = 'kontrak'">Kontrak</Button>
           <Button type="button" :variant="activeTab === 'pembayaran' ? 'default' : 'ghost'" @click="activeTab = 'pembayaran'">Pembayaran</Button>
+          <Button v-if="showReportTab" type="button" :variant="activeTab === 'laporan' ? 'default' : 'ghost'" @click="activeTab = 'laporan'">Laporan</Button>
         </div>
       </section>
 
@@ -754,14 +801,10 @@ const submitRevisionItem = () => {
               <CardDescription>Snapshot preview yang sedang atau terakhir ditinjau customer sebelum laporan final diupload.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-4">
-              <div class="grid gap-3 md:grid-cols-3">
+              <div class="grid gap-3 md:grid-cols-2">
                 <div class="rounded-2xl border p-4">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Estimasi Bawah</p>
                   <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(marketPreview.summary?.estimated_value_low) }}</p>
-                </div>
-                <div class="rounded-2xl border p-4">
-                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Tengah</p>
-                  <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(marketPreview.summary?.market_value_final) }}</p>
                 </div>
                 <div class="rounded-2xl border p-4">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Estimasi Atas</p>
@@ -802,14 +845,13 @@ const submitRevisionItem = () => {
                   <div
                     v-for="asset in marketPreview.assets"
                     :key="asset.asset_id"
-                    class="grid gap-3 px-4 py-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]"
+                    class="grid gap-3 px-4 py-3 lg:grid-cols-[1.6fr_1fr_1fr]"
                   >
                     <div>
                       <p class="font-medium text-slate-950">{{ asset.asset_type_label }}</p>
                       <p class="text-xs text-slate-500">{{ asset.address }}</p>
                     </div>
                     <div class="text-sm text-slate-700">{{ formatCurrency(asset.estimated_value_low) }}</div>
-                    <div class="text-sm text-slate-700">{{ formatCurrency(asset.market_value_final) }}</div>
                     <div class="text-sm text-slate-700">{{ formatCurrency(asset.estimated_value_high) }}</div>
                   </div>
                 </div>
@@ -1587,17 +1629,77 @@ const submitRevisionItem = () => {
             </CardContent>
           </Card>
 
-          <Card v-if="activeTab === 'pembayaran' && (record.status_value === 'report_preparation' || reportPreparation.draft_available)">
+          <Card v-if="activeTab === 'laporan' && (record.status_value === 'report_preparation' || reportPreparation.draft_available)">
             <CardHeader>
               <CardTitle>Persiapan Laporan Final</CardTitle>
-              <CardDescription>Admin download draft, lengkapi barcode/QR dan tanda tangan di luar sistem, lalu upload PDF final.</CardDescription>
+              <CardDescription>Atur signer report, download draft DigiPro, lalu upload PDF final yang sudah diproses di luar sistem.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-4">
               <div class="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900">
-                Draft report hanya untuk kebutuhan internal admin. Customer baru mendapat akses ketika PDF final sudah diupload dan status berubah ke laporan siap.
+                Draft report hanya untuk kebutuhan internal admin. Customer baru mendapat akses ketika PDF final sudah diupload dan request berubah ke status selesai.
               </div>
 
-              <div class="grid gap-4 md:grid-cols-2">
+              <div class="grid gap-4 xl:grid-cols-3">
+                <div class="rounded-2xl border p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Konfigurasi Report</p>
+                  <p class="mt-2 text-sm text-slate-700">
+                    Pilih reviewer dan penilai publik yang akan tampil pada blok otorisasi draft report.
+                  </p>
+                  <p class="mt-3 text-xs text-slate-500">
+                    Tanggal penilaian: {{ formatDateTime(reportPreparation.valuation_date) }}
+                  </p>
+                  <div class="mt-4 space-y-3">
+                    <div class="space-y-2">
+                      <Label for="report_reviewer_signer_id">Reviewer</Label>
+                      <Select v-model="reportConfigForm.report_reviewer_signer_id">
+                        <SelectTrigger id="report_reviewer_signer_id">
+                          <SelectValue placeholder="Pilih reviewer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem
+                            v-for="option in reportPreparation.signer_options?.reviewers || []"
+                            :key="option.value"
+                            :value="String(option.value)"
+                          >
+                            {{ option.label }}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p v-if="reportConfigForm.errors.report_reviewer_signer_id" class="text-xs text-rose-600">
+                        {{ reportConfigForm.errors.report_reviewer_signer_id }}
+                      </p>
+                    </div>
+
+                    <div class="space-y-2">
+                      <Label for="report_public_appraiser_signer_id">Penilai Publik</Label>
+                      <Select v-model="reportConfigForm.report_public_appraiser_signer_id">
+                        <SelectTrigger id="report_public_appraiser_signer_id">
+                          <SelectValue placeholder="Pilih penilai publik" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem
+                            v-for="option in reportPreparation.signer_options?.public_appraisers || []"
+                            :key="option.value"
+                            :value="String(option.value)"
+                          >
+                            {{ option.label }}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p v-if="reportConfigForm.errors.report_public_appraiser_signer_id" class="text-xs text-rose-600">
+                        {{ reportConfigForm.errors.report_public_appraiser_signer_id }}
+                      </p>
+                    </div>
+
+                    <Button
+                      :disabled="reportConfigForm.processing || !reportPreparation.configuration_url"
+                      @click="submitReportConfiguration"
+                    >
+                      Simpan Konfigurasi Report
+                    </Button>
+                  </div>
+                </div>
+
                 <div class="rounded-2xl border p-4">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Draft Laporan</p>
                   <p class="mt-2 text-sm text-slate-700">
@@ -1606,12 +1708,14 @@ const submitRevisionItem = () => {
                   <p class="mt-2 text-xs text-slate-500">
                     Dibuat: {{ formatDateTime(reportPreparation.draft_generated_at) }}
                   </p>
+                  <div v-if="reportPreparation.signer_snapshot" class="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+                    <p>Reviewer: {{ reportPreparation.signer_snapshot?.reviewer?.name || '-' }}</p>
+                    <p class="mt-1">Penilai Publik: {{ reportPreparation.signer_snapshot?.public_appraiser?.name || '-' }}</p>
+                  </div>
                   <div v-if="reportPreparation.draft_download_url" class="mt-4">
-                    <Button as-child>
-                      <a :href="reportPreparation.draft_download_url">
-                        <Download class="mr-2 h-4 w-4" />
-                        Download Draft Report
-                      </a>
+                    <Button type="button" @click="downloadReportDraft">
+                      <Download class="mr-2 h-4 w-4" />
+                      Download Draft Report
                     </Button>
                   </div>
                 </div>
@@ -1623,11 +1727,14 @@ const submitRevisionItem = () => {
                   </p>
                   <div class="mt-4 space-y-3">
                     <Input type="file" accept="application/pdf" @change="onFinalReportSelected" />
+                    <p v-if="!reportPreparation.signer_snapshot" class="text-xs text-amber-700">
+                      Simpan konfigurasi signer report terlebih dahulu sebelum upload final.
+                    </p>
                     <p v-if="finalReportForm.errors.report_pdf" class="text-sm text-rose-600">
                       {{ finalReportForm.errors.report_pdf }}
                     </p>
                     <Button
-                      :disabled="finalReportForm.processing || !finalReportForm.report_pdf || !reportPreparation.final_upload_url"
+                      :disabled="finalReportForm.processing || !finalReportForm.report_pdf || !reportPreparation.final_upload_url || !reportPreparation.signer_snapshot"
                       @click="submitFinalReport"
                     >
                       Upload Laporan Final

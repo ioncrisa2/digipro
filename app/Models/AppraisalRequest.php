@@ -62,6 +62,9 @@ class AppraisalRequest extends Model
         'report_delivery_recipient_phone',
         'report_generated_at',
         'report_generated_by',
+        'report_reviewer_signer_id',
+        'report_public_appraiser_signer_id',
+        'report_signer_snapshot',
         'report_draft_generated_at',
         'report_draft_pdf_path',
         'report_draft_pdf_size',
@@ -107,6 +110,7 @@ class AppraisalRequest extends Model
         'market_preview_appeal_count'   => 'integer',
         'market_preview_appeal_submitted_at' => 'datetime',
         'report_generated_at'           => 'datetime',
+        'report_signer_snapshot'        => 'array',
         'report_draft_generated_at'     => 'datetime',
         'physical_report_printed_at'    => 'datetime',
         'physical_report_shipped_at'    => 'datetime',
@@ -167,6 +171,16 @@ class AppraisalRequest extends Model
     public function reportGeneratedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'report_generated_by');
+    }
+
+    public function reportReviewerSigner(): BelongsTo
+    {
+        return $this->belongsTo(ReportSigner::class, 'report_reviewer_signer_id');
+    }
+
+    public function reportPublicAppraiserSigner(): BelongsTo
+    {
+        return $this->belongsTo(ReportSigner::class, 'report_public_appraiser_signer_id');
     }
 
     public function physicalReportPrintedBy(): BelongsTo

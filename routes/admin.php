@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\IkkByProvinceController;
 use App\Http\Controllers\Admin\MasterDataController;
+use App\Http\Controllers\Admin\ReportSignerController;
 use App\Http\Controllers\Admin\ReferenceGuideDataController;
 use App\Http\Controllers\Admin\ReferenceGuideSettingsController;
 use App\Support\SystemNavigation;
@@ -40,6 +41,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::post('/{appraisalRequest}/send-offer', [AppraisalRequestWorkflowController::class, 'sendOffer'])->name('actions.send-offer');
                 Route::post('/{appraisalRequest}/approve-latest-negotiation', [AppraisalRequestWorkflowController::class, 'approveLatestNegotiation'])->name('actions.approve-latest-negotiation');
                 Route::get('/{appraisalRequest}/report-draft', [AppraisalRequestWorkflowController::class, 'downloadReportDraft'])->name('actions.report-draft');
+                Route::post('/{appraisalRequest}/report-configuration', [AppraisalRequestWorkflowController::class, 'saveReportConfiguration'])->name('actions.report-configuration');
                 Route::post('/{appraisalRequest}/report-final', [AppraisalRequestWorkflowController::class, 'uploadFinalReport'])->name('actions.report-final');
             });
 
@@ -152,6 +154,13 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                         Route::put('/users/{user}', [MasterDataController::class, 'usersUpdate'])->name('users.update');
                         Route::delete('/users/{user}', [MasterDataController::class, 'usersDestroy'])->name('users.destroy');
                     });
+
+                Route::get('/penandatangan-report', [ReportSignerController::class, 'index'])->name('report-signers.index');
+                Route::get('/penandatangan-report/buat', [ReportSignerController::class, 'create'])->name('report-signers.create');
+                Route::post('/penandatangan-report', [ReportSignerController::class, 'store'])->name('report-signers.store');
+                Route::get('/penandatangan-report/{reportSigner}/edit', [ReportSignerController::class, 'edit'])->name('report-signers.edit');
+                Route::put('/penandatangan-report/{reportSigner}', [ReportSignerController::class, 'update'])->name('report-signers.update');
+                Route::delete('/penandatangan-report/{reportSigner}', [ReportSignerController::class, 'destroy'])->name('report-signers.destroy');
 
                 Route::get('/provinsi', [MasterDataController::class, 'provincesIndex'])->name('provinces.index');
                 Route::get('/provinsi/buat', [MasterDataController::class, 'provincesCreate'])->name('provinces.create');

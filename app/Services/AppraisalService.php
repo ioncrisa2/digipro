@@ -964,7 +964,7 @@ class AppraisalService
             $entries[] = [
                 'id' => 'report-' . $record->id,
                 'type' => 'report_pdf',
-                'label' => 'Laporan Penilaian',
+                'label' => 'Laporan Kajian Pasar',
                 'original_name' => basename((string) $record->report_pdf_path),
                 'mime' => 'application/pdf',
                 'size' => (int) ($record->report_pdf_size ?? 0),
@@ -1295,7 +1295,7 @@ class AppraisalService
             $append(
                 'report_ready',
                 'Laporan Siap',
-                'Laporan penilaian sudah tersedia untuk diunduh.',
+                'Laporan kajian pasar sudah tersedia untuk diunduh.',
                 $record->report_generated_at,
                 'success'
             );

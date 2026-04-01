@@ -11,6 +11,12 @@ use RuntimeException;
 
 class AppraisalReportPdfService
 {
+    public function __construct(
+        private readonly AppraisalReportPayloadBuilder $payloadBuilder,
+        private readonly AppraisalFinalDocumentService $finalDocumentService
+    ) {
+    }
+
     public function generateDraft(AppraisalRequest $record): void
     {
         $snapshot = $record->market_preview_snapshot;
@@ -20,17 +26,10 @@ class AppraisalReportPdfService
         }
 
         $record->loadMissing(['user:id,name,email']);
+        $reportPayload = $this->payloadBuilder->build($record);
 
         $pdfBinary = Pdf::loadView('pdfs.appraisal-market-report-draft', [
-            'report' => [
-                'request_number' => $record->request_number ?? ('REQ-' . $record->id),
-                'client_name' => $record->client_name ?: ($record->user?->name ?? '-'),
-                'contract_number' => $record->contract_number ?: '-',
-                'generated_at' => now()->toDateTimeString(),
-                'preview_version' => (int) ($record->market_preview_version ?? 1),
-                'summary' => $snapshot['summary'] ?? [],
-                'assets' => $snapshot['assets'] ?? [],
-            ],
+            'report' => $reportPayload,
         ])
             ->setPaper('a4', 'portrait')
             ->output();
@@ -67,6 +66,11 @@ class AppraisalReportPdfService
             throw new RuntimeException('Laporan final hanya bisa diupload saat status sedang disiapkan admin.');
         }
 
+        $signerSnapshot = is_array($record->report_signer_snapshot) ? $record->report_signer_snapshot : [];
+        if (blank(data_get($signerSnapshot, 'reviewer.name')) || blank(data_get($signerSnapshot, 'public_appraiser.name'))) {
+            throw new RuntimeException('Pilih reviewer dan penilai publik report terlebih dahulu sebelum upload PDF final.');
+        }
+
         if ($record->report_pdf_path && Storage::disk('public')->exists($record->report_pdf_path)) {
             Storage::disk('public')->delete($record->report_pdf_path);
         }
@@ -76,12 +80,16 @@ class AppraisalReportPdfService
         $storedName = "final-report-{$requestNumber}-" . now()->format('YmdHis') . ".{$extension}";
         $storedPath = $file->storeAs("appraisal-requests/{$record->id}/reports/final", $storedName, 'public');
 
+        $this->finalDocumentService->generateAfterPayment(
+            $record->fresh(['payments', 'offerNegotiations.user', 'files', 'user', 'assets'])
+        );
+
         $record->update([
             'report_generated_at' => now(),
             'report_generated_by' => $actorId,
             'report_pdf_path' => $storedPath,
             'report_pdf_size' => $file->getSize(),
-            'status' => AppraisalStatusEnum::ReportReady,
+            'status' => AppraisalStatusEnum::Completed,
         ]);
     }
 

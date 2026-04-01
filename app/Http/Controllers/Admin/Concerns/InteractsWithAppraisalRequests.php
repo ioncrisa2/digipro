@@ -15,6 +15,7 @@ use App\Support\AppraisalAssetFieldOptions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 
 trait InteractsWithAppraisalRequests
@@ -49,7 +50,7 @@ trait InteractsWithAppraisalRequests
             'contract_sign_mock' => 'Tanda tangan kontrak',
             'cancel_request' => 'Permohonan dibatalkan',
             'cancelled' => 'Negosiasi dibatalkan',
-            default => Arr::headline((string) $action),
+            default => Str::headline((string) $action),
         };
     }
 
@@ -113,6 +114,12 @@ trait InteractsWithAppraisalRequests
             'peruntukan' => $asset->peruntukan,
             'peruntukan_label' => $this->assetOptionLabel('usage', $asset->peruntukan),
             'title_document_label' => $this->assetOptionLabel('title_document', $asset->title_document),
+            'certificate_number' => $asset->certificate_number,
+            'certificate_holder_name' => $asset->certificate_holder_name,
+            'certificate_issued_at' => optional($asset->certificate_issued_at)?->toDateString(),
+            'land_book_date' => optional($asset->land_book_date)?->toDateString(),
+            'document_land_area' => $asset->document_land_area,
+            'legal_notes' => $asset->legal_notes,
             'land_shape_label' => $this->assetOptionLabel('land_shape', $asset->land_shape),
             'land_position_label' => $this->assetOptionLabel('land_position', $asset->land_position),
             'land_condition_label' => $this->assetOptionLabel('land_condition', $asset->land_condition),
@@ -194,12 +201,12 @@ trait InteractsWithAppraisalRequests
             'request_file' => 'Dokumen Request',
             'asset_document' => 'Dokumen Aset',
             'asset_photo' => 'Foto Aset',
-            default => Arr::headline((string) $item->item_type),
+            default => Str::headline((string) $item->item_type),
         };
         $targetLabel = $scopeLabel . ': ' . match ((string) $item->item_type) {
             'request_file' => $this->requestFileTypeLabel($item->requested_file_type),
             'asset_document', 'asset_photo' => $this->assetFileTypeLabel($item->requested_file_type),
-            default => Arr::headline((string) $item->requested_file_type),
+            default => Str::headline((string) $item->requested_file_type),
         };
 
         if ($assetOrder !== null) {
@@ -290,7 +297,7 @@ trait InteractsWithAppraisalRequests
             default => [],
         };
 
-        return $options[$value] ?? Arr::headline($value);
+        return $options[$value] ?? Str::headline($value);
     }
 
     private function requestFileTypeLabel(?string $type): string
@@ -304,7 +311,7 @@ trait InteractsWithAppraisalRequests
             'representative_letter_pdf' => 'Surat Representatif DigiPro',
             'permission' => 'Surat Izin',
             'other_request_document' => 'Lampiran Request',
-            default => Arr::headline((string) $type),
+            default => Str::headline((string) $type),
         };
     }
 
@@ -317,7 +324,7 @@ trait InteractsWithAppraisalRequests
             'photo_access_road' => 'Foto Akses Jalan',
             'photo_front' => 'Foto Depan',
             'photo_interior' => 'Foto Dalam',
-            default => Arr::headline((string) $type),
+            default => Str::headline((string) $type),
         };
     }
 
@@ -328,7 +335,7 @@ trait InteractsWithAppraisalRequests
             'submitted' => 'Dikirim Ulang Customer',
             'reviewed' => 'Selesai Direview',
             'cancelled' => 'Dibatalkan',
-            default => Arr::headline((string) $status),
+            default => Str::headline((string) $status),
         };
     }
 
@@ -339,7 +346,7 @@ trait InteractsWithAppraisalRequests
             'reuploaded' => 'Sudah Upload Ulang',
             'approved' => 'Disetujui',
             'rejected' => 'Perlu Revisi Lagi',
-            default => Arr::headline((string) $status),
+            default => Str::headline((string) $status),
         };
     }
 
@@ -411,6 +418,12 @@ trait InteractsWithAppraisalRequests
             'asset_type' => $asset?->asset_type,
             'peruntukan' => $asset?->peruntukan,
             'title_document' => $asset?->title_document,
+            'certificate_number' => $asset?->certificate_number,
+            'certificate_holder_name' => $asset?->certificate_holder_name,
+            'certificate_issued_at' => $asset?->certificate_issued_at?->toDateString(),
+            'land_book_date' => $asset?->land_book_date?->toDateString(),
+            'document_land_area' => $asset?->document_land_area,
+            'legal_notes' => $asset?->legal_notes,
             'land_shape' => $asset?->land_shape,
             'land_position' => $asset?->land_position,
             'land_condition' => $asset?->land_condition,
@@ -440,6 +453,12 @@ trait InteractsWithAppraisalRequests
             'asset_type' => $validated['asset_type'],
             'peruntukan' => $this->blankToNull($validated['peruntukan'] ?? null),
             'title_document' => $this->blankToNull($validated['title_document'] ?? null),
+            'certificate_number' => $this->blankToNull($validated['certificate_number'] ?? null),
+            'certificate_holder_name' => $this->blankToNull($validated['certificate_holder_name'] ?? null),
+            'certificate_issued_at' => $this->blankToNull($validated['certificate_issued_at'] ?? null),
+            'land_book_date' => $this->blankToNull($validated['land_book_date'] ?? null),
+            'document_land_area' => $this->blankToNull($validated['document_land_area'] ?? null),
+            'legal_notes' => $this->blankToNull($validated['legal_notes'] ?? null),
             'land_shape' => $this->blankToNull($validated['land_shape'] ?? null),
             'land_position' => $this->blankToNull($validated['land_position'] ?? null),
             'land_condition' => $this->blankToNull($validated['land_condition'] ?? null),

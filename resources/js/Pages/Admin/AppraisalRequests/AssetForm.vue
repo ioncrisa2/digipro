@@ -85,6 +85,12 @@ const form = useForm({
   asset_type: props.record.asset_type ?? '',
   peruntukan: props.record.peruntukan ?? '',
   title_document: props.record.title_document ?? '',
+  certificate_number: props.record.certificate_number ?? '',
+  certificate_holder_name: props.record.certificate_holder_name ?? '',
+  certificate_issued_at: props.record.certificate_issued_at ?? '',
+  land_book_date: props.record.land_book_date ?? '',
+  document_land_area: props.record.document_land_area ?? '',
+  legal_notes: props.record.legal_notes ?? '',
   land_shape: props.record.land_shape ?? '',
   land_position: props.record.land_position ?? '',
   land_condition: props.record.land_condition ?? '',
@@ -448,6 +454,50 @@ const submit = () => {
               <Label for="access_road_width">Lebar Akses Jalan (m)</Label>
               <Input id="access_road_width" v-model="form.access_road_width" type="number" min="0" step="0.01" />
               <p v-if="form.errors.access_road_width" class="text-xs text-red-500">{{ form.errors.access_road_width }}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Metadata Legal untuk Report</CardTitle>
+            <CardDescription>Field ini dipakai untuk menyusun bagian legalitas pada draft report DigiPro.</CardDescription>
+          </CardHeader>
+          <CardContent class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div class="space-y-2">
+              <Label for="certificate_number">Nomor Sertifikat</Label>
+              <Input id="certificate_number" v-model="form.certificate_number" placeholder="Contoh: SHM No. 685" />
+              <p v-if="form.errors.certificate_number" class="text-xs text-red-500">{{ form.errors.certificate_number }}</p>
+            </div>
+
+            <div class="space-y-2">
+              <Label for="certificate_holder_name">Nama Pemegang Hak</Label>
+              <Input id="certificate_holder_name" v-model="form.certificate_holder_name" placeholder="Nama sesuai dokumen" />
+              <p v-if="form.errors.certificate_holder_name" class="text-xs text-red-500">{{ form.errors.certificate_holder_name }}</p>
+            </div>
+
+            <div class="space-y-2">
+              <Label for="document_land_area">Luas Menurut Dokumen (m2)</Label>
+              <Input id="document_land_area" v-model="form.document_land_area" type="number" min="0" step="0.01" />
+              <p v-if="form.errors.document_land_area" class="text-xs text-red-500">{{ form.errors.document_land_area }}</p>
+            </div>
+
+            <div class="space-y-2">
+              <Label for="certificate_issued_at">Tanggal Terbit Sertifikat</Label>
+              <Input id="certificate_issued_at" v-model="form.certificate_issued_at" type="date" />
+              <p v-if="form.errors.certificate_issued_at" class="text-xs text-red-500">{{ form.errors.certificate_issued_at }}</p>
+            </div>
+
+            <div class="space-y-2">
+              <Label for="land_book_date">Tanggal Buku Tanah</Label>
+              <Input id="land_book_date" v-model="form.land_book_date" type="date" />
+              <p v-if="form.errors.land_book_date" class="text-xs text-red-500">{{ form.errors.land_book_date }}</p>
+            </div>
+
+            <div class="space-y-2 md:col-span-2 xl:col-span-3">
+              <Label for="legal_notes">Catatan Legal Tambahan</Label>
+              <Textarea id="legal_notes" v-model="form.legal_notes" rows="4" placeholder="Opsional, misalnya catatan dokumen atau legalitas tambahan untuk kebutuhan report." />
+              <p v-if="form.errors.legal_notes" class="text-xs text-red-500">{{ form.errors.legal_notes }}</p>
             </div>
           </CardContent>
         </Card>

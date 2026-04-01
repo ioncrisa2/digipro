@@ -40,6 +40,7 @@ class AppraisalFinalDocumentService
             AppraisalStatusEnum::ContractSigned->value,
             AppraisalStatusEnum::ValuationOnProgress->value,
             AppraisalStatusEnum::ValuationCompleted->value,
+            AppraisalStatusEnum::ReportPreparation->value,
             AppraisalStatusEnum::ReportReady->value,
             AppraisalStatusEnum::Completed->value,
         ], true) && $latestPayment?->status === 'paid';

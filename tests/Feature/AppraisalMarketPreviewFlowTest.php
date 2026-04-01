@@ -5,6 +5,8 @@ use App\Enums\ContractStatusEnum;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalRequest;
 use App\Models\GuidelineSet;
+use App\Models\Payment;
+use App\Models\ReportSigner;
 use App\Models\User;
 use App\Support\AdminWorkspaceAccessSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -149,12 +151,47 @@ it('creates an admin draft after customer approval and only exposes the final re
 
     $record->refresh();
 
+    Payment::create([
+        'appraisal_request_id' => $record->id,
+        'amount' => 2500000,
+        'method' => 'gateway',
+        'gateway' => 'midtrans',
+        'external_payment_id' => 'PAY-' . Str::upper(Str::random(8)),
+        'status' => 'paid',
+        'paid_at' => now()->subMinutes(5),
+        'metadata' => [
+            'invoice_number' => 'INV-' . Str::upper(Str::random(6)),
+        ],
+    ]);
+
     expect($record->status)->toBe(AppraisalStatusEnum::ReportPreparation);
     expect($record->market_preview_approved_at)->not->toBeNull();
     expect($record->report_draft_pdf_path)->not->toBeNull();
     Storage::disk('public')->assertExists($record->report_draft_pdf_path);
 
     $draftName = 'Draft-Laporan-' . preg_replace('/[^A-Za-z0-9\-_.]/', '-', (string) $record->request_number) . '.pdf';
+
+    $reviewerSigner = ReportSigner::query()->create([
+        'role' => 'reviewer',
+        'name' => 'Reviewer Sertifikasi',
+        'position_title' => 'Reviewer Bersertifikasi',
+        'certification_number' => 'REV-001',
+        'is_active' => true,
+    ]);
+    $publicAppraiserSigner = ReportSigner::query()->create([
+        'role' => 'public_appraiser',
+        'name' => 'Penilai Publik',
+        'position_title' => 'Penilai Publik',
+        'certification_number' => 'PP-001',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.appraisal-requests.actions.report-configuration', ['appraisalRequest' => $record->id]), [
+            'report_reviewer_signer_id' => $reviewerSigner->id,
+            'report_public_appraiser_signer_id' => $publicAppraiserSigner->id,
+        ])
+        ->assertRedirect();
 
     $this->actingAs($admin)
         ->get(route('admin.appraisal-requests.actions.report-draft', ['appraisalRequest' => $record->id]))
@@ -178,9 +215,10 @@ it('creates an admin draft after customer approval and only exposes the final re
 
     $record->refresh();
 
-    expect($record->status)->toBe(AppraisalStatusEnum::ReportReady);
+    expect($record->status)->toBe(AppraisalStatusEnum::Completed);
     expect($record->report_pdf_path)->not->toBeNull();
     expect($record->report_generated_at)->not->toBeNull();
+    expect(data_get($record->report_signer_snapshot, 'reviewer.name'))->toBe('Reviewer Sertifikasi');
     Storage::disk('public')->assertExists($record->report_pdf_path);
 
     $this->actingAs($customer)
@@ -189,7 +227,11 @@ it('creates an admin draft after customer approval and only exposes the final re
         ->assertInertia(fn (Assert $page) => $page
             ->component('Reports/Show')
             ->where('report.summary.ready_report', true)
+            ->where('report.summary.ready_legal_documents', true)
             ->where('report.system_documents', fn ($files) => collect($files)->pluck('type')->contains('report_pdf'))
+            ->where('report.legal_documents', fn ($files) => collect($files)->pluck('type')->contains('agreement_pdf')
+                && collect($files)->pluck('type')->contains('disclaimer_pdf')
+                && collect($files)->pluck('type')->contains('representative_letter_pdf'))
         );
 });
 

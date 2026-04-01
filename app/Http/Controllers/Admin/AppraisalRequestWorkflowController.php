@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\AppraisalStatusEnum;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreAppraisalReportConfigurationRequest;
 use App\Http\Requests\Admin\StoreAppraisalRequestRevisionBatchRequest;
 use App\Http\Requests\Admin\StoreAppraisalOfferRequest;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestRevisionItem;
+use App\Models\ReportSigner;
 use App\Notifications\AppraisalStatusUpdated;
 use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestRevisionReviewService;
@@ -144,6 +146,51 @@ class AppraisalRequestWorkflowController extends Controller
         return Storage::disk('public')->download($path, "Draft-Laporan-{$requestNumber}.pdf");
     }
 
+    public function saveReportConfiguration(
+        StoreAppraisalReportConfigurationRequest $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalReportPdfService $reportPdfService
+    ): RedirectResponse {
+        if (($appraisalRequest->status?->value ?? (string) $appraisalRequest->status) !== AppraisalStatusEnum::ReportPreparation->value) {
+            return back()->with('error', 'Konfigurasi report hanya bisa diatur saat status persiapan laporan final.');
+        }
+
+        $validated = $request->validated();
+        $reviewerSigner = ReportSigner::query()->findOrFail($validated['report_reviewer_signer_id']);
+        $publicAppraiserSigner = ReportSigner::query()->findOrFail($validated['report_public_appraiser_signer_id']);
+
+        $appraisalRequest->update([
+            'report_reviewer_signer_id' => $reviewerSigner->id,
+            'report_public_appraiser_signer_id' => $publicAppraiserSigner->id,
+            'report_signer_snapshot' => [
+                'reviewer' => [
+                    'id' => $reviewerSigner->id,
+                    'name' => $reviewerSigner->name,
+                    'position_title' => $reviewerSigner->position_title,
+                    'title_suffix' => $reviewerSigner->title_suffix,
+                    'certification_number' => $reviewerSigner->certification_number,
+                ],
+                'public_appraiser' => [
+                    'id' => $publicAppraiserSigner->id,
+                    'name' => $publicAppraiserSigner->name,
+                    'position_title' => $publicAppraiserSigner->position_title,
+                    'title_suffix' => $publicAppraiserSigner->title_suffix,
+                    'certification_number' => $publicAppraiserSigner->certification_number,
+                ],
+                'configured_at' => now()->toDateTimeString(),
+                'configured_by' => (int) $request->user()->id,
+            ],
+        ]);
+
+        try {
+            $reportPdfService->generateDraft($appraisalRequest->fresh());
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'Konfigurasi report berhasil disimpan dan draft diperbarui.');
+    }
+
     public function uploadFinalReport(
         Request $request,
         AppraisalRequest $appraisalRequest,
@@ -171,11 +218,11 @@ class AppraisalRequestWorkflowController extends Controller
                 appraisalId: (int) $freshRecord->id,
                 requestNumber: (string) ($freshRecord->request_number ?? ('REQ-' . $freshRecord->id)),
                 oldStatus: $oldStatus,
-                newStatus: AppraisalStatusEnum::ReportReady->label(),
+                newStatus: AppraisalStatusEnum::Completed->label(),
             ));
         }
 
-        return back()->with('success', 'PDF laporan final berhasil diunggah dan request berubah menjadi laporan siap.');
+        return back()->with('success', 'PDF laporan final berhasil diunggah. Request selesai dan laporan sudah bisa diunduh customer.');
     }
 
     public function approveRevisionItem(
