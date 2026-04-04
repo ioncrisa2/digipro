@@ -38,6 +38,7 @@ const props = defineProps({
 
 const form = useForm({
   replacements: {},
+  field_values: {},
 });
 
 const previewDialogOpen = ref(false);
@@ -93,6 +94,21 @@ const setReplacementFile = (itemId, file) => {
 
   delete form.replacements[itemId];
 };
+
+const setFieldValue = (itemId, value) => {
+  form.field_values[itemId] = value;
+};
+
+const fieldValue = (item) => {
+  if (Object.prototype.hasOwnProperty.call(form.field_values, item.id)) {
+    return form.field_values[item.id];
+  }
+
+  return item.field?.replacement_value?.value ?? item.field?.original_value?.value ?? '';
+};
+
+const fieldDisplayValue = (snapshot) => snapshot?.display ?? 'Belum diisi';
+const fieldInputType = (item) => item?.field?.input_type ?? 'text';
 
 const openPreview = (item) => {
   if (!item) return;
@@ -153,18 +169,18 @@ const itemStatusLabel = (status) => {
 </script>
 
 <template>
-  <Head :title="`Revisi Dokumen - ${record.request_number}`" />
+  <Head :title="`Revisi Data & Dokumen - ${record.request_number}`" />
 
   <DashboardLayout>
     <div class="space-y-5">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="space-y-2">
           <div class="flex flex-wrap items-center gap-2">
-            <h1 class="text-xl font-semibold">Revisi Dokumen</h1>
+            <h1 class="text-xl font-semibold">Revisi Data & Dokumen</h1>
             <Badge variant="secondary">{{ record.request_number }}</Badge>
           </div>
           <p class="text-sm text-muted-foreground">
-            Upload ulang hanya dokumen atau foto yang diminta admin. File lama tetap tersimpan sebagai histori.
+            Perbaiki hanya item yang diminta admin. Histori nilai lama dan file lama tetap tersimpan untuk audit.
           </p>
         </div>
 
@@ -216,6 +232,14 @@ const itemStatusLabel = (status) => {
 
                 <div class="grid gap-3 lg:grid-cols-[1.05fr_0.95fr]">
                   <div class="rounded-xl border p-3">
+                    <template v-if="item.field">
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Sebelumnya</p>
+                      <div class="mt-3 rounded-2xl border bg-slate-50 p-4">
+                        <p class="text-sm font-medium text-slate-950">{{ fieldDisplayValue(item.field.original_value) }}</p>
+                      </div>
+                    </template>
+
+                    <template v-else>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">File Sebelumnya</p>
 
                     <button
@@ -267,9 +291,62 @@ const itemStatusLabel = (status) => {
                       <ImageIcon class="mb-3 h-10 w-10" />
                       Tidak ada file sebelumnya. Anda perlu mengunggah file baru untuk item ini.
                     </div>
+                    </template>
                   </div>
 
-                  <div class="rounded-xl border p-3">
+                  <div v-if="item.field" class="rounded-xl border p-3">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Perbaikan</p>
+                    <div class="mt-3 rounded-xl border bg-slate-50 p-3">
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Saat Ini</p>
+                      <p class="mt-2 text-sm font-medium text-slate-950">{{ fieldDisplayValue(item.field.original_value) }}</p>
+                    </div>
+                    <div class="mt-3 space-y-2">
+                      <Label :for="`field_${item.id}`">Nilai Baru</Label>
+
+                      <Select
+                        v-if="fieldInputType(item) === 'select'"
+                        :model-value="String(fieldValue(item) ?? '')"
+                        @update:model-value="setFieldValue(item.id, $event)"
+                      >
+                        <SelectTrigger :id="`field_${item.id}`">
+                          <SelectValue placeholder="Pilih nilai" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem
+                            v-for="option in item.field.options || []"
+                            :key="option.value"
+                            :value="String(option.value)"
+                          >
+                            {{ option.label }}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Textarea
+                        v-else-if="fieldInputType(item) === 'textarea'"
+                        :id="`field_${item.id}`"
+                        :model-value="fieldValue(item)"
+                        rows="4"
+                        :placeholder="item.field.placeholder || 'Isi nilai baru'"
+                        @update:model-value="setFieldValue(item.id, $event)"
+                      />
+
+                      <Input
+                        v-else
+                        :id="`field_${item.id}`"
+                        :type="['number', 'integer'].includes(fieldInputType(item)) ? 'number' : 'text'"
+                        :step="fieldInputType(item) === 'number' ? '0.0000001' : '1'"
+                        :model-value="fieldValue(item)"
+                        :placeholder="item.field.placeholder || 'Isi nilai baru'"
+                        @update:model-value="setFieldValue(item.id, $event)"
+                      />
+                    </div>
+                    <p v-if="form.errors[`field_values.${item.id}`]" class="mt-2 text-xs text-rose-600">
+                      {{ form.errors[`field_values.${item.id}`] }}
+                    </p>
+                  </div>
+
+                  <div v-else class="rounded-xl border p-3">
                     <Label :for="`replacement_${item.id}`">Upload File Pengganti</Label>
                     <div
                       v-if="item.replacement_file"
@@ -316,7 +393,7 @@ const itemStatusLabel = (status) => {
             <div class="flex justify-end">
               <Button type="submit" :disabled="form.processing">
                 <Upload class="mr-2 h-4 w-4" />
-                Kirim Revisi Dokumen
+                Kirim Revisi
               </Button>
             </div>
           </form>

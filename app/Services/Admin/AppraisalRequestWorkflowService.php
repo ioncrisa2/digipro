@@ -43,7 +43,7 @@ class AppraisalRequestWorkflowService
             return [
                 'show' => true,
                 'ready' => false,
-                'message' => 'Masih ada item revisi dokumen yang belum selesai ditinjau. Selesaikan review revisi per-item terlebih dahulu.',
+                'message' => 'Masih ada item revisi data/dokumen yang belum selesai ditinjau. Selesaikan review revisi per-item terlebih dahulu.',
             ];
         }
 
@@ -103,6 +103,19 @@ class AppraisalRequestWorkflowService
     {
         return $this->statusValue($record) === AppraisalStatusEnum::WaitingOffer->value
             && $this->latestCounterRequest($record)?->expected_fee !== null;
+    }
+
+    public function canCancelRequest(AppraisalRequest $record): bool
+    {
+        if ($record->report_generated_at !== null) {
+            return false;
+        }
+
+        return ! in_array($this->statusValue($record), [
+            AppraisalStatusEnum::Cancelled->value,
+            AppraisalStatusEnum::ReportReady->value,
+            AppraisalStatusEnum::Completed->value,
+        ], true);
     }
 
     public function resolveOfferDefaults(AppraisalRequest $record): array
@@ -189,9 +202,11 @@ class AppraisalRequestWorkflowService
             throw new RuntimeException('Status dokumen kurang hanya bisa diberikan saat request masih pada tahap review dokumen atau penawaran awal.');
         }
 
-        $record->update([
-            'status' => AppraisalStatusEnum::DocsIncomplete,
-        ]);
+        DB::transaction(function () use ($record): void {
+            $record->update([
+                'status' => AppraisalStatusEnum::DocsIncomplete,
+            ]);
+        });
     }
 
     public function markContractSigned(AppraisalRequest $record): void
@@ -200,10 +215,12 @@ class AppraisalRequestWorkflowService
             throw new RuntimeException('Kontrak hanya bisa ditandai ditandatangani saat request sedang menunggu tanda tangan.');
         }
 
-        $record->update([
-            'status' => AppraisalStatusEnum::ContractSigned,
-            'contract_status' => ContractStatusEnum::ContractSigned,
-        ]);
+        DB::transaction(function () use ($record): void {
+            $record->update([
+                'status' => AppraisalStatusEnum::ContractSigned,
+                'contract_status' => ContractStatusEnum::ContractSigned,
+            ]);
+        });
     }
 
     public function verifyPayment(AppraisalRequest $record): void
@@ -212,9 +229,46 @@ class AppraisalRequestWorkflowService
             throw new RuntimeException('Pembayaran belum siap diverifikasi. Pastikan pembayaran Midtrans terbaru sudah berstatus Dibayar.');
         }
 
-        $record->update([
-            'status' => AppraisalStatusEnum::ValuationOnProgress,
-        ]);
+        DB::transaction(function () use ($record): void {
+            $record->update([
+                'status' => AppraisalStatusEnum::ValuationOnProgress,
+            ]);
+        });
+    }
+
+    public function cancelRequest(AppraisalRequest $record, int $actorId, string $reason): void
+    {
+        if (! $this->canCancelRequest($record)) {
+            throw new RuntimeException('Request ini tidak bisa dibatalkan lagi dari workspace admin.');
+        }
+
+        $statusBefore = $this->statusValue($record);
+        $contractStatusBefore = $this->contractStatusValue($record);
+
+        DB::transaction(function () use ($record, $actorId, $reason, $statusBefore, $contractStatusBefore): void {
+            $record->update([
+                'status' => AppraisalStatusEnum::Cancelled,
+                'contract_status' => ContractStatusEnum::Cancelled,
+                'cancelled_by' => $actorId,
+                'cancelled_at' => now(),
+                'cancellation_reason' => $reason,
+            ]);
+
+            $record->offerNegotiations()->create([
+                'user_id' => $actorId,
+                'action' => 'cancelled',
+                'round' => $this->countNegotiationRounds($record),
+                'offered_fee' => $record->fee_total,
+                'reason' => $reason,
+                'meta' => [
+                    'flow' => 'admin_request_cancelled',
+                    'status_before' => $statusBefore,
+                    'contract_status_before' => $contractStatusBefore,
+                    'status_after' => AppraisalStatusEnum::Cancelled->value,
+                    'contract_status_after' => ContractStatusEnum::Cancelled->value,
+                ],
+            ]);
+        });
     }
 
     public function sendOffer(AppraisalRequest $record, int $actorId, array $data): array

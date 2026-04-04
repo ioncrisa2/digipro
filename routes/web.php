@@ -1,22 +1,24 @@
 <?php
 
-use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
-use App\Http\Controllers\LandingController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\UserNotificationController;
+use App\Http\Controllers\Account\ProfileController;
+use App\Http\Controllers\Account\UserNotificationController;
+use App\Http\Controllers\Customer\PaymentController;
+use App\Http\Controllers\Landing\ArticleController;
+use App\Http\Controllers\Landing\ContactController;
+use App\Http\Controllers\Landing\HomeController;
+use App\Http\Controllers\Landing\LegalController;
 use Illuminate\Support\Facades\Route;
 
 // landing route
-Route::get('/', [LandingController::class, 'index'])->name('landing');
-Route::get('/policy', [LandingController::class, 'policy'])->name('policy');
-Route::get('/terms', [LandingController::class, 'terms'])->name('terms');
-Route::get('/contact', [LandingController::class, 'contact'])->name('contact')->middleware('throttle:10,1');
-Route::post('/contact', [LandingController::class, 'storeContact'])->name('contact.store');
+Route::get('/', HomeController::class)->name('landing');
+Route::get('/policy', [LegalController::class, 'policy'])->name('policy');
+Route::get('/terms', [LegalController::class, 'terms'])->name('terms');
+Route::get('/contact', [ContactController::class, 'show'])->name('contact')->middleware('throttle:10,1');
+Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
 Route::get('/artikel', [ArticleController::class, 'index'])->name('articles.index');
 Route::get('/artikel/{slug}', [ArticleController::class, 'show'])->name('articles.show');
 Route::post('/payments/midtrans/notification', [PaymentController::class, 'midtransNotification'])

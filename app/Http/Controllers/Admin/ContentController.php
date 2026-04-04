@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ArticleIndexRequest;
+use App\Http\Requests\Admin\ReorderArticleCategoryRequest;
+use App\Http\Requests\Admin\ReorderTagRequest;
+use App\Http\Requests\Admin\SimpleStatusIndexRequest;
 use App\Http\Requests\Admin\StoreArticleCategoryRequest;
 use App\Http\Requests\Admin\StoreArticleInlineImageRequest;
 use App\Http\Requests\Admin\StoreArticleRequest;
@@ -19,14 +23,9 @@ use Inertia\Response;
 
 class ContentController extends Controller
 {
-    public function articlesIndex(Request $request): Response
+    public function articlesIndex(ArticleIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-            'category' => (string) $request->query('category', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $records = Article::query()
             ->with(['category:id,name', 'tags:id,name'])
@@ -38,11 +37,20 @@ class ContentController extends Controller
                         ->orWhere('excerpt', 'like', '%' . $filters['q'] . '%');
                 });
             })
-            ->when($filters['status'] === 'published', fn ($query) => $query->where('is_published', true))
+            ->when($filters['status'] === 'published', function ($query): void {
+                $query
+                    ->where('is_published', true)
+                    ->where(function ($innerQuery): void {
+                        $innerQuery->whereNull('published_at')->orWhere('published_at', '<=', now());
+                    });
+            })
+            ->when($filters['status'] === 'scheduled', fn ($query) => $query
+                ->where('is_published', true)
+                ->where('published_at', '>', now()))
             ->when($filters['status'] === 'draft', fn ($query) => $query->where('is_published', false))
             ->when($filters['category'] !== 'all', fn ($query) => $query->where('category_id', $filters['category']))
             ->latest('created_at')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (Article $article) => $this->transformArticleRow($article));
@@ -52,6 +60,7 @@ class ContentController extends Controller
             'statusOptions' => [
                 ['value' => 'all', 'label' => 'Semua Status'],
                 ['value' => 'published', 'label' => 'Published'],
+                ['value' => 'scheduled', 'label' => 'Scheduled'],
                 ['value' => 'draft', 'label' => 'Draft'],
             ],
             'categoryOptions' => ArticleCategory::query()
@@ -65,7 +74,11 @@ class ContentController extends Controller
                 ->values(),
             'summary' => [
                 'total' => Article::query()->count(),
-                'published' => Article::query()->where('is_published', true)->count(),
+                'published' => Article::query()->published()->count(),
+                'scheduled' => Article::query()
+                    ->where('is_published', true)
+                    ->where('published_at', '>', now())
+                    ->count(),
                 'draft' => Article::query()->where('is_published', false)->count(),
                 'categories' => ArticleCategory::query()->count(),
             ],
@@ -152,12 +165,9 @@ class ContentController extends Controller
             ->with('success', 'Artikel berhasil dihapus.');
     }
 
-    public function articleCategoriesIndex(Request $request): Response
+    public function articleCategoriesIndex(SimpleStatusIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-        ];
+        $filters = $request->filters();
 
         $records = ArticleCategory::query()
             ->withCount('articles')
@@ -259,12 +269,9 @@ class ContentController extends Controller
             ->with('success', 'Kategori artikel berhasil dihapus.');
     }
 
-    public function articleCategoriesReorder(Request $request): RedirectResponse
+    public function articleCategoriesReorder(ReorderArticleCategoryRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['required', 'integer', 'distinct', 'exists:article_categories,id'],
-        ]);
+        $validated = $request->validated();
 
         $this->syncSortOrder(ArticleCategory::query(), $validated['ids']);
 
@@ -273,12 +280,9 @@ class ContentController extends Controller
             ->with('success', 'Urutan kategori artikel berhasil diperbarui.');
     }
 
-    public function tagsIndex(Request $request): Response
+    public function tagsIndex(SimpleStatusIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-        ];
+        $filters = $request->filters();
 
         $records = Tag::query()
             ->withCount('articles')
@@ -377,12 +381,9 @@ class ContentController extends Controller
             ->with('success', 'Tag artikel berhasil dihapus.');
     }
 
-    public function tagsReorder(Request $request): RedirectResponse
+    public function tagsReorder(ReorderTagRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['required', 'integer', 'distinct', 'exists:tags,id'],
-        ]);
+        $validated = $request->validated();
 
         $this->syncSortOrder(Tag::query(), $validated['ids']);
 
@@ -404,6 +405,8 @@ class ContentController extends Controller
             'category_name' => $article->category?->name,
             'tag_names' => $article->tags->pluck('name')->values()->all(),
             'is_published' => (bool) $article->is_published,
+            'editorial_status_value' => $this->resolveArticleEditorialStatus($article),
+            'editorial_status_label' => $this->resolveArticleEditorialStatusLabel($article),
             'published_at' => $article->published_at?->toIso8601String(),
             'views' => (int) ($article->views ?? 0),
             'preview_url' => route('articles.show', $article->slug) . '?preview=1',
@@ -497,13 +500,11 @@ class ContentController extends Controller
     private function persistArticle(Article $article, array $validated, Request $request): void
     {
         $coverPath = $article->cover_image_path;
+        $oldCoverPath = $article->cover_image_path;
+        $newCoverPath = null;
+
         if ($request->hasFile('cover_image')) {
             $newCoverPath = $request->file('cover_image')->store('articles', 'public');
-
-            if (filled($coverPath) && Storage::disk('public')->exists($coverPath)) {
-                Storage::disk('public')->delete($coverPath);
-            }
-
             $coverPath = $newCoverPath;
         }
 
@@ -517,20 +518,61 @@ class ContentController extends Controller
             $publishedAt = null;
         }
 
-        $article->fill([
-            'title' => $validated['title'],
-            'slug' => $validated['slug'],
-            'excerpt' => $validated['excerpt'] ?? null,
-            'content_html' => $validated['content_html'],
-            'cover_image_path' => $coverPath,
-            'meta_title' => $validated['meta_title'] ?? null,
-            'meta_description' => $validated['meta_description'] ?? null,
-            'category_id' => $validated['category_id'] ?: null,
-            'is_published' => $isPublished,
-            'published_at' => $publishedAt,
-        ]);
-        $article->save();
-        $article->tags()->sync($validated['tag_ids'] ?? []);
+        try {
+            DB::transaction(function () use ($article, $validated, $coverPath, $isPublished, $publishedAt): void {
+                $article->fill([
+                    'title' => $validated['title'],
+                    'slug' => $validated['slug'],
+                    'excerpt' => $validated['excerpt'] ?? null,
+                    'content_html' => $validated['content_html'],
+                    'cover_image_path' => $coverPath,
+                    'meta_title' => $validated['meta_title'] ?? null,
+                    'meta_description' => $validated['meta_description'] ?? null,
+                    'category_id' => $validated['category_id'] ?: null,
+                    'is_published' => $isPublished,
+                    'published_at' => $publishedAt,
+                ]);
+                $article->save();
+                $article->tags()->sync($validated['tag_ids'] ?? []);
+            });
+        } catch (\Throwable $exception) {
+            if ($newCoverPath && Storage::disk('public')->exists($newCoverPath)) {
+                Storage::disk('public')->delete($newCoverPath);
+            }
+
+            throw $exception;
+        }
+
+        if (
+            $newCoverPath
+            && filled($oldCoverPath)
+            && $oldCoverPath !== $newCoverPath
+            && Storage::disk('public')->exists($oldCoverPath)
+        ) {
+            Storage::disk('public')->delete($oldCoverPath);
+        }
+    }
+
+    private function resolveArticleEditorialStatus(Article $article): string
+    {
+        if (! $article->is_published) {
+            return 'draft';
+        }
+
+        if ($article->published_at?->isFuture()) {
+            return 'scheduled';
+        }
+
+        return 'published';
+    }
+
+    private function resolveArticleEditorialStatusLabel(Article $article): string
+    {
+        return match ($this->resolveArticleEditorialStatus($article)) {
+            'draft' => 'Draft',
+            'scheduled' => 'Scheduled',
+            default => 'Published',
+        };
     }
 
     private function nextSortOrder($query): int

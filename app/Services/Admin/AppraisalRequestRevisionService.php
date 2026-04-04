@@ -7,7 +7,8 @@ use App\Models\AppraisalAsset;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestRevisionBatch;
 use App\Notifications\AppraisalRevisionRequestedNotification;
-use App\Services\AppraisalRevisionFileResolver;
+use App\Services\Revisions\AppraisalRevisionFileResolver;
+use App\Services\Revisions\AppraisalRevisionFieldRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -15,7 +16,8 @@ use RuntimeException;
 class AppraisalRequestRevisionService
 {
     public function __construct(
-        private readonly AppraisalRevisionFileResolver $fileResolver
+        private readonly AppraisalRevisionFileResolver $fileResolver,
+        private readonly AppraisalRevisionFieldRegistry $fieldRegistry
     ) {
     }
 
@@ -50,7 +52,7 @@ class AppraisalRequestRevisionService
         ], true)) {
             return [
                 'can_create' => false,
-                'message' => 'Permintaan revisi dokumen hanya bisa dibuat saat request masih berada pada tahap verifikasi administrasi atau penawaran awal.',
+                'message' => 'Permintaan revisi data atau dokumen hanya bisa dibuat saat request masih berada pada tahap verifikasi administrasi atau penawaran awal.',
             ];
         }
 
@@ -58,7 +60,7 @@ class AppraisalRequestRevisionService
             'can_create' => true,
             'message' => $this->hasOpenBatch($record)
                 ? 'Tambahkan item revisi ke batch yang masih terbuka untuk request ini.'
-                : 'Klik tombol revisi pada dokumen atau foto yang perlu diperbaiki customer.',
+                : 'Klik tombol revisi pada data, dokumen, atau foto yang perlu diperbaiki customer.',
         ];
     }
 
@@ -174,6 +176,10 @@ class AppraisalRequestRevisionService
             }
         }
 
+        foreach ($this->fieldRegistry->buildTargetOptions($record) as $option) {
+            $options[] = $option;
+        }
+
         return array_values($options);
     }
 
@@ -198,7 +204,7 @@ class AppraisalRequestRevisionService
             throw new RuntimeException($this->creationState($record)['message']);
         }
 
-        return DB::transaction(function () use ($record, $actorId, $items, $adminNote): AppraisalRequestRevisionBatch {
+        $batch = DB::transaction(function () use ($record, $actorId, $items, $adminNote): AppraisalRequestRevisionBatch {
             $batch = $record->revisionBatches()
                 ->where('status', 'open')
                 ->latest('id')
@@ -242,12 +248,15 @@ class AppraisalRequestRevisionService
                     'appraisal_asset_id' => $item['appraisal_asset_id'],
                     'item_type' => $item['item_type'],
                     'requested_file_type' => $item['requested_file_type'],
+                    'requested_field_key' => $item['requested_field_key'] ?? null,
                     'status' => 'pending',
                     'issue_note' => $item['issue_note'],
+                    'original_value' => $item['original_value'] ?? null,
                     'original_request_file_id' => $item['original_request_file_id'],
                     'original_asset_file_id' => $item['original_asset_file_id'],
                     'replacement_request_file_id' => null,
                     'replacement_asset_file_id' => null,
+                    'replacement_value' => null,
                 ];
             }
 
@@ -259,18 +268,6 @@ class AppraisalRequestRevisionService
                 ]);
             }
 
-            $record->loadMissing('user');
-
-            if ($record->user) {
-                $record->user->notify(new AppraisalRevisionRequestedNotification(
-                    (int) $record->id,
-                    (int) $batch->id,
-                    (string) ($record->request_number ?? ('REQ-' . $record->id)),
-                    count($items),
-                    $this->normalizeNullableString($adminNote),
-                ));
-            }
-
             return $batch->load([
                 'creator',
                 'items.appraisalAsset',
@@ -280,6 +277,20 @@ class AppraisalRequestRevisionService
                 'items.replacementAssetFile',
             ]);
         });
+
+        $record->loadMissing('user');
+
+        if ($record->user) {
+            $record->user->notify(new AppraisalRevisionRequestedNotification(
+                (int) $record->id,
+                (int) $batch->id,
+                (string) ($record->request_number ?? ('REQ-' . $record->id)),
+                count($items),
+                $this->normalizeNullableString($adminNote),
+            ));
+        }
+
+        return $batch;
     }
 
     private function expectedAssetDocumentTypes(): array

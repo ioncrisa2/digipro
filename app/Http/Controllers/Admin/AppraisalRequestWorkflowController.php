@@ -4,9 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\AppraisalStatusEnum;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\AdminActionRequest;
+use App\Http\Requests\Admin\RejectAppraisalRevisionItemRequest;
+use App\Http\Requests\Admin\StoreAppraisalCancellationRequest;
 use App\Http\Requests\Admin\StoreAppraisalReportConfigurationRequest;
+use App\Http\Requests\Admin\StoreAppraisalFieldCorrectionRequest;
 use App\Http\Requests\Admin\StoreAppraisalRequestRevisionBatchRequest;
 use App\Http\Requests\Admin\StoreAppraisalOfferRequest;
+use App\Http\Requests\Admin\UploadFinalReportRequest;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestRevisionItem;
 use App\Models\ReportSigner;
@@ -14,9 +19,9 @@ use App\Notifications\AppraisalStatusUpdated;
 use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestRevisionReviewService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
-use App\Services\AppraisalReportPdfService;
+use App\Services\Admin\AppraisalFieldCorrectionService;
+use App\Services\Reports\AppraisalReportPdfService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -35,7 +40,7 @@ class AppraisalRequestWorkflowController extends Controller
                 $request->string('admin_note')->toString()
             );
 
-            return back()->with('success', 'Permintaan revisi dokumen berhasil dibuat dan customer perlu mengunggah ulang dokumen yang diminta.');
+            return back()->with('success', 'Permintaan revisi berhasil dibuat dan customer perlu memperbaiki item yang diminta.');
         } catch (\RuntimeException $exception) {
             return back()->with('error', $exception->getMessage());
         }
@@ -66,7 +71,7 @@ class AppraisalRequestWorkflowController extends Controller
     public function approveLatestNegotiation(
         AppraisalRequest $appraisalRequest,
         AppraisalRequestWorkflowService $workflowService,
-        Request $request
+        AdminActionRequest $request
     ): RedirectResponse {
         try {
             $workflowService->approveLatestNegotiation($appraisalRequest, (int) $request->user()->id);
@@ -80,7 +85,7 @@ class AppraisalRequestWorkflowController extends Controller
     public function verifyDocs(
         AppraisalRequest $appraisalRequest,
         AppraisalRequestWorkflowService $workflowService,
-        Request $request
+        AdminActionRequest $request
     ): RedirectResponse {
         try {
             $workflowService->verifyDocs($appraisalRequest, (int) $request->user()->id);
@@ -128,6 +133,34 @@ class AppraisalRequestWorkflowController extends Controller
         } catch (\RuntimeException $exception) {
             return back()->with('error', $exception->getMessage());
         }
+    }
+
+    public function cancelRequest(
+        StoreAppraisalCancellationRequest $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    ): RedirectResponse {
+        $oldStatus = $appraisalRequest->status?->label() ?? (string) $appraisalRequest->status;
+        $reason = trim((string) $request->string('reason')->toString());
+
+        try {
+            $workflowService->cancelRequest($appraisalRequest, (int) $request->user()->id, $reason);
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        $freshRecord = $appraisalRequest->fresh(['user']);
+        if ($freshRecord?->user) {
+            $freshRecord->user->notify(new AppraisalStatusUpdated(
+                appraisalId: (int) $freshRecord->id,
+                requestNumber: (string) ($freshRecord->request_number ?? ('REQ-' . $freshRecord->id)),
+                oldStatus: $oldStatus,
+                newStatus: AppraisalStatusEnum::Cancelled->label(),
+                detail: $reason,
+            ));
+        }
+
+        return back()->with('success', 'Request berhasil dibatalkan dan alasan pembatalan sudah tersimpan.');
     }
 
     public function downloadReportDraft(AppraisalRequest $appraisalRequest): StreamedResponse|RedirectResponse
@@ -191,14 +224,34 @@ class AppraisalRequestWorkflowController extends Controller
         return back()->with('success', 'Konfigurasi report berhasil disimpan dan draft diperbarui.');
     }
 
+    public function storeFieldCorrection(
+        StoreAppraisalFieldCorrectionRequest $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalFieldCorrectionService $fieldCorrectionService
+    ): RedirectResponse {
+        try {
+            $fieldCorrectionService->apply(
+                $appraisalRequest,
+                (int) $request->user()->id,
+                (string) $request->input('target_key'),
+                $request->normalizedValue(),
+                $request->string('reason')->toString()
+            );
+
+            return back()->with('success', 'Data request berhasil diperbaiki oleh admin.');
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            return back()->withErrors($exception->errors())->withInput();
+        }
+    }
+
     public function uploadFinalReport(
-        Request $request,
+        UploadFinalReportRequest $request,
         AppraisalRequest $appraisalRequest,
         AppraisalReportPdfService $reportPdfService
     ): RedirectResponse {
-        $validated = $request->validate([
-            'report_pdf' => ['required', 'file', 'mimes:pdf', 'max:20480'],
-        ]);
+        $validated = $request->validated();
 
         $oldStatus = $appraisalRequest->status?->label() ?? AppraisalStatusEnum::ReportPreparation->label();
 
@@ -229,7 +282,7 @@ class AppraisalRequestWorkflowController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalRequestRevisionItem $revisionItem,
         AppraisalRequestRevisionReviewService $reviewService,
-        Request $request
+        AdminActionRequest $request
     ): RedirectResponse {
         try {
             $reviewService->approveItem(
@@ -248,11 +301,9 @@ class AppraisalRequestWorkflowController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalRequestRevisionItem $revisionItem,
         AppraisalRequestRevisionReviewService $reviewService,
-        Request $request
+        RejectAppraisalRevisionItemRequest $request
     ): RedirectResponse {
-        $validated = $request->validate([
-            'review_note' => ['required', 'string', 'max:1000'],
-        ]);
+        $validated = $request->validated();
 
         try {
             $reviewService->rejectItem(

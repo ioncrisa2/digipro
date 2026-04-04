@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\BuildingEconomicLifeExport;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ImportBuildingEconomicLifeRequest;
+use App\Http\Requests\Admin\ReferenceGuideDataIndexRequest;
 use App\Http\Requests\Admin\StoreBuildingEconomicLifeRequest;
 use App\Imports\BuildingEconomicLifeImport;
 use App\Models\BuildingEconomicLife;
 use App\Models\GuidelineSet;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -19,17 +19,10 @@ use Throwable;
 
 class BuildingEconomicLifeController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(ReferenceGuideDataIndexRequest $request): Response
     {
         $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_item_id' => (string) $request->query('guideline_item_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'category' => (string) $request->query('category', 'all'),
-            'building_class' => (string) $request->query('building_class', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters(['q', 'guideline_item_id', 'year', 'category', 'building_class']);
 
         $records = $this->buildingEconomicLifeFilteredQuery($filters)
             ->with('guidelineSet:id,name,year,is_active')
@@ -37,7 +30,7 @@ class BuildingEconomicLifeController extends Controller
             ->orderBy('category')
             ->orderBy('building_class')
             ->orderBy('storey_min')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (BuildingEconomicLife $record) => $this->transformBuildingEconomicLifeRow($record));
@@ -78,15 +71,9 @@ class BuildingEconomicLifeController extends Controller
         ]);
     }
 
-    public function export(Request $request): BinaryFileResponse
+    public function export(ReferenceGuideDataIndexRequest $request): BinaryFileResponse
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_item_id' => (string) $request->query('guideline_item_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'category' => (string) $request->query('category', 'all'),
-            'building_class' => (string) $request->query('building_class', 'all'),
-        ];
+        $filters = $request->filters(['q', 'guideline_item_id', 'year', 'category', 'building_class'], false);
 
         $query = $this->buildingEconomicLifeFilteredQuery($filters)
             ->orderByDesc('year')
@@ -133,13 +120,9 @@ class BuildingEconomicLifeController extends Controller
             ->with('success', 'BEL berhasil ditambahkan.');
     }
 
-    public function import(Request $request): RedirectResponse
+    public function import(ImportBuildingEconomicLifeRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'guideline_item_id' => ['required', 'integer', Rule::exists('ref_guideline_sets', 'id')],
-            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
-        ]);
+        $validated = $request->validated();
 
         $import = new BuildingEconomicLifeImport(
             guidelineItemId: (int) $validated['guideline_item_id'],

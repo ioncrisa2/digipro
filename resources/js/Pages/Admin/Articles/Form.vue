@@ -3,6 +3,7 @@ import { computed, watch } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import AdminRichTextEditor from '@/components/admin/AdminRichTextEditor.vue';
 import ImageUpload from '@/components/admin/ImageUpload.vue';
@@ -63,6 +64,71 @@ watch(() => form.title, (value) => {
   }
 });
 
+const toLocalDateTimeValue = (date = new Date()) => {
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+
+  return localDate.toISOString().slice(0, 16);
+};
+
+const publicationState = computed(() => {
+  if (!form.is_published) {
+    return {
+      value: 'draft',
+      label: 'Draft',
+      description: 'Artikel belum tampil ke publik.',
+      tone: 'bg-slate-100 text-slate-800 border-slate-200',
+    };
+  }
+
+  if (form.published_at && new Date(form.published_at).getTime() > Date.now()) {
+    return {
+      value: 'scheduled',
+      label: 'Scheduled',
+      description: 'Artikel akan tampil otomatis sesuai jadwal publikasi.',
+      tone: 'bg-amber-100 text-amber-900 border-amber-200',
+    };
+  }
+
+  return {
+    value: 'published',
+    label: 'Published',
+    description: 'Artikel akan tersedia di halaman publik.',
+    tone: 'bg-emerald-100 text-emerald-900 border-emerald-200',
+  };
+});
+
+const plainContent = computed(() => String(form.content_html ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim());
+const contentWordCount = computed(() => plainContent.value ? plainContent.value.split(' ').length : 0);
+
+const healthChecks = computed(() => [
+  {
+    label: 'Cover',
+    value: props.record.cover_url || form.cover_image ? 'Siap' : 'Perlu diisi',
+    good: Boolean(props.record.cover_url || form.cover_image),
+  },
+  {
+    label: 'Ringkasan',
+    value: form.excerpt?.trim() ? `${form.excerpt.trim().length} karakter` : 'Belum ada',
+    good: Boolean(form.excerpt?.trim()),
+  },
+  {
+    label: 'Meta Title',
+    value: form.meta_title?.trim() ? `${form.meta_title.trim().length} karakter` : 'Belum ada',
+    good: Boolean(form.meta_title?.trim()) && form.meta_title.trim().length <= 60,
+  },
+  {
+    label: 'Meta Description',
+    value: form.meta_description?.trim() ? `${form.meta_description.trim().length} karakter` : 'Belum ada',
+    good: Boolean(form.meta_description?.trim()) && form.meta_description.trim().length <= 160,
+  },
+  {
+    label: 'Konten',
+    value: `${contentWordCount.value} kata`,
+    good: contentWordCount.value >= 120,
+  },
+]);
+
 const toggleTag = (tagId) => {
   const value = String(tagId);
   if (form.tag_ids.includes(value)) {
@@ -78,6 +144,31 @@ const submit = () => {
     forceFormData: true,
     preserveScroll: true,
   });
+};
+
+const saveDraft = () => {
+  form.clearErrors('published_at');
+  form.is_published = false;
+  submit();
+};
+
+const publishNow = () => {
+  form.clearErrors('published_at');
+  form.is_published = true;
+  form.published_at = toLocalDateTimeValue();
+  submit();
+};
+
+const schedulePublish = () => {
+  form.clearErrors('published_at');
+
+  if (!form.published_at) {
+    form.setError('published_at', 'Tentukan tanggal publikasi untuk menjadwalkan artikel.');
+    return;
+  }
+
+  form.is_published = true;
+  submit();
 };
 </script>
 
@@ -100,6 +191,46 @@ const submit = () => {
       </section>
 
       <form class="space-y-6" @submit.prevent="submit">
+        <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Status Editorial</CardTitle>
+              <CardDescription>{{ publicationState.description }}</CardDescription>
+            </CardHeader>
+            <CardContent class="flex flex-wrap items-center justify-between gap-4">
+              <div class="space-y-2">
+                <Badge variant="outline" :class="publicationState.tone">{{ publicationState.label }}</Badge>
+                <p class="text-sm text-slate-600">
+                  Gunakan draft untuk menahan artikel, publish sekarang untuk tayang langsung, atau jadwalkan untuk tayang otomatis.
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" :disabled="form.processing" @click="saveDraft">Simpan Draft</Button>
+                <Button type="button" variant="outline" :disabled="form.processing" @click="schedulePublish">Jadwalkan</Button>
+                <Button type="button" :disabled="form.processing" @click="publishNow">Publish Sekarang</Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Health Check</CardTitle>
+              <CardDescription>Pemeriksaan cepat sebelum artikel tayang.</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-3">
+              <div v-for="item in healthChecks" :key="item.label" class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5">
+                <div>
+                  <p class="text-sm font-medium text-slate-900">{{ item.label }}</p>
+                  <p class="mt-1 text-xs text-slate-500">{{ item.value }}</p>
+                </div>
+                <Badge variant="outline" :class="item.good ? 'bg-emerald-100 text-emerald-900 border-emerald-200' : 'bg-amber-100 text-amber-900 border-amber-200'">
+                  {{ item.good ? 'OK' : 'Perlu' }}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
         <Card>
           <CardHeader>
             <CardTitle>Artikel</CardTitle>
@@ -152,6 +283,7 @@ const submit = () => {
             <div class="space-y-2">
               <Label for="published_at">Tanggal Publikasi</Label>
               <Input id="published_at" v-model="form.published_at" type="datetime-local" />
+              <p class="text-xs text-slate-500">Kosongkan jika ingin publish sekarang. Isi tanggal masa depan untuk menjadwalkan artikel.</p>
               <p v-if="form.errors.published_at" class="text-xs text-rose-600">{{ form.errors.published_at }}</p>
             </div>
 
@@ -206,7 +338,11 @@ const submit = () => {
 
         <div class="flex flex-wrap justify-end gap-2">
           <Button type="button" variant="outline" as-child><Link :href="indexUrl">Batal</Link></Button>
-          <Button type="submit" :disabled="form.processing">{{ isEditMode ? 'Simpan Perubahan' : 'Publikasikan Draft' }}</Button>
+          <Button type="button" variant="outline" :disabled="form.processing" @click="saveDraft">Simpan Draft</Button>
+          <Button type="button" variant="outline" :disabled="form.processing" @click="schedulePublish">Jadwalkan</Button>
+          <Button type="button" :disabled="form.processing" @click="publishNow">
+            {{ isEditMode ? 'Simpan & Publish' : 'Publish Sekarang' }}
+          </Button>
         </div>
       </form>
     </div>

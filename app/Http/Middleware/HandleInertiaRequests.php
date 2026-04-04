@@ -77,39 +77,55 @@ class HandleInertiaRequests extends Middleware
             ],
 
             //notification count
-            'unreadCount' => fn() => $request->user()
-                ? $request->user()->unreadNotifications()->count()
-                : 0,
+            'unreadCount' => fn() => rescue(
+                fn () => $request->user()
+                    ? $request->user()->unreadNotifications()->count()
+                    : 0,
+                0,
+                report: false
+            ),
 
             //notification
-            'notifications' => fn() => $request->user()
-                ? $request->user()->notifications()
-                ->latest()
-                ->limit(15)
-                ->get()
-                ->map(fn($n) => [
-                    'id' => $n->id,
-                    'title' => data_get($n->data, 'title', 'Notifikasi'),
-                    'message' => data_get($n->data, 'message', ''),
-                    'url' => data_get($n->data, 'url'),
-                    'read' => ! is_null($n->read_at),
-                    'time' => optional($n->created_at)->diffForHumans(),
-                ])
-                : [],
+            'notifications' => fn() => rescue(
+                fn () => $request->user()
+                    ? $request->user()->notifications()
+                        ->latest()
+                        ->limit(15)
+                        ->get()
+                        ->map(fn($n) => [
+                            'id' => $n->id,
+                            'title' => data_get($n->data, 'title', 'Notifikasi'),
+                            'message' => data_get($n->data, 'message', ''),
+                            'url' => data_get($n->data, 'url'),
+                            'read' => ! is_null($n->read_at),
+                            'time' => optional($n->created_at)->diffForHumans(),
+                        ])
+                    : [],
+                [],
+                report: false
+            ),
 
-            'termsDocument' => fn() => TermsDocument::active()
-                ->orderByDesc('published_at')
-                ->first()
-                ?->toPublicArray(),
+            'termsDocument' => fn() => rescue(
+                fn () => TermsDocument::active()
+                    ->orderByDesc('published_at')
+                    ->first()
+                    ?->toPublicArray(),
+                null,
+                report: false
+            ),
 
-            'blogNavCategories' => fn () => $request->routeIs('articles.*')
-                ? ArticleCategory::query()
-                    ->active()
-                    ->showInNav()
-                    ->orderBy('sort_order')
-                    ->orderBy('name')
-                    ->get(['name', 'slug'])
-                : [],
+            'blogNavCategories' => fn () => rescue(
+                fn () => $request->routeIs('articles.*')
+                    ? ArticleCategory::query()
+                        ->active()
+                        ->showInNav()
+                        ->orderBy('sort_order')
+                        ->orderBy('name')
+                        ->get(['name', 'slug'])
+                    : [],
+                [],
+                report: false
+            ),
         ];
     }
 }

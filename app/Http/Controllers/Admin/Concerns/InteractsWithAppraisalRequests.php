@@ -49,7 +49,7 @@ trait InteractsWithAppraisalRequests
             'accepted' => 'Penawaran diterima',
             'contract_sign_mock' => 'Tanda tangan kontrak',
             'cancel_request' => 'Permohonan dibatalkan',
-            'cancelled' => 'Negosiasi dibatalkan',
+            'cancelled' => 'Permohonan dibatalkan sistem',
             default => Str::headline((string) $action),
         };
     }
@@ -201,11 +201,14 @@ trait InteractsWithAppraisalRequests
             'request_file' => 'Dokumen Request',
             'asset_document' => 'Dokumen Aset',
             'asset_photo' => 'Foto Aset',
+            'asset_field' => 'Data Aset',
+            'request_field' => 'Data Request',
             default => Str::headline((string) $item->item_type),
         };
         $targetLabel = $scopeLabel . ': ' . match ((string) $item->item_type) {
             'request_file' => $this->requestFileTypeLabel($item->requested_file_type),
             'asset_document', 'asset_photo' => $this->assetFileTypeLabel($item->requested_file_type),
+            'asset_field', 'request_field' => $this->revisionFieldLabel((string) ($item->requested_field_key ?: $item->requested_file_type)),
             default => Str::headline((string) $item->requested_file_type),
         };
 
@@ -227,6 +230,12 @@ trait InteractsWithAppraisalRequests
             'reviewed_at' => $item->reviewed_at?->toIso8601String(),
             'can_approve' => (string) $item->status === 'reuploaded',
             'can_reject' => (string) $item->status === 'reuploaded',
+            'field' => in_array((string) $item->item_type, ['asset_field', 'request_field'], true) ? [
+                'key' => (string) ($item->requested_field_key ?: $item->requested_file_type),
+                'label' => $this->revisionFieldLabel((string) ($item->requested_field_key ?: $item->requested_file_type)),
+                'original_value' => $item->original_value,
+                'replacement_value' => $item->replacement_value,
+            ] : null,
             'approve_url' => (string) $item->status === 'reuploaded'
                 ? route('admin.appraisal-requests.revision-items.approve', [
                     'appraisalRequest' => $appraisalRequestId,
@@ -272,6 +281,14 @@ trait InteractsWithAppraisalRequests
 
         if ($item->original_asset_file_id) {
             return "{$item->item_type}:existing:{$item->original_asset_file_id}";
+        }
+
+        if (in_array((string) $item->item_type, ['asset_field', 'request_field'], true)) {
+            if ($item->appraisal_asset_id) {
+                return "{$item->item_type}:{$item->appraisal_asset_id}:{$item->requested_field_key}";
+            }
+
+            return "{$item->item_type}:{$item->requested_field_key}";
         }
 
         if ($item->appraisal_asset_id) {
@@ -347,6 +364,23 @@ trait InteractsWithAppraisalRequests
             'approved' => 'Disetujui',
             'rejected' => 'Perlu Revisi Lagi',
             default => Str::headline((string) $status),
+        };
+    }
+
+    private function revisionFieldLabel(string $fieldKey): string
+    {
+        return match ($fieldKey) {
+            'title_document' => 'Jenis Dokumen Tanah',
+            'address' => 'Alamat Lengkap',
+            'maps_link' => 'Link Google Maps',
+            'coordinates_lat' => 'Latitude',
+            'coordinates_lng' => 'Longitude',
+            'land_area' => 'Luas Tanah (m2)',
+            'building_area' => 'Luas Bangunan (m2)',
+            'building_floors' => 'Jumlah Lantai',
+            'build_year' => 'Tahun Bangun',
+            'renovation_year' => 'Tahun Renovasi',
+            default => Str::headline($fieldKey),
         };
     }
 
@@ -527,6 +561,19 @@ trait InteractsWithAppraisalRequests
                 'url' => route('admin.appraisal-requests.actions.verify-payment', $appraisalRequest),
                 'disabled' => false,
                 'disabled_reason' => null,
+            ];
+        }
+
+        if ($workflowService->canCancelRequest($appraisalRequest)) {
+            $actions[] = [
+                'key' => 'cancel-request',
+                'label' => 'Batalkan Request',
+                'variant' => 'destructive',
+                'message' => 'Batalkan request ini dari workspace admin. Alasan pembatalan wajib diisi dan akan terlihat oleh customer.',
+                'url' => route('admin.appraisal-requests.actions.cancel', $appraisalRequest),
+                'disabled' => false,
+                'disabled_reason' => null,
+                'requires_reason' => true,
             ];
         }
 

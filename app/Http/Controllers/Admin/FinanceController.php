@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\PaymentIndexRequest;
 use App\Http\Requests\Admin\UpdatePaymentRequest;
 use App\Models\Payment;
 use App\Services\Payments\MidtransSnapService;
@@ -13,13 +14,9 @@ use Inertia\Response;
 
 class FinanceController extends Controller
 {
-    public function paymentsIndex(Request $request, MidtransSnapService $midtrans): Response
+    public function paymentsIndex(PaymentIndexRequest $request, MidtransSnapService $midtrans): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $records = Payment::query()
             ->with(['appraisalRequest.user'])
@@ -37,7 +34,7 @@ class FinanceController extends Controller
             })
             ->when($filters['status'] !== 'all', fn ($query) => $query->where('status', $filters['status']))
             ->latest('created_at')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (Payment $payment) => $this->transformPaymentRow($payment, $midtrans));

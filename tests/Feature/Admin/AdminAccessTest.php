@@ -33,12 +33,14 @@ use App\Models\Testimonial;
 use App\Models\TermsDocument;
 use App\Models\User;
 use App\Models\ValuationSetting;
+use App\Notifications\AppraisalStatusUpdated;
 use App\Models\District;
 use App\Models\Village;
 use App\Support\SystemNavigation;
 use App\Support\AdminWorkspaceAccessSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Permission;
@@ -252,6 +254,70 @@ it('renders appraisal request detail in the vue admin workspace', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Admin/AppraisalRequests/Show')
             ->where('record.request_number', 'REQ-ADMIN-001'));
+});
+
+it('allows admin to cancel an appraisal request with a required reason', function () {
+    Notification::fake();
+
+    $admin = createAdminUser();
+    $requester = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $record = AppraisalRequest::create([
+        'user_id' => $requester->id,
+        'request_number' => 'REQ-ADMIN-CANCEL-001',
+        'purpose' => PurposeEnum::JualBeli,
+        'status' => AppraisalStatusEnum::Submitted,
+        'contract_status' => ContractStatusEnum::None,
+        'requested_at' => now(),
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.appraisal-requests.actions.cancel', $record), [
+            'reason' => 'Sertifikat terindikasi memiliki hak tanggungan aktif sehingga request tidak dapat dilanjutkan.',
+        ])
+        ->assertRedirect();
+
+    $record->refresh();
+
+    expect($record->status)->toBe(AppraisalStatusEnum::Cancelled)
+        ->and($record->contract_status)->toBe(ContractStatusEnum::Cancelled)
+        ->and($record->cancelled_by)->toBe($admin->id)
+        ->and($record->cancelled_at)->not->toBeNull()
+        ->and($record->cancellation_reason)->toBe('Sertifikat terindikasi memiliki hak tanggungan aktif sehingga request tidak dapat dilanjutkan.');
+
+    expect($record->offerNegotiations()->latest('id')->first())
+        ->not->toBeNull()
+        ->action->toBe('cancelled');
+
+    Notification::assertSentTo(
+        $requester,
+        AppraisalStatusUpdated::class,
+        fn (AppraisalStatusUpdated $notification) => $notification->newStatus === AppraisalStatusEnum::Cancelled->label()
+            && $notification->detail === 'Sertifikat terindikasi memiliki hak tanggungan aktif sehingga request tidak dapat dilanjutkan.'
+    );
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.appraisal-requests.show', $record))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/AppraisalRequests/Show')
+            ->where('record.status_value', AppraisalStatusEnum::Cancelled->value)
+            ->where('record.cancelled_by_name', $admin->name)
+            ->where('record.cancellation_reason', 'Sertifikat terindikasi memiliki hak tanggungan aktif sehingga request tidak dapat dilanjutkan.'));
+
+    $this
+        ->actingAs($requester)
+        ->get(route('appraisal.show', $record))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Penilaian/Show')
+            ->where('request.status', AppraisalStatusEnum::Cancelled->value)
+            ->where('request.cancelled_by_name', $admin->name)
+            ->where('request.cancellation_reason', 'Sertifikat terindikasi memiliki hak tanggungan aktif sehingga request tidak dapat dilanjutkan.'));
 });
 
 it('renders the appraisal request index for admin users', function () {
@@ -1533,7 +1599,7 @@ it('creates a revision batch from the admin appraisal workflow', function () {
     $requester->refresh();
 
     expect($requester->notifications()->count())->toBe(1);
-    expect($requester->notifications()->first()->data['title'])->toBe('Revisi dokumen diperlukan');
+    expect($requester->notifications()->first()->data['title'])->toBe('Revisi data atau dokumen diperlukan');
     expect($requester->notifications()->first()->data['url'])->toContain("/permohonan-penilaian/{$record->id}/revisi-dokumen");
 });
 

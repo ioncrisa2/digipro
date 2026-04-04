@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ReportSignerIndexRequest;
 use App\Http\Requests\Admin\StoreReportSignerRequest;
 use App\Models\ReportSigner;
 use Illuminate\Http\RedirectResponse;
@@ -11,14 +12,9 @@ use Inertia\Response;
 
 class ReportSignerController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(ReportSignerIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'role' => (string) $request->query('role', 'all'),
-            'active' => (string) $request->query('active', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $baseQuery = ReportSigner::query();
 
@@ -37,7 +33,7 @@ class ReportSignerController extends Controller
             ->orderByDesc('is_active')
             ->orderBy('role')
             ->orderBy('name')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (ReportSigner $signer) => $this->transformSignerRow($signer));

@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Auth;
 
 use App\Models\User;
 use App\Support\SystemNavigation;
-use App\Http\Requests\LoginRequest;
+use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use App\Http\Requests\RegisterRequest;
+use App\Http\Requests\Auth\RegisterRequest;
 use Illuminate\Auth\Events\Registered;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Models\Role;

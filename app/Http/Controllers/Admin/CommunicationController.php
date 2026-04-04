@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ContactMessageIndexRequest;
 use App\Models\ContactMessage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,15 +12,9 @@ use Inertia\Response;
 
 class CommunicationController extends Controller
 {
-    public function contactMessagesIndex(Request $request): Response
+    public function contactMessagesIndex(ContactMessageIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-            'unread' => (string) $request->query('unread', 'all'),
-            'source' => (string) $request->query('source', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $records = ContactMessage::query()
             ->with('handledBy:id,name')
@@ -45,7 +40,7 @@ class CommunicationController extends Controller
                 fn ($query) => $query->where('source', $filters['source'])
             )
             ->latest('created_at')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (ContactMessage $message) => $this->transformContactMessageRow($message));

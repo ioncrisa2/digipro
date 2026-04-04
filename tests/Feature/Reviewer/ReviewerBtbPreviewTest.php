@@ -13,6 +13,7 @@ use App\Models\GuidelineSet;
 use App\Models\MappiRcnStandard;
 use App\Models\User;
 use App\Models\ValuationSetting;
+use App\Support\AdminWorkspaceAccessSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 
@@ -20,6 +21,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     Role::findOrCreate('Reviewer', 'web');
+    AdminWorkspaceAccessSynchronizer::sync();
 });
 
 function seedBtbReviewerReference(): GuidelineSet

@@ -209,6 +209,34 @@ const timelineDotClass = (type) => {
                 </CardContent>
             </Card>
 
+            <Card
+                v-if="req.status === 'cancelled'"
+                class="border-red-200 bg-red-50/80"
+            >
+                <CardHeader class="pb-2">
+                    <CardTitle class="text-base text-red-950">Permohonan Dibatalkan Sistem</CardTitle>
+                    <CardDescription class="text-red-800">
+                        Request ini tidak dapat dilanjutkan. Alasan pembatalan ditampilkan agar Anda mengetahui dasar keputusan sistem.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-3 text-sm">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div class="rounded-lg border border-red-200 bg-white/70 p-3">
+                            <div class="text-xs text-red-700">Dicatat Oleh</div>
+                            <div class="mt-1 font-medium text-red-950">{{ req.cancelled_by_name ?? "Admin" }}</div>
+                        </div>
+                        <div class="rounded-lg border border-red-200 bg-white/70 p-3">
+                            <div class="text-xs text-red-700">Waktu Pembatalan</div>
+                            <div class="mt-1 font-medium text-red-950">{{ req.cancelled_at ?? "-" }}</div>
+                        </div>
+                    </div>
+                    <div class="rounded-lg border border-red-200 bg-white/70 p-3">
+                        <div class="text-xs text-red-700">Alasan Pembatalan</div>
+                        <div class="mt-1 whitespace-pre-line text-red-950">{{ req.cancellation_reason ?? "-" }}</div>
+                    </div>
+                </CardContent>
+            </Card>
+
             <Card v-if="previewState.has_preview">
                 <CardHeader class="pb-2">
                     <CardTitle class="text-base">Preview Hasil Kajian Pasar</CardTitle>
@@ -253,18 +281,18 @@ const timelineDotClass = (type) => {
 
             <Card v-if="revisionSummary.has_open_batch">
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-base">Revisi Dokumen Dibutuhkan</CardTitle>
+                    <CardTitle class="text-base">Revisi Data / Dokumen Dibutuhkan</CardTitle>
                     <CardDescription>
-                        Admin meminta Anda mengunggah ulang {{ revisionSummary.items_count }} item dokumen atau foto.
+                        Admin meminta Anda memperbaiki {{ revisionSummary.items_count }} item data, dokumen, atau foto.
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div class="text-sm text-slate-700">
-                        Buka halaman revisi untuk melihat file mana yang harus diperbaiki, lalu unggah ulang seluruh dokumen yang diminta.
+                        Buka halaman revisi untuk melihat item mana yang harus diperbaiki, lalu kirim ulang seluruh perubahan yang diminta.
                     </div>
                     <Button @click="goRevisionPage">
                         <FileText class="mr-2 h-4 w-4" />
-                        Upload Revisi Dokumen
+                        Buka Halaman Revisi
                     </Button>
                 </CardContent>
             </Card>

@@ -1,7 +1,12 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\Reviewer\ReviewerController;
+use App\Http\Controllers\Account\ProfileController;
+use App\Http\Controllers\Reviewer\AdjustmentController;
+use App\Http\Controllers\Reviewer\AssetController;
+use App\Http\Controllers\Reviewer\BtbController;
+use App\Http\Controllers\Reviewer\ComparableController;
+use App\Http\Controllers\Reviewer\DashboardController;
+use App\Http\Controllers\Reviewer\ReviewController;
 use App\Support\SystemNavigation;
 use Illuminate\Support\Facades\Route;
 
@@ -11,7 +16,7 @@ Route::middleware(['auth', 'verified', 'reviewer.role'])
     ->group(function (): void {
         Route::middleware('system.section:' . SystemNavigation::ACCESS_REVIEWER_DASHBOARD)
             ->group(function (): void {
-                Route::get('/', [ReviewerController::class, 'dashboard'])->name('dashboard');
+                Route::get('/', DashboardController::class)->name('dashboard');
             });
 
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -23,19 +28,19 @@ Route::middleware(['auth', 'verified', 'reviewer.role'])
 
         Route::middleware('system.section:' . SystemNavigation::MANAGE_REVIEWER_REVIEWS)
             ->group(function (): void {
-                Route::get('/reviews', [ReviewerController::class, 'reviewsIndex'])->name('reviews.index');
-                Route::get('/reviews/{review}', [ReviewerController::class, 'reviewsShow'])->name('reviews.show');
+                Route::get('/reviews', [ReviewController::class, 'index'])->name('reviews.index');
+                Route::get('/reviews/{review}', [ReviewController::class, 'show'])->name('reviews.show');
 
-                Route::get('/assets', [ReviewerController::class, 'assetsIndex'])->name('assets.index');
-                Route::get('/assets/{asset}', [ReviewerController::class, 'assetsShow'])->name('assets.show');
-                Route::get('/assets/{asset}/adjustment', [ReviewerController::class, 'assetsAdjustment'])->name('assets.adjustment');
-                Route::get('/assets/{asset}/btb', [ReviewerController::class, 'assetsBtb'])->name('assets.btb');
+                Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
+                Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
+                Route::get('/assets/{asset}/adjustment', [AssetController::class, 'adjustment'])->name('assets.adjustment');
+                Route::get('/assets/{asset}/btb', [AssetController::class, 'btb'])->name('assets.btb');
             });
 
         Route::middleware('system.section:' . SystemNavigation::MANAGE_REVIEWER_COMPARABLES)
             ->group(function (): void {
-                Route::get('/comparables', [ReviewerController::class, 'comparablesIndex'])->name('comparables.index');
-                Route::get('/comparables/{comparable}', [ReviewerController::class, 'comparablesShow'])->name('comparables.show');
+                Route::get('/comparables', [ComparableController::class, 'index'])->name('comparables.index');
+                Route::get('/comparables/{comparable}', [ComparableController::class, 'show'])->name('comparables.show');
             });
 
         Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_MASTER_DATA)
@@ -145,21 +150,21 @@ Route::middleware(['auth', 'verified', 'reviewer.role'])
         Route::prefix('api')->name('api.')->group(function (): void {
             Route::middleware('system.section:' . SystemNavigation::MANAGE_REVIEWER_REVIEWS)
                 ->group(function (): void {
-                    Route::post('/reviews/{review}/start', [ReviewerController::class, 'startReview'])->name('reviews.start');
-                    Route::post('/reviews/{review}/finish', [ReviewerController::class, 'finishReview'])->name('reviews.finish');
+                    Route::post('/reviews/{review}/start', [ReviewController::class, 'start'])->name('reviews.start');
+                    Route::post('/reviews/{review}/finish', [ReviewController::class, 'finish'])->name('reviews.finish');
 
-                    Route::post('/assets/{asset}/general-data', [ReviewerController::class, 'updateGeneralData'])->name('assets.general-data');
-                    Route::post('/assets/{asset}/adjustment/preview', [ReviewerController::class, 'previewAdjustment'])->name('assets.adjustment.preview');
-                    Route::post('/assets/{asset}/adjustment/save', [ReviewerController::class, 'saveAdjustment'])->name('assets.adjustment.save');
-                    Route::post('/assets/{asset}/btb/preview', [ReviewerController::class, 'previewBtb'])->name('assets.btb.preview');
-                    Route::post('/assets/{asset}/btb/save', [ReviewerController::class, 'saveBtb'])->name('assets.btb.save');
+                    Route::post('/assets/{asset}/general-data', [AssetController::class, 'updateGeneralData'])->name('assets.general-data');
+                    Route::post('/assets/{asset}/adjustment/preview', [AdjustmentController::class, 'preview'])->name('assets.adjustment.preview');
+                    Route::post('/assets/{asset}/adjustment/save', [AdjustmentController::class, 'save'])->name('assets.adjustment.save');
+                    Route::post('/assets/{asset}/btb/preview', [BtbController::class, 'preview'])->name('assets.btb.preview');
+                    Route::post('/assets/{asset}/btb/save', [BtbController::class, 'save'])->name('assets.btb.save');
                 });
 
             Route::middleware('system.section:' . SystemNavigation::MANAGE_REVIEWER_COMPARABLES)
                 ->group(function (): void {
-                    Route::post('/assets/{asset}/comparables/search', [ReviewerController::class, 'searchComparables'])->name('assets.comparables.search');
-                    Route::post('/assets/{asset}/comparables/sync', [ReviewerController::class, 'syncComparables'])->name('assets.comparables.sync');
-                    Route::post('/comparables/{comparable}', [ReviewerController::class, 'updateComparable'])->name('comparables.update');
+                    Route::post('/assets/{asset}/comparables/search', [ComparableController::class, 'search'])->name('assets.comparables.search');
+                    Route::post('/assets/{asset}/comparables/sync', [ComparableController::class, 'sync'])->name('assets.comparables.sync');
+                    Route::post('/comparables/{comparable}', [ComparableController::class, 'update'])->name('comparables.update');
                 });
         });
     });

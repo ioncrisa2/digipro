@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Controllers\AppraisalController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\ReportController;
+use App\Http\Controllers\Customer\AppraisalController;
+use App\Http\Controllers\Customer\DashboardController;
+use App\Http\Controllers\Customer\PaymentController;
+use App\Http\Controllers\Customer\ReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'customer.role'])

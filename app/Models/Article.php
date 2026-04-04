@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use App\Models\ArticleCategory;
 use App\Models\Tag;
+use Illuminate\Support\Carbon;
 
 class Article extends Model
 {
@@ -31,7 +32,13 @@ class Article extends Model
 
     public function scopePublished(Builder $query): Builder
     {
-        return $query->where('is_published', true);
+        return $query
+            ->where('is_published', true)
+            ->where(function (Builder $innerQuery): void {
+                $innerQuery
+                    ->whereNull('published_at')
+                    ->orWhere('published_at', '<=', Carbon::now());
+            });
     }
 
     public function category()

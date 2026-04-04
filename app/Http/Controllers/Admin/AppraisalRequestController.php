@@ -8,13 +8,14 @@ use App\Enums\ReportTypeEnum;
 use App\Enums\ValuationObjectiveEnum;
 use App\Http\Controllers\Admin\Concerns\InteractsWithAppraisalRequests;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\AppraisalRequestIndexRequest;
 use App\Http\Requests\Admin\UpdateAppraisalRequestBasicRequest;
 use App\Models\AppraisalRequest;
 use App\Models\ReportSigner;
 use App\Services\Admin\AppraisalContractNumberService;
 use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
-use App\Services\AppraisalRevisionFileResolver;
+use App\Services\Revisions\AppraisalRevisionFileResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Response;
@@ -23,13 +24,9 @@ class AppraisalRequestController extends Controller
 {
     use InteractsWithAppraisalRequests;
 
-    public function appraisalRequestsIndex(Request $request): Response
+    public function appraisalRequestsIndex(AppraisalRequestIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $records = AppraisalRequest::query()
             ->with('user')
@@ -47,7 +44,7 @@ class AppraisalRequestController extends Controller
             })
             ->when($filters['status'] !== 'all', fn ($query) => $query->where('status', $filters['status']))
             ->latest('requested_at')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (AppraisalRequest $record) => $this->transformRequestTableRow($record));
@@ -88,6 +85,7 @@ class AppraisalRequestController extends Controller
         $appraisalRequest->load([
             'guidelineSet',
             'user',
+            'cancelledBy:id,name',
             'reportReviewerSigner',
             'reportPublicAppraiserSigner',
             'files',
@@ -142,6 +140,9 @@ class AppraisalRequestController extends Controller
                 'notes' => $appraisalRequest->notes,
                 'user_request_note' => $appraisalRequest->user_request_note,
                 'guideline_set' => $appraisalRequest->guidelineSet?->name ?? '-',
+                'cancelled_at' => $appraisalRequest->cancelled_at?->toIso8601String(),
+                'cancelled_by_name' => $appraisalRequest->cancelledBy?->name,
+                'cancellation_reason' => $appraisalRequest->cancellation_reason,
             ],
             'marketPreview' => [
                 'version' => (int) ($appraisalRequest->market_preview_version ?? 0),
@@ -265,6 +266,7 @@ class AppraisalRequestController extends Controller
             'revisionWorkspace' => [
                 'state' => $revisionService->creationState($appraisalRequest),
                 'create_url' => route('admin.appraisal-requests.revision-batches.store', $appraisalRequest),
+                'field_correction_url' => route('admin.appraisal-requests.field-corrections.store', $appraisalRequest),
                 'target_options' => $revisionService->buildTargetOptions($appraisalRequest),
                 'batches' => $appraisalRequest->revisionBatches
                     ->map(fn ($batch) => $this->transformRevisionBatch($batch, $appraisalRequest))

@@ -9,6 +9,7 @@ use App\Models\AppraisalRequestFile;
 use App\Models\AppraisalRequestRevisionBatch;
 use App\Models\AppraisalRequestRevisionItem;
 use App\Models\User;
+use App\Support\AdminWorkspaceAccessSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +21,7 @@ uses(RefreshDatabase::class);
 beforeEach(function (): void {
     Role::findOrCreate('admin', 'web');
     Role::findOrCreate('customer', 'web');
+    AdminWorkspaceAccessSynchronizer::sync();
 });
 
 function createCustomerUserForRevision(): User

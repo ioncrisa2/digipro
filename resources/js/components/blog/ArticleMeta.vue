@@ -15,22 +15,21 @@ const props = defineProps({
   },
   categoryClass: {
     type: String,
-    default: 'px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium',
+    default: 'rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700',
   },
 })
 
 const { formatDate, getReadTime } = useArticleFormat()
-
 const readTime = computed(() => getReadTime(props.readSource, { suffix: props.readSuffix }))
 </script>
 
 <template>
   <div :class="containerClass">
     <span>{{ formatDate(publishedAt) }}</span>
-    <span class="text-slate-300">•</span>
+    <span class="text-slate-300">/</span>
     <span>{{ readTime }}</span>
     <template v-if="showViews">
-      <span class="text-slate-300">•</span>
+      <span class="text-slate-300">/</span>
       <span>{{ views ?? 0 }} views</span>
     </template>
     <span v-if="category" :class="categoryClass">

@@ -6,7 +6,14 @@ import UserDashboardLayout from "@/layouts/UserDashboardLayout.vue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, Printer, ReceiptText } from "lucide-vue-next";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ArrowLeft, ChevronDown, Download, Printer, ReceiptText } from "lucide-vue-next";
 
 const props = defineProps({
     request: { type: Object, default: () => ({}) },
@@ -89,23 +96,36 @@ const downloadInvoicePdf = () => {
                     </p>
                 </div>
 
-                <div class="flex flex-wrap gap-2">
-                    <Button variant="outline" @click="printInvoice">
-                        <Printer class="mr-2 h-4 w-4" />
-                        Cetak
-                    </Button>
-                    <Button @click="downloadInvoicePdf">
-                        <Download class="mr-2 h-4 w-4" />
-                        Download Invoice PDF
-                    </Button>
-                    <Button variant="outline" @click="downloadContractPdf">
-                        <Download class="mr-2 h-4 w-4" />
-                        Download Kontrak
-                    </Button>
+                <div class="flex w-full flex-wrap items-center justify-between gap-2">
                     <Button variant="outline" @click="goBack">
                         <ArrowLeft class="mr-2 h-4 w-4" />
                         Kembali ke Detail
                     </Button>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger as-child>
+                            <Button variant="outline">
+                                Option
+                                <ChevronDown class="ml-2 h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+
+                        <DropdownMenuContent align="end" class="w-56">
+                            <DropdownMenuItem @click="printInvoice">
+                                <Printer class="mr-2 h-4 w-4" />
+                                Cetak
+                            </DropdownMenuItem>
+                            <DropdownMenuItem @click="downloadInvoicePdf">
+                                <Download class="mr-2 h-4 w-4" />
+                                Download Invoice
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem @click="downloadContractPdf">
+                                <Download class="mr-2 h-4 w-4" />
+                                Download Kontrak
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
 

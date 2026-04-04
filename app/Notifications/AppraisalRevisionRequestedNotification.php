@@ -25,14 +25,14 @@ class AppraisalRevisionRequestedNotification extends Notification
 
     public function toDatabase(object $notifiable): array
     {
-        $message = "Admin meminta revisi {$this->itemsCount} dokumen/foto untuk {$this->requestNumber}.";
+        $message = "Admin meminta revisi {$this->itemsCount} data/dokumen untuk {$this->requestNumber}.";
 
         if ($this->adminNote) {
             $message .= " Catatan: {$this->adminNote}";
         }
 
         return [
-            'title' => 'Revisi dokumen diperlukan',
+            'title' => 'Revisi data atau dokumen diperlukan',
             'message' => $message,
             'url' => route('appraisal.revisions.page', ['id' => $this->appraisalId]),
             'appraisal_id' => $this->appraisalId,

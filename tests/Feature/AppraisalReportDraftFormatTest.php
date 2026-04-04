@@ -6,7 +6,7 @@ use App\Models\AppraisalAsset;
 use App\Models\AppraisalRequest;
 use App\Models\GuidelineSet;
 use App\Models\User;
-use App\Services\AppraisalReportPayloadBuilder;
+use App\Services\Reports\AppraisalReportPayloadBuilder;
 use App\Support\AdminWorkspaceAccessSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;

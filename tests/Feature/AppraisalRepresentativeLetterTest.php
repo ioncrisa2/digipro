@@ -10,7 +10,7 @@ use App\Models\ConsentDocument;
 use App\Models\GuidelineSet;
 use App\Models\Payment;
 use App\Models\User;
-use App\Services\AppraisalService;
+use App\Services\Customer\AppraisalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;

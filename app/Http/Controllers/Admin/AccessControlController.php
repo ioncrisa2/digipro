@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Support\SystemNavigation;
+use App\Http\Requests\Admin\RoleIndexRequest;
 use App\Http\Requests\Admin\StoreRoleRequest;
+use App\Http\Requests\Admin\WorkspaceMenuUpdateRequest;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -17,15 +19,11 @@ use Spatie\Permission\Models\Role;
 
 class AccessControlController extends Controller
 {
-    public function rolesIndex(Request $request): Response
+    public function rolesIndex(RoleIndexRequest $request): Response
     {
         $this->authorizeRoleAbility('view_any_role');
 
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guard' => (string) $request->query('guard', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $records = Role::query()
             ->withCount('permissions')
@@ -34,7 +32,7 @@ class AccessControlController extends Controller
             })
             ->when($filters['guard'] !== 'all', fn ($query) => $query->where('guard_name', $filters['guard']))
             ->latest('updated_at')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (Role $role) => $this->transformRoleRow($role));
@@ -107,15 +105,11 @@ class AccessControlController extends Controller
         ]);
     }
 
-    public function workspaceMenusIndex(Request $request): Response
+    public function workspaceMenusIndex(RoleIndexRequest $request): Response
     {
         $this->authorizeRoleAbility('view_any_role');
 
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guard' => (string) $request->query('guard', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $records = Role::query()
             ->with('permissions:id,name,guard_name')
@@ -124,7 +118,7 @@ class AccessControlController extends Controller
             })
             ->when($filters['guard'] !== 'all', fn ($query) => $query->where('guard_name', $filters['guard']))
             ->orderBy('name')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (Role $role) => $this->transformWorkspaceMenuRoleRow($role));
@@ -167,14 +161,10 @@ class AccessControlController extends Controller
         ]);
     }
 
-    public function workspaceMenusUpdate(Request $request, Role $role): RedirectResponse
+    public function workspaceMenusUpdate(WorkspaceMenuUpdateRequest $request, Role $role): RedirectResponse
     {
         $this->authorizeRoleAbility('update_role');
-
-        $validated = $request->validate([
-            'workspace_permissions' => ['array'],
-            'workspace_permissions.*' => ['string', Rule::in(SystemNavigation::sectionPermissions())],
-        ]);
+        $validated = $request->validated();
 
         $selectedWorkspacePermissions = collect($validated['workspace_permissions'] ?? [])
             ->values()

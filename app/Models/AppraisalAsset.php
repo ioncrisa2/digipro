@@ -104,4 +104,9 @@ class AppraisalAsset extends Model
     {
         return $this->hasMany(AppraisalRequestRevisionItem::class);
     }
+
+    public function fieldChangeLogs(): HasMany
+    {
+        return $this->hasMany(AppraisalFieldChangeLog::class);
+    }
 }

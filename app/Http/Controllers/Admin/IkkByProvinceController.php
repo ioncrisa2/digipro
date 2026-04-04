@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\IkkByProvinceIndexRequest;
 use App\Http\Requests\Admin\SaveIkkByProvinceRequest;
 use App\Models\ConstructionCostIndex;
 use App\Models\GuidelineSet;
@@ -15,24 +16,18 @@ use Inertia\Response;
 
 class IkkByProvinceController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(IkkByProvinceIndexRequest $request): Response
     {
-        $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
-
-        $filters = [
-            'guideline_set_id' => (string) ($request->query('guideline_set_id', $activeGuideline?->id ?? '')),
-            'year' => (string) ($request->query('year', $activeGuideline?->year ?? now()->format('Y'))),
-            'province_id' => (string) $request->query('province_id', ''),
-        ];
+        $filters = $request->filters();
 
         return inertia('Admin/IkkByProvince/Index', [
             'filters' => $filters,
             'guidelineSetOptions' => $this->guidelineSetOptions(),
             'provinceOptions' => $this->provinceOptions(),
             'items' => $this->items(
-                $this->normalizeGuidelineId($filters['guideline_set_id']),
-                $this->normalizeYear($filters['year']),
-                $this->normalizeProvinceId($filters['province_id'])
+                $request->guidelineSetId(),
+                $request->yearValue(),
+                $request->provinceId()
             ),
             'submitUrl' => $this->workspaceRoute('ref-guidelines.ikk-by-province.save'),
         ]);
@@ -139,22 +134,5 @@ class IkkByProvinceController extends Controller
             ])
             ->values()
             ->all();
-    }
-
-    private function normalizeGuidelineId(mixed $value): ?int
-    {
-        return is_numeric($value) ? (int) $value : null;
-    }
-
-    private function normalizeYear(mixed $value): ?int
-    {
-        return is_numeric($value) ? (int) $value : null;
-    }
-
-    private function normalizeProvinceId(mixed $value): ?string
-    {
-        $id = trim((string) $value);
-
-        return $id === '' ? null : $id;
     }
 }

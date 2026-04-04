@@ -6,7 +6,7 @@ use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetComparable;
 use App\Models\AppraisalRequest;
 use App\Models\User;
-use App\Services\ComparableDataApi;
+use App\Services\Reviewer\ComparableDataApi;
 use App\Support\AdminWorkspaceAccessSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
@@ -374,6 +374,50 @@ it('allows reviewer to search and sync comparables', function (): void {
     $syncResponse
         ->assertOk()
         ->assertJsonPath('comparables.0.external_id', '777');
+});
+
+it('rolls back comparable deletion when sync comparables fails', function (): void {
+    [$reviewer, $request, $asset] = createReviewerAssetFixture();
+
+    AppraisalAssetComparable::query()->create([
+        'appraisal_asset_id' => $asset->id,
+        'external_id' => 991,
+        'external_source' => 'seed',
+        'is_selected' => true,
+        'manual_rank' => 1,
+        'rank' => 1,
+        'snapshot_json' => [
+            'peruntukan' => [
+                'slug' => 'tanah_kosong',
+                'name' => 'Tanah Kosong',
+            ],
+        ],
+    ]);
+
+    $service = mock(ComparableDataApi::class);
+    $service->shouldReceive('upsertComparables')
+        ->once()
+        ->andThrow(new \RuntimeException('Sync gagal dari provider pembanding.'));
+    app()->instance(ComparableDataApi::class, $service);
+
+    $this->withoutExceptionHandling();
+
+    try {
+        $this
+            ->actingAs($reviewer)
+            ->postJson(route('reviewer.api.assets.comparables.sync', $asset), [
+                'items' => [
+                    ['id' => 1234],
+                ],
+            ]);
+
+        $this->fail('Expected sync comparables to throw.');
+    } catch (\RuntimeException $exception) {
+        expect($exception->getMessage())->toBe('Sync gagal dari provider pembanding.');
+    }
+
+    expect($asset->comparables()->count())->toBe(1);
+    expect($asset->comparables()->first()?->external_id)->toBe(991);
 });
 
 it('allows reviewer to update comparable selection and rank', function (): void {

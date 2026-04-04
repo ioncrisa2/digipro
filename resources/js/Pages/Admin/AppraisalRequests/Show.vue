@@ -183,9 +183,12 @@ const negotiationFilters = reactive({
 const revisionDialogOpen = ref(false);
 const revisionReviewDialogOpen = ref(false);
 const revisionFilePreviewOpen = ref(false);
+const fieldCorrectionDialogOpen = ref(false);
+const cancellationDialogOpen = ref(false);
 const confirmDialogOpen = ref(false);
 const selectedRevisionTarget = ref(null);
 const selectedReviewItem = ref(null);
+const selectedFieldCorrectionTarget = ref(null);
 const selectedPreviewFile = ref(null);
 const selectedPreviewLabel = ref('');
 let confirmDialogAction = null;
@@ -208,6 +211,15 @@ const revisionForm = useForm({
 const revisionReviewForm = useForm({
   review_note: '',
 });
+const cancelRequestForm = useForm({
+  reason: '',
+});
+const fieldCorrectionForm = useForm({
+  target_key: '',
+  value: '',
+  reason: '',
+});
+const selectedCancellationAction = ref(null);
 
 const statusTone = (value) => {
   switch (value) {
@@ -229,6 +241,8 @@ const statusTone = (value) => {
     case 'report_preparation':
     case 'report_ready':
       return 'bg-cyan-100 text-cyan-900 border-cyan-200';
+    case 'cancelled':
+      return 'bg-rose-100 text-rose-900 border-rose-200';
     default:
   return 'bg-slate-100 text-slate-800 border-slate-200';
   }
@@ -348,6 +362,15 @@ const runAction = (action) => {
   if (action.disabled) {
     return;
   }
+
+  if (action.requires_reason) {
+    selectedCancellationAction.value = action;
+    cancelRequestForm.reset();
+    cancelRequestForm.clearErrors();
+    cancellationDialogOpen.value = true;
+    return;
+  }
+
   openConfirmDialog({
     title: action.label,
     description: action.message,
@@ -357,6 +380,26 @@ const runAction = (action) => {
       router.post(action.url, {}, {
         preserveScroll: true,
       });
+    },
+  });
+};
+
+const closeCancellationDialog = () => {
+  cancellationDialogOpen.value = false;
+  selectedCancellationAction.value = null;
+  cancelRequestForm.reset();
+  cancelRequestForm.clearErrors();
+};
+
+const submitCancellation = () => {
+  if (!selectedCancellationAction.value?.url) {
+    return;
+  }
+
+  cancelRequestForm.post(selectedCancellationAction.value.url, {
+    preserveScroll: true,
+    onSuccess: () => {
+      closeCancellationDialog();
     },
   });
 };
@@ -469,6 +512,8 @@ const requestExistingRevisionOptions = computed(() => Object.fromEntries(
 ));
 const assetDocumentRevisionOptions = computed(() => revisionTargetOptions.value.filter((option) => option.item_type === 'asset_document'));
 const assetPhotoRevisionOptions = computed(() => revisionTargetOptions.value.filter((option) => option.item_type === 'asset_photo'));
+const assetFieldRevisionOptions = computed(() => revisionTargetOptions.value.filter((option) => option.item_type === 'asset_field'));
+const assetFieldOptions = (assetId) => assetFieldRevisionOptions.value.filter((option) => option.appraisal_asset_id === assetId);
 const showContractTab = computed(() => {
   return record.value?.contract_status_value === 'signed'
     || contractFiles.value.length > 0
@@ -574,6 +619,7 @@ const resetRevisionForm = () => {
 };
 
 const targetRevisionStatus = (targetKey) => openRevisionItemMap.value[targetKey] ?? null;
+const canApplyFieldCorrection = computed(() => ['submitted', 'docs_incomplete', 'waiting_offer', 'offer_sent'].includes(record.value?.status_value));
 
 const assetMissingDocumentOptions = (assetId) => assetDocumentRevisionOptions.value.filter((option) => option.kind === 'missing' && option.appraisal_asset_id === assetId);
 const assetMissingPhotoOptions = (assetId) => assetPhotoRevisionOptions.value.filter((option) => option.kind === 'missing' && option.appraisal_asset_id === assetId);
@@ -593,6 +639,47 @@ const openRevisionDialog = (target) => {
     issue_note: '',
   });
   revisionDialogOpen.value = true;
+};
+
+const fieldInputComponent = (target) => target?.field?.input_type ?? 'text';
+const fieldSelectOptions = (target) => target?.field?.options ?? [];
+const fieldDisplayValue = (snapshot) => snapshot?.display ?? 'Belum diisi';
+const fieldFormInitialValue = (target) => {
+  const value = target?.field?.value;
+  return value === null || value === undefined ? '' : String(value);
+};
+
+const openFieldCorrectionDialog = (target) => {
+  if (!target || !revisionWorkspace.value?.field_correction_url || !canApplyFieldCorrection.value) {
+    return;
+  }
+
+  selectedFieldCorrectionTarget.value = target;
+  fieldCorrectionForm.clearErrors();
+  fieldCorrectionForm.target_key = target.key;
+  fieldCorrectionForm.value = fieldFormInitialValue(target);
+  fieldCorrectionForm.reason = '';
+  fieldCorrectionDialogOpen.value = true;
+};
+
+const closeFieldCorrectionDialog = () => {
+  fieldCorrectionDialogOpen.value = false;
+  selectedFieldCorrectionTarget.value = null;
+  fieldCorrectionForm.reset();
+  fieldCorrectionForm.clearErrors();
+};
+
+const submitFieldCorrection = () => {
+  if (!revisionWorkspace.value?.field_correction_url || !selectedFieldCorrectionTarget.value) {
+    return;
+  }
+
+  fieldCorrectionForm.post(revisionWorkspace.value.field_correction_url, {
+    preserveScroll: true,
+    onSuccess: () => {
+      closeFieldCorrectionDialog();
+    },
+  });
 };
 
 const approveRevisionItem = (item) => {
@@ -795,6 +882,32 @@ const submitRevisionItem = () => {
             </CardContent>
           </Card>
 
+          <Card
+            v-if="activeTab === 'ringkasan' && record.status_value === 'cancelled'"
+            class="border-rose-200 bg-rose-50/80"
+          >
+            <CardHeader>
+              <CardTitle class="text-rose-950">Request Dibatalkan Sistem</CardTitle>
+              <CardDescription class="text-rose-800">
+                Pembatalan ini bersifat final untuk request saat ini. Alasan tersimpan dan juga terlihat di sisi customer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent class="grid gap-4 md:grid-cols-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-rose-700">Dicatat Oleh</p>
+                <p class="mt-2 text-sm text-rose-950">{{ record.cancelled_by_name || 'Admin' }}</p>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-rose-700">Waktu Pembatalan</p>
+                <p class="mt-2 text-sm text-rose-950">{{ formatDateTime(record.cancelled_at) }}</p>
+              </div>
+              <div class="md:col-span-3">
+                <p class="text-xs font-semibold uppercase tracking-widest text-rose-700">Alasan Pembatalan</p>
+                <p class="mt-2 whitespace-pre-line text-sm leading-6 text-rose-950">{{ record.cancellation_reason || '-' }}</p>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card v-if="activeTab === 'ringkasan' && marketPreview.version">
             <CardHeader>
               <CardTitle>Preview Kajian Pasar</CardTitle>
@@ -861,8 +974,8 @@ const submitRevisionItem = () => {
 
           <Card v-if="activeTab === 'dokumen'">
             <CardHeader>
-              <CardTitle>Permintaan Revisi Dokumen</CardTitle>
-              <CardDescription>Gunakan tombol revisi pada setiap dokumen atau foto untuk meminta customer mengunggah ulang item yang perlu diperbaiki.</CardDescription>
+              <CardTitle>Permintaan Revisi Data & Dokumen</CardTitle>
+              <CardDescription>Gunakan koreksi admin untuk kesalahan yang jelas, atau kirim permintaan revisi ketika customer perlu memperbaiki data, dokumen, atau foto sendiri.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-5">
               <div
@@ -880,7 +993,7 @@ const submitRevisionItem = () => {
                 <div class="flex items-center justify-between gap-3">
                   <div>
                     <p class="text-sm font-semibold text-slate-950">Riwayat Batch Revisi</p>
-                    <p class="text-xs text-slate-500">Catatan revisi terdahulu tetap disimpan agar histori dokumen bisa diaudit.</p>
+                    <p class="text-xs text-slate-500">Catatan revisi terdahulu tetap disimpan agar histori data dan dokumen bisa diaudit.</p>
                   </div>
                   <Badge variant="outline" class="bg-slate-100 text-slate-800 border-slate-200">
                     {{ revisionBatches.length }} batch
@@ -920,7 +1033,21 @@ const submitRevisionItem = () => {
                         <p class="mt-1">{{ item.review_note }}</p>
                       </div>
 
-                      <div class="mt-3 grid gap-3 xl:grid-cols-2">
+                      <div v-if="item.field" class="mt-3 grid gap-3 xl:grid-cols-2">
+                        <div class="rounded-2xl border bg-white p-3">
+                          <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Sebelumnya</p>
+                          <p class="mt-3 text-sm font-medium text-slate-950">{{ fieldDisplayValue(item.field.original_value) }}</p>
+                        </div>
+
+                        <div class="rounded-2xl border bg-white p-3">
+                          <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Revisi</p>
+                          <p class="mt-3 text-sm font-medium text-slate-950">
+                            {{ item.field.replacement_value ? fieldDisplayValue(item.field.replacement_value) : 'Customer belum mengirim nilai revisi.' }}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div v-else class="mt-3 grid gap-3 xl:grid-cols-2">
                         <div class="rounded-2xl border bg-white p-3">
                           <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">File Asal</p>
                           <div v-if="item.original_file" class="mt-2 space-y-1">
@@ -1040,7 +1167,7 @@ const submitRevisionItem = () => {
                 </div>
 
                 <div v-if="!revisionBatches.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
-                  Belum ada batch revisi dokumen untuk request ini.
+                  Belum ada batch revisi data atau dokumen untuk request ini.
                 </div>
               </div>
             </CardContent>
@@ -1213,6 +1340,55 @@ const submitRevisionItem = () => {
                 </div>
 
                 <div v-if="activeTab === 'dokumen'" class="mt-5 space-y-6">
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Data Input Customer</p>
+                    <div class="mt-3 space-y-3">
+                      <div
+                        v-for="option in assetFieldOptions(asset.id)"
+                        :key="option.key"
+                        class="rounded-2xl border bg-slate-50 p-4"
+                      >
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div class="space-y-2">
+                            <div>
+                              <p class="font-medium text-slate-950">{{ option.field.label }}</p>
+                              <p class="mt-1 text-xs text-slate-500">{{ option.description }}</p>
+                            </div>
+                            <div class="rounded-2xl border bg-white px-3 py-2 text-sm text-slate-700">
+                              Nilai saat ini: <span class="font-medium text-slate-950">{{ option.field.display }}</span>
+                            </div>
+                            <div
+                              v-if="targetRevisionStatus(option.key)"
+                              class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                            >
+                              <p class="font-medium">Permintaan revisi aktif</p>
+                              <p class="mt-1">{{ targetRevisionStatus(option.key).issue_note }}</p>
+                            </div>
+                          </div>
+
+                          <div class="flex flex-wrap gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              :disabled="Boolean(targetRevisionStatus(option.key)) || !canApplyFieldCorrection"
+                              @click="openFieldCorrectionDialog(option)"
+                            >
+                              Perbaiki Admin
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              :disabled="Boolean(targetRevisionStatus(option.key)) || !revisionState.can_create"
+                              @click="openRevisionDialog(option)"
+                            >
+                              Minta Revisi
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dokumen Aset</p>
                     <div class="mt-3 space-y-3">
@@ -1944,10 +2120,10 @@ const submitRevisionItem = () => {
 
     <Dialog :open="revisionDialogOpen" @update:open="(open) => { if (!open) closeRevisionDialog(); else revisionDialogOpen = open; }">
       <DialogContent class="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Permintaan Revisi Dokumen</DialogTitle>
+          <DialogHeader>
+          <DialogTitle>Permintaan Revisi Customer</DialogTitle>
           <DialogDescription>
-            Jelaskan dengan singkat apa yang perlu customer perbaiki atau unggah ulang pada item ini.
+            Jelaskan dengan singkat apa yang perlu customer perbaiki pada data, dokumen, atau foto pada item ini.
           </DialogDescription>
         </DialogHeader>
 
@@ -1982,6 +2158,84 @@ const submitRevisionItem = () => {
           </Button>
           <Button type="button" :disabled="revisionForm.processing" @click="submitRevisionItem">
             Simpan Revisi
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog :open="fieldCorrectionDialogOpen" @update:open="(open) => { if (!open) closeFieldCorrectionDialog(); else fieldCorrectionDialogOpen = open; }">
+      <DialogContent class="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Perbaiki Data oleh Admin</DialogTitle>
+          <DialogDescription>
+            Gunakan aksi ini jika nilai yang benar sudah bisa ditentukan admin tanpa perlu mengembalikan item ke customer.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4">
+          <div v-if="selectedFieldCorrectionTarget" class="rounded-2xl border bg-slate-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Field Target</p>
+            <p class="mt-2 text-sm font-medium text-slate-950">{{ selectedFieldCorrectionTarget.field.label }}</p>
+            <p class="mt-1 text-xs text-slate-500">Nilai saat ini: {{ selectedFieldCorrectionTarget.field.display }}</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="field_correction_value">Nilai Baru</Label>
+            <Select
+              v-if="fieldInputComponent(selectedFieldCorrectionTarget) === 'select'"
+              v-model="fieldCorrectionForm.value"
+            >
+              <SelectTrigger id="field_correction_value">
+                <SelectValue placeholder="Pilih nilai" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="option in fieldSelectOptions(selectedFieldCorrectionTarget)"
+                  :key="option.value"
+                  :value="String(option.value)"
+                >
+                  {{ option.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <Textarea
+              v-else-if="fieldInputComponent(selectedFieldCorrectionTarget) === 'textarea'"
+              id="field_correction_value"
+              v-model="fieldCorrectionForm.value"
+              rows="4"
+              :placeholder="selectedFieldCorrectionTarget?.field?.placeholder || 'Isi nilai baru'"
+            />
+            <Input
+              v-else
+              id="field_correction_value"
+              v-model="fieldCorrectionForm.value"
+              :type="['number', 'integer'].includes(fieldInputComponent(selectedFieldCorrectionTarget)) ? 'number' : 'text'"
+              :step="fieldInputComponent(selectedFieldCorrectionTarget) === 'number' ? '0.0000001' : '1'"
+              :placeholder="selectedFieldCorrectionTarget?.field?.placeholder || 'Isi nilai baru'"
+            />
+            <p v-if="fieldCorrectionForm.errors.value" class="text-xs text-rose-600">{{ fieldCorrectionForm.errors.value }}</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="field_correction_reason">Alasan Koreksi</Label>
+            <Textarea
+              id="field_correction_reason"
+              v-model="fieldCorrectionForm.reason"
+              rows="4"
+              placeholder="Contoh: typo alamat, titik koordinat tidak valid, atau data luas salah input."
+            />
+            <p v-if="fieldCorrectionForm.errors.reason" class="text-xs text-rose-600">{{ fieldCorrectionForm.errors.reason }}</p>
+            <p v-if="fieldCorrectionForm.errors.target_key" class="text-xs text-rose-600">{{ fieldCorrectionForm.errors.target_key }}</p>
+          </div>
+        </div>
+
+        <DialogFooter class="gap-2 sm:justify-end">
+          <Button type="button" variant="outline" @click="closeFieldCorrectionDialog">
+            <X class="h-4 w-4" />
+            Batal
+          </Button>
+          <Button type="button" :disabled="fieldCorrectionForm.processing" @click="submitFieldCorrection">
+            Simpan Koreksi
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -2090,6 +2344,51 @@ const submitRevisionItem = () => {
             </Button>
           </DialogFooter>
         </div>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog :open="cancellationDialogOpen" @update:open="(open) => { if (!open) closeCancellationDialog(); else cancellationDialogOpen = open; }">
+      <DialogContent class="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Batalkan Request Penilaian</DialogTitle>
+          <DialogDescription>
+            Gunakan aksi ini hanya jika request memang tidak dapat dilanjutkan, misalnya dokumen legal bermasalah, verifikasi peta bidang gagal, atau ada indikasi data material yang tidak valid.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4">
+          <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            Status request akan berpindah ke <span class="font-semibold">Dibatalkan</span>, kontrak ikut ditutup, dan alasan pembatalan akan terlihat oleh customer.
+          </div>
+
+          <div class="space-y-2">
+            <Label for="cancellation_reason">Alasan Pembatalan</Label>
+            <Textarea
+              id="cancellation_reason"
+              v-model="cancelRequestForm.reason"
+              rows="6"
+              placeholder="Contoh: Sertifikat terindikasi memiliki hak tanggungan aktif sehingga proses penilaian tidak dapat dilanjutkan."
+            />
+            <p class="text-xs text-slate-500">
+              Tulis alasan operasional yang spesifik agar customer memahami apa yang menjadi dasar pembatalan.
+            </p>
+            <p v-if="cancelRequestForm.errors.reason" class="text-xs text-rose-600">{{ cancelRequestForm.errors.reason }}</p>
+          </div>
+        </div>
+
+        <DialogFooter class="gap-2 sm:justify-end">
+          <Button type="button" variant="outline" @click="closeCancellationDialog">
+            Kembali
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            :disabled="cancelRequestForm.processing"
+            @click="submitCancellation"
+          >
+            Batalkan Request
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
 

@@ -216,10 +216,10 @@ const visitLocalPage = (page) => {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-      <div class="overflow-x-auto">
-        <Table class="[&_tbody_tr:last-child]:border-b-0">
+  <div class="max-w-full space-y-4">
+    <div class="max-w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div class="w-full max-w-full overflow-x-auto">
+        <Table class="w-full [&_tbody_tr:last-child]:border-b-0">
           <TableHeader class="bg-slate-50/90">
             <TableRow
               v-for="headerGroup in table.getHeaderGroups()"

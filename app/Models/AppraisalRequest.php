@@ -10,8 +10,8 @@ use App\Enums\AppraisalStatusEnum;
 use App\Enums\ValuationObjectiveEnum;
 use App\Traits\HasRequestNumber;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class AppraisalRequest extends Model
@@ -70,6 +70,9 @@ class AppraisalRequest extends Model
         'report_draft_pdf_size',
         'report_pdf_path',
         'report_pdf_size',
+        'cancelled_by',
+        'cancelled_at',
+        'cancellation_reason',
         'market_preview_snapshot',
         'market_preview_version',
         'market_preview_published_at',
@@ -112,6 +115,7 @@ class AppraisalRequest extends Model
         'report_generated_at'           => 'datetime',
         'report_signer_snapshot'        => 'array',
         'report_draft_generated_at'     => 'datetime',
+        'cancelled_at'                  => 'datetime',
         'physical_report_printed_at'    => 'datetime',
         'physical_report_shipped_at'    => 'datetime',
         'physical_report_delivered_at'  => 'datetime',
@@ -173,6 +177,11 @@ class AppraisalRequest extends Model
         return $this->belongsTo(User::class, 'report_generated_by');
     }
 
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
     public function reportReviewerSigner(): BelongsTo
     {
         return $this->belongsTo(ReportSigner::class, 'report_reviewer_signer_id');
@@ -228,6 +237,11 @@ class AppraisalRequest extends Model
     public function revisionBatches(): HasMany
     {
         return $this->hasMany(AppraisalRequestRevisionBatch::class);
+    }
+
+    public function fieldChangeLogs(): HasMany
+    {
+        return $this->hasMany(AppraisalFieldChangeLog::class);
     }
 
 }

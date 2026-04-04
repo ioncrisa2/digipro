@@ -1,15 +1,29 @@
 <script setup>
-import { computed } from "vue";
-import { router } from "@inertiajs/vue3";
-import DashboardLayout from "@/layouts/UserDashboardLayout.vue";
-import { useAppraisalIndex } from "@/composables/useAppraisalIndex";
-import { useAppraisalStatus } from "@/composables/useAppraisalStatus";
-import AppraisalHeader from "@/components/appraisal/AppraisalHeader.vue";
-import AppraisalStatsGrid from "@/components/appraisal/AppraisalStatsGrid.vue";
-import AppraisalFilters from "@/components/appraisal/AppraisalFilters.vue";
-import AppraisalEmptyState from "@/components/appraisal/AppraisalEmptyState.vue";
-import AppraisalTable from "@/components/appraisal/AppraisalTable.vue";
-import AppraisalCardsMobile from "@/components/appraisal/AppraisalCardsMobile.vue";
+import { computed, reactive } from 'vue'
+import { Head, Link, router } from '@inertiajs/vue3'
+import AdminDataTable from '@/components/admin/AdminDataTable.vue'
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue'
+import AppraisalEmptyState from '@/components/appraisal/AppraisalEmptyState.vue'
+import AppraisalHeader from '@/components/appraisal/AppraisalHeader.vue'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import DashboardLayout from '@/layouts/UserDashboardLayout.vue'
+import { useAppraisalStatus } from '@/composables/useAppraisalStatus'
 
 const props = defineProps({
   appraisals: { type: Object, required: true },
@@ -17,110 +31,195 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  filters: { type: Object, default: () => ({ q: "", status: "all" }) },
-});
+  filters: { type: Object, default: () => ({ q: '', status: 'all', per_page: '10' }) },
+})
 
-const { searchQuery, statusFilter, rows, links, goTo, resetFilters, hasActiveFilters } =
-  useAppraisalIndex(props);
+const { getStatusConfig, statusFilterOptions } = useAppraisalStatus()
 
-// Use status helper composable
-const { getStatusConfig, statusFilterOptions } = useAppraisalStatus();
+const form = reactive({
+  q: props.filters.q ?? '',
+  status: props.filters.status ?? 'all',
+})
 
-const goToCreate = () => router.get("/buat-permohonan");
+const rows = computed(() => props.appraisals?.data ?? [])
+const paginationMeta = computed(() => {
+  const meta = props.appraisals?.meta
 
-const viewDetail = (id) => {
-  router.get(`/permohonan-penilaian/${id}`);
-};
+  if (!meta) {
+    return null
+  }
+
+  return {
+    ...meta,
+    links: props.appraisals?.links ?? meta.links ?? [],
+  }
+})
+
+const hasActiveFilters = computed(() => Boolean(form.q.trim()) || form.status !== 'all')
+const activeFilterCount = computed(() => (form.status !== 'all' ? 1 : 0))
+
+const goToCreate = () => router.get('/buat-permohonan')
+
+const applyFilters = () => {
+  router.get(route('appraisal.list'), {
+    q: form.q || undefined,
+    status: form.status === 'all' ? undefined : form.status,
+  }, {
+    preserveState: true,
+    preserveScroll: true,
+    replace: true,
+  })
+}
+
+const resetFilters = () => {
+  form.q = ''
+  form.status = 'all'
+  applyFilters()
+}
 
 const formatDate = (dateString) => {
-  if (!dateString) return "-";
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-};
+  if (!dateString) return '-'
 
-const formatDateRelative = (dateString) => {
-  if (!dateString) return "-";
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffTime = Math.abs(now - date);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const date = new Date(dateString)
 
-  if (diffDays === 0) return "Hari ini";
-  if (diffDays === 1) return "Kemarin";
-  if (diffDays < 7) return `${diffDays} hari lalu`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} minggu lalu`;
-  return formatDate(dateString);
-};
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date)
+}
 
-// data table / cards
-const filteredAppraisals = computed(() => rows.value);
+const truncateText = (value, limit = 88) => {
+  const normalized = String(value ?? '').trim()
 
-// pagination convenience
-const prevLink = computed(
-  () => links.value.find((l) => l.label?.toLowerCase().includes("previous")) ?? null
-);
-const nextLink = computed(
-  () => links.value.find((l) => l.label?.toLowerCase().includes("next")) ?? null
-);
+  if (!normalized) {
+    return '-'
+  }
 
-// Stats cards configuration
-const statsCards = computed(() => {
-  props.statsCards?.length ? props.statsCards : []
-});
+  if (normalized.length <= limit) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, limit).trimEnd()}...`
+}
+
+const columns = [
+  { key: 'request', label: 'Request', cellClass: 'min-w-0 w-auto' },
+  { key: 'report_type', label: 'Laporan', headerClass: 'hidden xl:table-cell', cellClass: 'hidden xl:table-cell w-[150px]' },
+  { key: 'assets_count', label: 'Aset', headerClass: 'hidden lg:table-cell', cellClass: 'hidden lg:table-cell w-[80px]' },
+  { key: 'status', label: 'Status', cellClass: 'w-[160px]' },
+  { key: 'requested_at', label: 'Diajukan', headerClass: 'hidden 2xl:table-cell', cellClass: 'hidden 2xl:table-cell w-[130px]' },
+  { key: 'actions', label: 'Aksi', cellClass: 'w-[1%] whitespace-nowrap' },
+]
 </script>
 
 <template>
+  <Head title="Daftar Permohonan Penilaian" />
+
   <DashboardLayout>
     <template #title>Daftar Permohonan Penilaian</template>
 
     <div class="space-y-6">
       <AppraisalHeader :on-create="goToCreate" />
 
-      <AppraisalStatsGrid :stats-cards="statsCards" />
+      <Card class="overflow-hidden border-slate-200/80 bg-white/90 shadow-sm">
+        <CardHeader class="flex flex-col gap-4 space-y-0 border-b border-slate-200/80 bg-slate-50/60 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle class="text-slate-950">Daftar Request</CardTitle>
+            <CardDescription>
+              Pantau status permohonan, jumlah aset, dan tindak lanjut dari satu tabel kerja.
+            </CardDescription>
+          </div>
 
-      <AppraisalFilters
-        v-model:searchQuery="searchQuery"
-        v-model:statusFilter="statusFilter"
-        :status-filter-options="statusFilterOptions"
-        :has-active-filters="hasActiveFilters"
-        :reset-filters="resetFilters"
-        :get-status-config="getStatusConfig"
-      />
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari nomor request atau nama pemohon"
+            filter-title="Filter permohonan"
+            filter-description="Saring daftar berdasarkan status request."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; applyFilters() }"
+            @apply-filters="applyFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="space-y-2">
+              <Label for="customer_request_status">Status</Label>
+              <Select v-model="form.status">
+                <SelectTrigger id="customer_request_status">
+                  <SelectValue placeholder="Semua status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="option in statusFilterOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </AdminTableToolbar>
+        </CardHeader>
 
-      <AppraisalEmptyState
-        v-if="filteredAppraisals.length === 0"
-        :has-active-filters="hasActiveFilters"
-        :on-reset-filters="resetFilters"
-        :on-create="goToCreate"
-      />
+        <CardContent class="p-5">
+          <AppraisalEmptyState
+            v-if="rows.length === 0"
+            :has-active-filters="hasActiveFilters"
+            :on-reset-filters="resetFilters"
+            :on-create="goToCreate"
+          />
 
-      <AppraisalTable
-        v-if="filteredAppraisals.length > 0"
-        :items="filteredAppraisals"
-        :get-status-config="getStatusConfig"
-        :format-date="formatDate"
-        :format-date-relative="formatDateRelative"
-        :prev-link="prevLink"
-        :next-link="nextLink"
-        :on-view-detail="viewDetail"
-        :on-page="goTo"
-      />
+          <AdminDataTable
+            v-else
+            :columns="columns"
+            :rows="rows"
+            :meta="paginationMeta"
+            empty-text="Tidak ada permohonan yang cocok dengan filter saat ini."
+          >
+            <template #cell-request="{ row }">
+              <div class="min-w-0 space-y-2">
+                <Button variant="link" class="h-auto max-w-full px-0 text-left font-medium text-slate-950" as-child>
+                  <Link :href="route('appraisal.show', row.id)" class="block max-w-full break-words leading-6">
+                    {{ row.request_number }}
+                  </Link>
+                </Button>
+                <p class="text-sm text-slate-600" :title="row.location">
+                  {{ truncateText(row.location, 72) }}
+                </p>
+              </div>
+            </template>
 
-      <AppraisalCardsMobile
-        v-if="filteredAppraisals.length > 0"
-        :items="filteredAppraisals"
-        :get-status-config="getStatusConfig"
-        :format-date="formatDate"
-        :format-date-relative="formatDateRelative"
-        :prev-link="prevLink"
-        :next-link="nextLink"
-        :on-view-detail="viewDetail"
-        :on-page="goTo"
-      />
+            <template #cell-report_type="{ row }">
+              <span class="text-sm text-slate-700">{{ row.report_type_label }}</span>
+            </template>
+
+            <template #cell-assets_count="{ row }">
+              <span class="text-sm font-medium text-slate-900">{{ row.assets_count }}</span>
+            </template>
+
+            <template #cell-status="{ row }">
+              <Badge
+                variant="outline"
+                :class="[
+                  getStatusConfig(row.status).bgColor,
+                  getStatusConfig(row.status).color,
+                  getStatusConfig(row.status).borderColor,
+                ]"
+              >
+                {{ row.status_label }}
+              </Badge>
+            </template>
+
+            <template #cell-requested_at="{ row }">
+              <span class="text-sm text-slate-700">{{ formatDate(row.requested_at) }}</span>
+            </template>
+
+            <template #cell-actions="{ row }">
+              <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                <Button variant="outline" size="sm" as-child>
+                  <Link :href="route('appraisal.show', row.id)">Lihat Detail</Link>
+                </Button>
+              </div>
+            </template>
+          </AdminDataTable>
+        </CardContent>
+      </Card>
     </div>
   </DashboardLayout>
 </template>

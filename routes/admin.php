@@ -33,7 +33,9 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::put('/{appraisalRequest}', [AppraisalRequestController::class, 'appraisalRequestsUpdate'])->name('update');
                 Route::post('/{appraisalRequest}/verify-docs', [AppraisalRequestWorkflowController::class, 'verifyDocs'])->name('actions.verify-docs');
                 Route::post('/{appraisalRequest}/docs-incomplete', [AppraisalRequestWorkflowController::class, 'markDocsIncomplete'])->name('actions.docs-incomplete');
+                Route::post('/{appraisalRequest}/cancel', [AppraisalRequestWorkflowController::class, 'cancelRequest'])->name('actions.cancel');
                 Route::post('/{appraisalRequest}/revision-batches', [AppraisalRequestWorkflowController::class, 'storeRevisionBatch'])->name('revision-batches.store');
+                Route::post('/{appraisalRequest}/field-corrections', [AppraisalRequestWorkflowController::class, 'storeFieldCorrection'])->name('field-corrections.store');
                 Route::post('/{appraisalRequest}/revision-items/{revisionItem}/approve', [AppraisalRequestWorkflowController::class, 'approveRevisionItem'])->name('revision-items.approve');
                 Route::post('/{appraisalRequest}/revision-items/{revisionItem}/reject', [AppraisalRequestWorkflowController::class, 'rejectRevisionItem'])->name('revision-items.reject');
                 Route::post('/{appraisalRequest}/contract-signed', [AppraisalRequestWorkflowController::class, 'markContractSigned'])->name('actions.contract-signed');

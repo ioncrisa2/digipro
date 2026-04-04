@@ -7,6 +7,11 @@ use App\Exports\FloorIndexExport;
 use App\Exports\IkkExport;
 use App\Exports\MappiRcnStandardExport;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ImportConstructionCostIndicesRequest;
+use App\Http\Requests\Admin\ImportCostElementRequest;
+use App\Http\Requests\Admin\ImportFloorIndexRequest;
+use App\Http\Requests\Admin\ImportMappiRcnStandardRequest;
+use App\Http\Requests\Admin\ReferenceGuideDataIndexRequest;
 use App\Http\Requests\Admin\StoreConstructionCostIndexRequest;
 use App\Http\Requests\Admin\StoreCostElementRequest;
 use App\Http\Requests\Admin\StoreFloorIndexRequest;
@@ -24,8 +29,6 @@ use App\Models\Province;
 use App\Models\Regency;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -33,16 +36,10 @@ use Throwable;
 
 class ReferenceGuideDataController extends Controller
 {
-    public function constructionCostIndicesIndex(Request $request): Response
+    public function constructionCostIndicesIndex(ReferenceGuideDataIndexRequest $request): Response
     {
         $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'province_id' => (string) $request->query('province_id', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters(['q', 'guideline_set_id', 'year', 'province_id']);
 
         $records = $this->constructionCostIndicesFilteredQuery($filters)
             ->with([
@@ -52,7 +49,7 @@ class ReferenceGuideDataController extends Controller
             ])
             ->orderByDesc('year')
             ->orderBy('region_code')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (ConstructionCostIndex $record) => $this->transformConstructionCostIndexRow($record));
@@ -97,14 +94,9 @@ class ReferenceGuideDataController extends Controller
         ]);
     }
 
-    public function constructionCostIndicesExport(Request $request): BinaryFileResponse
+    public function constructionCostIndicesExport(ReferenceGuideDataIndexRequest $request): BinaryFileResponse
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'province_id' => (string) $request->query('province_id', 'all'),
-        ];
+        $filters = $request->filters(['q', 'guideline_set_id', 'year', 'province_id'], false);
 
         $query = $this->constructionCostIndicesFilteredQuery($filters)->orderByDesc('year')->orderBy('region_code');
 
@@ -154,15 +146,9 @@ class ReferenceGuideDataController extends Controller
             ->with('success', 'IKK berhasil ditambahkan.');
     }
 
-    public function constructionCostIndicesImport(Request $request): RedirectResponse
+    public function constructionCostIndicesImport(ImportConstructionCostIndicesRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'guideline_set_id' => ['required', 'integer', Rule::exists('ref_guideline_sets', 'id')],
-            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
-            'skip_province_rows' => ['nullable', 'boolean'],
-            'require_regency' => ['nullable', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         $import = new IKKImport(
             guidelineSetId: (int) $validated['guideline_set_id'],
@@ -246,24 +232,17 @@ class ReferenceGuideDataController extends Controller
             ->with('success', 'IKK berhasil dihapus.');
     }
 
-    public function costElementsIndex(Request $request): Response
+    public function costElementsIndex(ReferenceGuideDataIndexRequest $request): Response
     {
         $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'base_region' => (string) $request->query('base_region', 'all'),
-            'group' => (string) $request->query('group', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters(['q', 'guideline_set_id', 'year', 'base_region', 'group']);
 
         $records = $this->costElementsFilteredQuery($filters)
             ->with('guidelineSet:id,name,year,is_active')
             ->orderByDesc('year')
             ->orderBy('group')
             ->orderBy('element_code')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (CostElement $record) => $this->transformCostElementRow($record));
@@ -307,15 +286,9 @@ class ReferenceGuideDataController extends Controller
         ]);
     }
 
-    public function costElementsExport(Request $request): BinaryFileResponse
+    public function costElementsExport(ReferenceGuideDataIndexRequest $request): BinaryFileResponse
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'base_region' => (string) $request->query('base_region', 'all'),
-            'group' => (string) $request->query('group', 'all'),
-        ];
+        $filters = $request->filters(['q', 'guideline_set_id', 'year', 'base_region', 'group'], false);
 
         $query = $this->costElementsFilteredQuery($filters)
             ->orderByDesc('year')
@@ -379,14 +352,9 @@ class ReferenceGuideDataController extends Controller
             ->with('success', 'Cost element berhasil ditambahkan.');
     }
 
-    public function costElementsImport(Request $request): RedirectResponse
+    public function costElementsImport(ImportCostElementRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'guideline_set_id' => ['required', 'integer', Rule::exists('ref_guideline_sets', 'id')],
-            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            'base_region' => ['required', 'string', 'max:255'],
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
-        ]);
+        $validated = $request->validated();
 
         $import = new CostElementImport(
             guidelineSetId: (int) $validated['guideline_set_id'],
@@ -481,23 +449,17 @@ class ReferenceGuideDataController extends Controller
             ->with('success', 'Cost element berhasil dihapus.');
     }
 
-    public function floorIndicesIndex(Request $request): Response
+    public function floorIndicesIndex(ReferenceGuideDataIndexRequest $request): Response
     {
         $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'building_class' => (string) $request->query('building_class', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters(['q', 'guideline_set_id', 'year', 'building_class']);
 
         $records = $this->floorIndicesFilteredQuery($filters)
             ->with('guidelineSet:id,name,year,is_active')
             ->orderByDesc('year')
             ->orderBy('building_class')
             ->orderBy('floor_count')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (FloorIndex $record) => $this->transformFloorIndexRow($record));
@@ -536,14 +498,9 @@ class ReferenceGuideDataController extends Controller
         ]);
     }
 
-    public function floorIndicesExport(Request $request): BinaryFileResponse
+    public function floorIndicesExport(ReferenceGuideDataIndexRequest $request): BinaryFileResponse
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'building_class' => (string) $request->query('building_class', 'all'),
-        ];
+        $filters = $request->filters(['q', 'guideline_set_id', 'year', 'building_class'], false);
 
         $query = $this->floorIndicesFilteredQuery($filters)
             ->orderByDesc('year')
@@ -593,13 +550,9 @@ class ReferenceGuideDataController extends Controller
             ->with('success', 'Floor index berhasil ditambahkan.');
     }
 
-    public function floorIndicesImport(Request $request): RedirectResponse
+    public function floorIndicesImport(ImportFloorIndexRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'guideline_set_id' => ['required', 'integer', Rule::exists('ref_guideline_sets', 'id')],
-            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
-        ]);
+        $validated = $request->validated();
 
         $import = new FloorIndexImport(
             guidelineSetId: (int) $validated['guideline_set_id'],
@@ -676,24 +629,17 @@ class ReferenceGuideDataController extends Controller
             ->with('success', 'Floor index berhasil dihapus.');
     }
 
-    public function mappiRcnStandardsIndex(Request $request): Response
+    public function mappiRcnStandardsIndex(ReferenceGuideDataIndexRequest $request): Response
     {
         $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'building_type' => (string) $request->query('building_type', 'all'),
-            'building_class' => (string) $request->query('building_class', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters(['q', 'guideline_set_id', 'year', 'building_type', 'building_class']);
 
         $records = $this->mappiRcnStandardsFilteredQuery($filters)
             ->with('guidelineSet:id,name,year,is_active')
             ->orderByDesc('year')
             ->orderBy('building_type')
             ->orderBy('building_class')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (MappiRcnStandard $record) => $this->transformMappiRcnStandardRow($record));
@@ -735,15 +681,9 @@ class ReferenceGuideDataController extends Controller
         ]);
     }
 
-    public function mappiRcnStandardsExport(Request $request): BinaryFileResponse
+    public function mappiRcnStandardsExport(ReferenceGuideDataIndexRequest $request): BinaryFileResponse
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'building_type' => (string) $request->query('building_type', 'all'),
-            'building_class' => (string) $request->query('building_class', 'all'),
-        ];
+        $filters = $request->filters(['q', 'guideline_set_id', 'year', 'building_type', 'building_class'], false);
 
         $query = $this->mappiRcnStandardsFilteredQuery($filters)
             ->orderByDesc('year')
@@ -799,14 +739,9 @@ class ReferenceGuideDataController extends Controller
             ->with('success', 'MAPPI RCN berhasil ditambahkan.');
     }
 
-    public function mappiRcnStandardsImport(Request $request): RedirectResponse
+    public function mappiRcnStandardsImport(ImportMappiRcnStandardRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'guideline_set_id' => ['required', 'integer', Rule::exists('ref_guideline_sets', 'id')],
-            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            'reference_region' => ['required', 'string', 'max:255'],
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
-        ]);
+        $validated = $request->validated();
 
         $import = new MappiRcnStandardImport(
             guidelineSetId: (int) $validated['guideline_set_id'],

@@ -5,7 +5,7 @@ namespace App\Services\Reviewer;
 use App\Enums\AppraisalStatusEnum;
 use App\Enums\AssetTypeEnum;
 use App\Services\Reviewer\AdjustmentWorkbenchService;
-use App\Services\AppraisalRevisionFileResolver;
+use App\Services\Revisions\AppraisalRevisionFileResolver;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetComparable;
 use App\Models\AppraisalRequest;

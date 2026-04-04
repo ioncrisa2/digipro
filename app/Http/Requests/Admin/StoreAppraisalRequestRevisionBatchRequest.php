@@ -40,7 +40,7 @@ class StoreAppraisalRequestRevisionBatchRequest extends FormRequest
                 $targetKey = (string) data_get($item, 'target_key', '');
 
                 if ($targetKey === '' || ! array_key_exists($targetKey, $targetMap)) {
-                    $validator->errors()->add("items.{$index}.target_key", 'Target revisi dokumen tidak valid.');
+                    $validator->errors()->add("items.{$index}.target_key", 'Target revisi tidak valid.');
                     continue;
                 }
 
@@ -74,6 +74,8 @@ class StoreAppraisalRequestRevisionBatchRequest extends FormRequest
                     'appraisal_asset_id' => $target['appraisal_asset_id'],
                     'item_type' => $target['item_type'],
                     'requested_file_type' => $target['requested_file_type'],
+                    'requested_field_key' => $target['requested_field_key'] ?? null,
+                    'original_value' => $target['field']['value'] ?? null,
                     'original_request_file_id' => $target['original_request_file_id'],
                     'original_asset_file_id' => $target['original_asset_file_id'],
                     'issue_note' => trim((string) ($item['issue_note'] ?? '')),

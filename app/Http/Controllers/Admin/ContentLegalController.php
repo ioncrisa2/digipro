@@ -3,11 +3,17 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\AppraisalUserConsentIndexRequest;
+use App\Http\Requests\Admin\ConsentDocumentIndexRequest;
+use App\Http\Requests\Admin\ReorderFaqRequest;
+use App\Http\Requests\Admin\SimpleStatusIndexRequest;
 use App\Http\Requests\Admin\StoreConsentDocumentRequest;
 use App\Http\Requests\Admin\StoreFaqRequest;
 use App\Http\Requests\Admin\StoreFeatureRequest;
 use App\Http\Requests\Admin\StoreLegalDocumentRequest;
 use App\Http\Requests\Admin\StoreTestimonialRequest;
+use App\Http\Requests\Admin\UploadLandingImageRequest;
+use App\Http\Requests\Admin\UploadPlatformPreviewImageRequest;
 use App\Models\AppraisalUserConsent;
 use App\Models\ConsentDocument;
 use App\Models\Faq;
@@ -17,16 +23,15 @@ use App\Models\PrivacyPolicy;
 use App\Models\Testimonial;
 use App\Models\TermsDocument;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Response;
 
 class ContentLegalController extends Controller
 {
-    public function faqsIndex(Request $request): Response
+    public function faqsIndex(SimpleStatusIndexRequest $request): Response
     {
-        $filters = $this->simpleActiveFilters($request);
+        $filters = $request->filters();
 
         $records = Faq::query()
             ->when($filters['q'] !== '', fn ($query) => $query->where('question', 'like', '%' . $filters['q'] . '%'))
@@ -116,12 +121,9 @@ class ContentLegalController extends Controller
         return redirect()->route('admin.content.legal.faqs.index')->with('success', 'FAQ berhasil dihapus.');
     }
 
-    public function faqsReorder(Request $request): RedirectResponse
+    public function faqsReorder(ReorderFaqRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['required', 'integer', 'distinct', 'exists:faqs,id'],
-        ]);
+        $validated = $request->validated();
 
         DB::transaction(function () use ($validated): void {
             foreach (array_values($validated['ids']) as $index => $id) {
@@ -134,9 +136,9 @@ class ContentLegalController extends Controller
         return redirect()->route('admin.content.legal.faqs.index')->with('success', 'Urutan FAQ berhasil diperbarui.');
     }
 
-    public function featuresIndex(Request $request): Response
+    public function featuresIndex(SimpleStatusIndexRequest $request): Response
     {
-        $filters = $this->simpleActiveFilters($request);
+        $filters = $request->filters();
 
         $records = Feature::query()
             ->when($filters['q'] !== '', fn ($query) => $query->where('title', 'like', '%' . $filters['q'] . '%'))
@@ -264,12 +266,8 @@ class ContentLegalController extends Controller
         return redirect()->route('admin.content.legal.features.index')->with('success', 'Fitur berhasil dihapus.');
     }
 
-    public function featuresHeroBackgroundUpdate(Request $request): RedirectResponse
+    public function featuresHeroBackgroundUpdate(UploadLandingImageRequest $request): RedirectResponse
     {
-        $request->validate([
-            'image' => ['required', 'image', 'max:20480'],
-        ]);
-
         $setting = LandingMediaSetting::query()->firstOrNew([
             'key' => 'hero_background',
         ]);
@@ -288,13 +286,9 @@ class ContentLegalController extends Controller
         return redirect()->route('admin.content.legal.features.index')->with('success', 'Background hero landing berhasil diperbarui.');
     }
 
-    public function featuresPlatformPreviewUpdate(Request $request, int $slot): RedirectResponse
+    public function featuresPlatformPreviewUpdate(UploadPlatformPreviewImageRequest $request, int $slot): RedirectResponse
     {
         abort_unless(in_array($slot, [1, 2, 3], true), 404);
-
-        $request->validate([
-            'image' => ['required', 'image', 'max:6144'],
-        ]);
 
         $key = 'platform_preview_slide_' . $slot;
         $setting = LandingMediaSetting::query()->firstOrNew([
@@ -315,9 +309,9 @@ class ContentLegalController extends Controller
         return redirect()->route('admin.content.legal.features.index')->with('success', 'Gambar platform preview berhasil diperbarui.');
     }
 
-    public function testimonialsIndex(Request $request): Response
+    public function testimonialsIndex(SimpleStatusIndexRequest $request): Response
     {
-        $filters = $this->simpleActiveFilters($request);
+        $filters = $request->filters();
 
         $records = Testimonial::query()
             ->when($filters['q'] !== '', fn ($query) => $query->where('name', 'like', '%' . $filters['q'] . '%'))
@@ -440,10 +434,10 @@ class ContentLegalController extends Controller
         return redirect()->route('admin.content.legal.testimonials.index')->with('success', 'Testimoni berhasil dihapus.');
     }
 
-    public function termsDocumentsIndex(Request $request): Response
+    public function termsDocumentsIndex(SimpleStatusIndexRequest $request): Response
     {
         return $this->legalDocumentsIndex(
-            $request,
+            $request->filters(),
             TermsDocument::class,
             'Admin/LegalDocuments/Index',
             'admin.content.legal.terms',
@@ -494,10 +488,10 @@ class ContentLegalController extends Controller
         return redirect()->route('admin.content.legal.terms.index')->with('success', 'Dokumen terms berhasil dihapus.');
     }
 
-    public function privacyPoliciesIndex(Request $request): Response
+    public function privacyPoliciesIndex(SimpleStatusIndexRequest $request): Response
     {
         return $this->legalDocumentsIndex(
-            $request,
+            $request->filters(),
             PrivacyPolicy::class,
             'Admin/LegalDocuments/Index',
             'admin.content.legal.privacy',
@@ -548,12 +542,9 @@ class ContentLegalController extends Controller
         return redirect()->route('admin.content.legal.privacy.index')->with('success', 'Dokumen privacy berhasil dihapus.');
     }
 
-    public function consentDocumentsIndex(Request $request): Response
+    public function consentDocumentsIndex(ConsentDocumentIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-        ];
+        $filters = $request->filters();
 
         $records = ConsentDocument::query()
             ->when($filters['q'] !== '', function ($query) use ($filters): void {
@@ -679,13 +670,9 @@ class ContentLegalController extends Controller
         return redirect()->route('admin.content.legal.consent.index')->with('success', 'Dokumen consent berhasil dipublish.');
     }
 
-    public function appraisalUserConsentsIndex(Request $request): Response
+    public function appraisalUserConsentsIndex(AppraisalUserConsentIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'code' => (string) $request->query('code', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $records = AppraisalUserConsent::query()
             ->with(['user', 'document'])
@@ -701,7 +688,7 @@ class ContentLegalController extends Controller
             })
             ->when($filters['code'] !== 'all', fn ($query) => $query->where('code', $filters['code']))
             ->latest('accepted_at')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (AppraisalUserConsent $consent) => [
@@ -751,14 +738,6 @@ class ContentLegalController extends Controller
             'indexUrl' => route('admin.content.legal.user-consents.index'),
             'links' => $this->legalModuleLinks(),
         ]);
-    }
-
-    private function simpleActiveFilters(Request $request): array
-    {
-        return [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-        ];
     }
 
     private function simpleStatusOptions(): array
@@ -826,17 +805,12 @@ class ContentLegalController extends Controller
     }
 
     private function legalDocumentsIndex(
-        Request $request,
+        array $filters,
         string $modelClass,
         string $component,
         string $routePrefix,
         string $documentType
     ): Response {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-        ];
-
         $records = $modelClass::query()
             ->when($filters['q'] !== '', fn ($query) => $query->where('title', 'like', '%' . $filters['q'] . '%'))
             ->when($filters['status'] === 'active', fn ($query) => $query->where('is_active', true))

@@ -12,12 +12,15 @@ class AppraisalRequestRevisionItem extends Model
         'appraisal_asset_id',
         'item_type',
         'requested_file_type',
+        'requested_field_key',
         'status',
         'issue_note',
+        'original_value',
         'original_request_file_id',
         'original_asset_file_id',
         'replacement_request_file_id',
         'replacement_asset_file_id',
+        'replacement_value',
         'reviewed_by',
         'reviewed_at',
         'review_note',
@@ -25,6 +28,8 @@ class AppraisalRequestRevisionItem extends Model
 
     protected $casts = [
         'reviewed_at' => 'datetime',
+        'original_value' => 'array',
+        'replacement_value' => 'array',
     ];
 
     public function batch(): BelongsTo

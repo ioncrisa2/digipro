@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\LocationIdPreviewRequest;
+use App\Http\Requests\Admin\LocationOptionsRequest;
+use App\Http\Requests\Admin\MasterDataLocationIndexRequest;
 use App\Http\Requests\Admin\StoreDistrictRequest;
 use App\Http\Requests\Admin\StoreProvinceRequest;
 use App\Http\Requests\Admin\StoreRegencyRequest;
 use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\StoreVillageRequest;
+use App\Http\Requests\Admin\UsersIndexRequest;
 use App\Models\District;
 use App\Models\Province;
 use App\Models\Regency;
@@ -18,21 +22,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
 
 class MasterDataController extends Controller
 {
-    public function usersIndex(Request $request): Response
+    public function usersIndex(UsersIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'role' => (string) $request->query('role', 'all'),
-            'verified' => (string) $request->query('verified', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $baseQuery = $this->manageableUsersQuery();
 
@@ -49,7 +47,7 @@ class MasterDataController extends Controller
             ->when($filters['verified'] === 'verified', fn ($query) => $query->whereNotNull('email_verified_at'))
             ->when($filters['verified'] === 'unverified', fn ($query) => $query->whereNull('email_verified_at'))
             ->latest('created_at')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (User $user) => $this->transformUserRow($user));
@@ -184,14 +182,9 @@ class MasterDataController extends Controller
             ->with('success', 'User berhasil dihapus.');
     }
 
-    public function locationIdPreview(Request $request, LocationIdGenerator $generator): JsonResponse
+    public function locationIdPreview(LocationIdPreviewRequest $request, LocationIdGenerator $generator): JsonResponse
     {
-        $validated = $request->validate([
-            'type' => ['required', 'in:province,regency,district,village'],
-            'province_id' => ['nullable', 'string', 'size:2'],
-            'regency_id' => ['nullable', 'string', 'size:4'],
-            'district_id' => ['nullable', 'string', 'size:7'],
-        ]);
+        $validated = $request->validated();
 
         try {
             $id = DB::transaction(function () use ($validated, $generator) {
@@ -213,13 +206,9 @@ class MasterDataController extends Controller
         ]);
     }
 
-    public function locationOptions(Request $request): JsonResponse
+    public function locationOptions(LocationOptionsRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'type' => ['required', 'in:provinces,regencies,districts'],
-            'province_id' => ['nullable', 'string', 'size:2'],
-            'regency_id' => ['nullable', 'string', 'size:4'],
-        ]);
+        $validated = $request->validated();
 
         $options = match ($validated['type']) {
             'provinces' => $this->provinceSelectOptions(),
@@ -232,12 +221,9 @@ class MasterDataController extends Controller
         ]);
     }
 
-    public function provincesIndex(Request $request): Response
+    public function provincesIndex(MasterDataLocationIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters(['q']);
 
         $records = Province::query()
             ->withCount('regencies')
@@ -249,7 +235,7 @@ class MasterDataController extends Controller
                 });
             })
             ->orderBy('name')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (Province $province) => $this->transformProvinceRow($province));
@@ -337,13 +323,9 @@ class MasterDataController extends Controller
         return $this->destroyLocationRecord($province, 'master-data.provinces.index', 'Provinsi');
     }
 
-    public function regenciesIndex(Request $request): Response
+    public function regenciesIndex(MasterDataLocationIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'province_id' => (string) $request->query('province_id', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters(['q', 'province_id']);
 
         $records = Regency::query()
             ->with(['province:id,name'])
@@ -357,7 +339,7 @@ class MasterDataController extends Controller
             })
             ->when($filters['province_id'] !== 'all', fn ($query) => $query->where('province_id', $filters['province_id']))
             ->orderBy('name')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (Regency $regency) => $this->transformRegencyRow($regency));
@@ -382,9 +364,9 @@ class MasterDataController extends Controller
         ]);
     }
 
-    public function regenciesCreate(Request $request, LocationIdGenerator $generator): Response
+    public function regenciesCreate(MasterDataLocationIndexRequest $request, LocationIdGenerator $generator): Response
     {
-        $selectedProvinceId = (string) $request->query('province_id', '');
+        $selectedProvinceId = $request->selectedProvinceId();
 
         return inertia('Admin/Locations/Form', [
             'resource' => $this->locationResourceDefinition('regencies'),
@@ -469,14 +451,9 @@ class MasterDataController extends Controller
         return $this->destroyLocationRecord($regency, 'master-data.regencies.index', 'Kabupaten/Kota');
     }
 
-    public function districtsIndex(Request $request): Response
+    public function districtsIndex(MasterDataLocationIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'province_id' => (string) $request->query('province_id', 'all'),
-            'regency_id' => (string) $request->query('regency_id', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters(['q', 'province_id', 'regency_id']);
 
         $records = District::query()
             ->with(['regency:id,name,province_id', 'regency.province:id,name'])
@@ -493,7 +470,7 @@ class MasterDataController extends Controller
                 $query->whereHas('regency', fn ($regencyQuery) => $regencyQuery->where('province_id', $filters['province_id']));
             })
             ->orderBy('name')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (District $district) => $this->transformDistrictRow($district));
@@ -526,9 +503,9 @@ class MasterDataController extends Controller
         ]);
     }
 
-    public function districtsCreate(Request $request, LocationIdGenerator $generator): Response
+    public function districtsCreate(MasterDataLocationIndexRequest $request, LocationIdGenerator $generator): Response
     {
-        $selectedRegencyId = (string) $request->query('regency_id', '');
+        $selectedRegencyId = $request->selectedRegencyId();
         $selectedProvinceId = '';
 
         if ($selectedRegencyId !== '') {
@@ -645,15 +622,9 @@ class MasterDataController extends Controller
         return $this->destroyLocationRecord($district, 'master-data.districts.index', 'Kecamatan');
     }
 
-    public function villagesIndex(Request $request): Response
+    public function villagesIndex(MasterDataLocationIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'province_id' => (string) $request->query('province_id', 'all'),
-            'regency_id' => (string) $request->query('regency_id', 'all'),
-            'district_id' => (string) $request->query('district_id', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters(['q', 'province_id', 'regency_id', 'district_id']);
 
         $records = Village::query()
             ->with(['district:id,name,regency_id', 'district.regency:id,name,province_id', 'district.regency.province:id,name'])
@@ -672,7 +643,7 @@ class MasterDataController extends Controller
                 $query->whereHas('district.regency', fn ($regencyQuery) => $regencyQuery->where('province_id', $filters['province_id']));
             })
             ->orderBy('name')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (Village $village) => $this->transformVillageRow($village));
@@ -711,9 +682,9 @@ class MasterDataController extends Controller
         ]);
     }
 
-    public function villagesCreate(Request $request, LocationIdGenerator $generator): Response
+    public function villagesCreate(MasterDataLocationIndexRequest $request, LocationIdGenerator $generator): Response
     {
-        $selectedDistrictId = (string) $request->query('district_id', '');
+        $selectedDistrictId = $request->selectedDistrictId();
         $selectedRegencyId = '';
         $selectedProvinceId = '';
 

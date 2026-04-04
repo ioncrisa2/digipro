@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\GuidelineSetExport;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\GuidelineSetIndexRequest;
 use App\Http\Requests\Admin\StoreGuidelineSetRequest;
 use App\Http\Requests\Admin\StoreValuationSettingRequest;
+use App\Http\Requests\Admin\ValuationSettingIndexRequest;
 use App\Models\ConstructionCostIndex;
 use App\Models\GuidelineSet;
 use App\Models\ValuationSetting;
@@ -19,13 +21,9 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ReferenceGuideSettingsController extends Controller
 {
-    public function guidelineSetsIndex(Request $request): Response
+    public function guidelineSetsIndex(GuidelineSetIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $records = $this->guidelineSetFilteredQuery($filters)
             ->withCount([
@@ -35,7 +33,7 @@ class ReferenceGuideSettingsController extends Controller
                 'mappiRcnStandards',
             ])
             ->orderByDesc('year')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (GuidelineSet $guidelineSet) => $this->transformGuidelineSetRow($guidelineSet));
@@ -63,12 +61,9 @@ class ReferenceGuideSettingsController extends Controller
         ]);
     }
 
-    public function guidelineSetsExport(Request $request): BinaryFileResponse
+    public function guidelineSetsExport(GuidelineSetIndexRequest $request): BinaryFileResponse
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'status' => (string) $request->query('status', 'all'),
-        ];
+        $filters = $request->filters(withPerPage: false);
 
         $query = $this->guidelineSetFilteredQuery($filters)->orderByDesc('year');
 
@@ -170,15 +165,9 @@ class ReferenceGuideSettingsController extends Controller
             ->with('success', 'Guideline set berhasil dihapus.');
     }
 
-    public function valuationSettingsIndex(Request $request): Response
+    public function valuationSettingsIndex(ValuationSettingIndexRequest $request): Response
     {
-        $filters = [
-            'q' => trim((string) $request->query('q', '')),
-            'guideline_set_id' => (string) $request->query('guideline_set_id', 'all'),
-            'year' => (string) $request->query('year', 'all'),
-            'key' => (string) $request->query('key', 'all'),
-            'per_page' => (string) $this->adminPerPage($request),
-        ];
+        $filters = $request->filters();
 
         $records = ValuationSetting::query()
             ->with('guidelineSet:id,name,year,is_active')
@@ -203,7 +192,7 @@ class ReferenceGuideSettingsController extends Controller
                 fn ($query) => $query->where('key', $filters['key'])
             )
             ->latest('updated_at')
-            ->paginate($this->adminPerPage($request))
+            ->paginate($request->perPage())
             ->withQueryString();
 
         $records->through(fn (ValuationSetting $valuationSetting) => $this->transformValuationSettingRow($valuationSetting));
