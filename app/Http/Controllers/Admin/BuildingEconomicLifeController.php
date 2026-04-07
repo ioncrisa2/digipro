@@ -393,19 +393,4 @@ class BuildingEconomicLifeController extends Controller
     {
         return is_string($value) && trim($value) === '' ? null : $value;
     }
-    protected function paginatedRecordsPayload(object $records): array
-    {
-        return [
-            'data' => $records->items(),
-            'meta' => [
-                'from' => $records->firstItem(),
-                'to' => $records->lastItem(),
-                'total' => $records->total(),
-                'current_page' => $records->currentPage(),
-                'last_page' => $records->lastPage(),
-                'per_page' => $records->perPage(),
-                'links' => $records->linkCollection()->toArray(),
-            ],
-        ];
-    }
 }
