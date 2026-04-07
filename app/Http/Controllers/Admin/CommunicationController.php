@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ContactMessageIndexRequest;
+use App\Http\Requests\Admin\UpdateSupportContactSettingRequest;
 use App\Models\ContactMessage;
+use App\Models\SupportContactSetting;
+use App\Support\SupportContact;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Response;
 
@@ -60,6 +62,7 @@ class CommunicationController extends Controller
                 'done' => ContactMessage::query()->where('status', 'done')->count(),
             ],
             'records' => $this->paginatedRecordsPayload($records),
+            'supportContactEditUrl' => route('admin.communications.support-contact.edit'),
         ]);
     }
 
@@ -127,6 +130,35 @@ class CommunicationController extends Controller
         return redirect()
             ->route('admin.communications.contact-messages.index')
             ->with('success', 'Pesan berhasil dihapus.');
+    }
+
+    public function supportContactEdit(): Response
+    {
+        $setting = SupportContactSetting::query()->first();
+        $defaults = SupportContact::defaults();
+
+        return inertia('Admin/CommunicationSettings/SupportContact', [
+            'record' => [
+                'name' => $setting?->name ?? $defaults['name'],
+                'phone' => $setting?->phone ?? $defaults['phone'],
+                'whatsapp' => $setting?->whatsapp ?? $defaults['whatsapp'],
+                'email' => $setting?->email ?? $defaults['email'],
+                'availability_label' => $setting?->availability_label ?? $defaults['availability_label'],
+            ],
+            'submitUrl' => route('admin.communications.support-contact.update'),
+            'indexUrl' => route('admin.communications.contact-messages.index'),
+        ]);
+    }
+
+    public function supportContactUpdate(UpdateSupportContactSettingRequest $request): RedirectResponse
+    {
+        $setting = SupportContactSetting::query()->first() ?? new SupportContactSetting();
+        $setting->fill($request->validated());
+        $setting->save();
+
+        return redirect()
+            ->route('admin.communications.support-contact.edit')
+            ->with('success', 'Kontak support berhasil diperbarui.');
     }
 
     private function transformContactMessageRow(ContactMessage $message): array

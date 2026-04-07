@@ -287,6 +287,8 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
             ->prefix('komunikasi')
             ->name('communications.')
             ->group(function (): void {
+                Route::get('/support-contact', [CommunicationController::class, 'supportContactEdit'])->name('support-contact.edit');
+                Route::put('/support-contact', [CommunicationController::class, 'supportContactUpdate'])->name('support-contact.update');
                 Route::get('/contact-messages', [CommunicationController::class, 'contactMessagesIndex'])->name('contact-messages.index');
                 Route::get('/contact-messages/{contactMessage}', [CommunicationController::class, 'contactMessagesShow'])->name('contact-messages.show');
                 Route::post('/contact-messages/{contactMessage}/in-progress', [CommunicationController::class, 'contactMessagesMarkInProgress'])->name('contact-messages.in-progress');

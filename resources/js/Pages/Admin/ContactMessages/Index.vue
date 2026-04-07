@@ -25,6 +25,7 @@ const props = defineProps({
   sourceOptions: { type: Array, default: () => [] },
   summary: { type: Object, default: () => ({ total: 0, new: 0, unread: 0, done: 0 }) },
   records: { type: Object, required: true },
+  supportContactEditUrl: { type: String, default: null },
 });
 
 const columns = [
@@ -102,6 +103,9 @@ const statusTone = (status) => {
             Inbox pesan masuk dari halaman kontak publik untuk tindak lanjut admin.
           </p>
         </div>
+        <Button v-if="supportContactEditUrl" variant="outline" as-child>
+          <Link :href="supportContactEditUrl">Edit Support Contact</Link>
+        </Button>
       </section>
 
       <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

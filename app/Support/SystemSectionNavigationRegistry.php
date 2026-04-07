@@ -437,6 +437,24 @@ class SystemSectionNavigationRegistry
                 'activePatterns' => ['admin.communications.*'],
                 'pathPrefixes' => ['/admin/komunikasi'],
                 'requiredPermission' => SystemNavigation::MANAGE_ADMIN_COMMUNICATIONS,
+                'subItems' => [
+                    [
+                        'key' => 'admin.communications.contact-messages',
+                        'label' => 'Contact Message',
+                        'icon' => 'Mail',
+                        'routeName' => 'admin.communications.contact-messages.index',
+                        'activePatterns' => ['admin.communications.contact-messages.*'],
+                        'pathPrefixes' => ['/admin/komunikasi/contact-messages'],
+                    ],
+                    [
+                        'key' => 'admin.communications.support-contact',
+                        'label' => 'Support Contact',
+                        'icon' => 'CircleHelp',
+                        'routeName' => 'admin.communications.support-contact.edit',
+                        'activePatterns' => ['admin.communications.support-contact.*'],
+                        'pathPrefixes' => ['/admin/komunikasi/support-contact'],
+                    ],
+                ],
             ],
         ];
     }

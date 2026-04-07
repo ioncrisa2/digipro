@@ -53,6 +53,13 @@ class HandleInertiaRequests extends Middleware
                     'address' => $request->user()->address,
                     'company_name' => $request->user()->company_name,
                     'billing_address' => $request->user()->billing_address,
+                    'billing_recipient_name' => $request->user()->billing_recipient_name,
+                    'billing_province_id' => $request->user()->billing_province_id,
+                    'billing_regency_id' => $request->user()->billing_regency_id,
+                    'billing_district_id' => $request->user()->billing_district_id,
+                    'billing_village_id' => $request->user()->billing_village_id,
+                    'billing_postal_code' => $request->user()->billing_postal_code,
+                    'billing_address_detail' => $request->user()->billing_address_detail,
                     'avatar_url' => $request->user()->avatar_url
                         ? Storage::disk('public')->url($request->user()->avatar_url)
                         : null,

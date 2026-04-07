@@ -13,6 +13,13 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -32,6 +39,7 @@ const user = computed(() => page.props.auth?.user || {});
 const layoutContext = computed(() => page.props.layoutContext || "customer");
 const isCustomer = computed(() => layoutContext.value === "customer");
 const supportContact = computed(() => page.props.supportContact || null);
+const profileLocationOptions = computed(() => page.props.profileLocationOptions || {});
 const profileRoutes = computed(() => page.props.profileRoutes || {
   edit: "/profile",
   update: "/profile",
@@ -39,6 +47,7 @@ const profileRoutes = computed(() => page.props.profileRoutes || {
   passwordVerify: "/profile/password/verify",
   avatar: route("profile.avatar"),
   avatarRemove: route("profile.avatar.remove"),
+  locationOptions: route("profile.location-options"),
 });
 const layoutComponent = computed(() => {
   if (layoutContext.value === "reviewer") return ReviewerLayout;
@@ -82,9 +91,19 @@ const profileForm = useForm({
   phone_number: user.value.phone_number || "",
   whatsapp_number: user.value.whatsapp_number || "",
   address: user.value.address || "",
-  company_name: user.value.company_name || "",
-  billing_address: user.value.billing_address || "",
+  billing_recipient_name: user.value.billing_recipient_name || "",
+  billing_province_id: user.value.billing_province_id || "",
+  billing_regency_id: user.value.billing_regency_id || "",
+  billing_district_id: user.value.billing_district_id || "",
+  billing_village_id: user.value.billing_village_id || "",
+  billing_postal_code: user.value.billing_postal_code || "",
+  billing_address_detail: user.value.billing_address_detail || "",
 });
+
+const provinceOptions = ref(profileLocationOptions.value.provinceOptions || []);
+const regencyOptions = ref(profileLocationOptions.value.regencyOptions || []);
+const districtOptions = ref(profileLocationOptions.value.districtOptions || []);
+const villageOptions = ref(profileLocationOptions.value.villageOptions || []);
 
 const avatarForm = useForm({
   avatar: null,
@@ -138,10 +157,84 @@ const cancelProfileEdit = () => {
   profileForm.phone_number = user.value.phone_number || "";
   profileForm.whatsapp_number = user.value.whatsapp_number || "";
   profileForm.address = user.value.address || "";
-  profileForm.company_name = user.value.company_name || "";
-  profileForm.billing_address = user.value.billing_address || "";
+  profileForm.billing_recipient_name = user.value.billing_recipient_name || "";
+  profileForm.billing_province_id = user.value.billing_province_id || "";
+  profileForm.billing_regency_id = user.value.billing_regency_id || "";
+  profileForm.billing_district_id = user.value.billing_district_id || "";
+  profileForm.billing_village_id = user.value.billing_village_id || "";
+  profileForm.billing_postal_code = user.value.billing_postal_code || "";
+  profileForm.billing_address_detail = user.value.billing_address_detail || "";
+  provinceOptions.value = profileLocationOptions.value.provinceOptions || [];
+  regencyOptions.value = profileLocationOptions.value.regencyOptions || [];
+  districtOptions.value = profileLocationOptions.value.districtOptions || [];
+  villageOptions.value = profileLocationOptions.value.villageOptions || [];
   profileForm.clearErrors();
   profileEditing.value = false;
+};
+
+const selectedBillingLabels = computed(() => {
+  const labels = profileLocationOptions.value.selectedLabels || {};
+  const resolveLabel = (options, value, fallback = null) => {
+    if (!value) return "-";
+    return options.find((option) => option.value === value)?.label || fallback || value;
+  };
+
+  return {
+    province: resolveLabel(provinceOptions.value, user.value.billing_province_id, labels.province),
+    regency: resolveLabel(regencyOptions.value, user.value.billing_regency_id, labels.regency),
+    district: resolveLabel(districtOptions.value, user.value.billing_district_id, labels.district),
+    village: resolveLabel(villageOptions.value, user.value.billing_village_id, labels.village),
+  };
+});
+
+const fetchProfileLocationOptions = async (type, params = {}) => {
+  const url = profileRoutes.value.locationOptions;
+  if (!url) return [];
+
+  const response = await axios.get(url, {
+    params: {
+      type,
+      ...params,
+    },
+  });
+
+  return Array.isArray(response.data?.options) ? response.data.options : [];
+};
+
+const handleBillingProvinceChange = async (value) => {
+  profileForm.billing_province_id = value;
+  profileForm.billing_regency_id = "";
+  profileForm.billing_district_id = "";
+  profileForm.billing_village_id = "";
+  regencyOptions.value = [];
+  districtOptions.value = [];
+  villageOptions.value = [];
+
+  if (!value) return;
+
+  regencyOptions.value = await fetchProfileLocationOptions("regencies", { province_id: value });
+};
+
+const handleBillingRegencyChange = async (value) => {
+  profileForm.billing_regency_id = value;
+  profileForm.billing_district_id = "";
+  profileForm.billing_village_id = "";
+  districtOptions.value = [];
+  villageOptions.value = [];
+
+  if (!value) return;
+
+  districtOptions.value = await fetchProfileLocationOptions("districts", { regency_id: value });
+};
+
+const handleBillingDistrictChange = async (value) => {
+  profileForm.billing_district_id = value;
+  profileForm.billing_village_id = "";
+  villageOptions.value = [];
+
+  if (!value) return;
+
+  villageOptions.value = await fetchProfileLocationOptions("villages", { district_id: value });
 };
 
 const openAvatarPicker = () => {
@@ -663,33 +756,152 @@ watch(activeTab, (val) => {
                   <section v-if="isCustomer" class="space-y-4">
                     <div>
                       <h3 class="text-sm font-semibold text-slate-900">Billing Ringkas</h3>
-                      <p class="text-xs text-slate-500">Data ini membantu penyiapan invoice, kontrak, dan kebutuhan penagihan dasar.</p>
+                      <p class="text-xs text-slate-500">Alamat ini digunakan untuk pengiriman laporan fisik ke alamat yang dicantumkan.</p>
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div class="space-y-2">
-                        <Label for="company_name">Nama Perusahaan / Instansi</Label>
+                        <Label for="billing_recipient_name">Nama Billing / Penerima Laporan</Label>
                         <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
-                          {{ user.company_name || "-" }}
+                          {{ user.billing_recipient_name || "-" }}
                         </div>
                         <div v-else>
-                          <Input id="company_name" v-model="profileForm.company_name" />
-                          <p v-if="profileForm.errors.company_name" class="mt-1 text-xs text-red-500">
-                            {{ profileForm.errors.company_name }}
+                          <Input id="billing_recipient_name" v-model="profileForm.billing_recipient_name" />
+                          <p v-if="profileForm.errors.billing_recipient_name" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.billing_recipient_name }}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div class="space-y-2">
+                        <Label for="billing_postal_code">Kode Pos</Label>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ user.billing_postal_code || "-" }}
+                        </div>
+                        <div v-else>
+                          <Input id="billing_postal_code" v-model="profileForm.billing_postal_code" inputmode="numeric" />
+                          <p v-if="profileForm.errors.billing_postal_code" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.billing_postal_code }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div class="space-y-2">
+                        <Label for="billing_province_id">Provinsi</Label>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ selectedBillingLabels.province }}
+                        </div>
+                        <div v-else>
+                          <Select
+                            :model-value="profileForm.billing_province_id || undefined"
+                            @update:model-value="handleBillingProvinceChange"
+                          >
+                            <SelectTrigger id="billing_province_id" class="w-full">
+                              <SelectValue placeholder="Pilih provinsi" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem v-for="option in provinceOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p v-if="profileForm.errors.billing_province_id" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.billing_province_id }}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div class="space-y-2">
+                        <Label for="billing_regency_id">Kabupaten / Kota</Label>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ selectedBillingLabels.regency }}
+                        </div>
+                        <div v-else>
+                          <Select
+                            :model-value="profileForm.billing_regency_id || undefined"
+                            @update:model-value="handleBillingRegencyChange"
+                          >
+                            <SelectTrigger id="billing_regency_id" class="w-full">
+                              <SelectValue placeholder="Pilih kabupaten / kota" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem v-for="option in regencyOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p v-if="profileForm.errors.billing_regency_id" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.billing_regency_id }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div class="space-y-2">
+                        <Label for="billing_district_id">Kecamatan</Label>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ selectedBillingLabels.district }}
+                        </div>
+                        <div v-else>
+                          <Select
+                            :model-value="profileForm.billing_district_id || undefined"
+                            @update:model-value="handleBillingDistrictChange"
+                          >
+                            <SelectTrigger id="billing_district_id" class="w-full">
+                              <SelectValue placeholder="Pilih kecamatan" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem v-for="option in districtOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p v-if="profileForm.errors.billing_district_id" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.billing_district_id }}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div class="space-y-2">
+                        <Label for="billing_village_id">Kelurahan / Desa</Label>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ selectedBillingLabels.village }}
+                        </div>
+                        <div v-else>
+                          <Select
+                            v-model="profileForm.billing_village_id"
+                          >
+                            <SelectTrigger id="billing_village_id" class="w-full">
+                              <SelectValue placeholder="Pilih kelurahan / desa" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem v-for="option in villageOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p v-if="profileForm.errors.billing_village_id" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.billing_village_id }}
                           </p>
                         </div>
                       </div>
                     </div>
 
                     <div class="space-y-2">
-                      <Label for="billing_address">Alamat Billing</Label>
+                      <Label for="billing_address_detail">Alamat Detail Billing</Label>
+                      <p class="text-xs text-slate-500">
+                        Alamat ini digunakan untuk pengiriman laporan fisik ke alamat yang dicantumkan.
+                      </p>
                       <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
-                        {{ user.billing_address || "-" }}
+                        {{ user.billing_address_detail || "-" }}
                       </div>
                       <div v-else>
-                        <Textarea id="billing_address" v-model="profileForm.billing_address" rows="4" />
-                        <p v-if="profileForm.errors.billing_address" class="mt-1 text-xs text-red-500">
-                          {{ profileForm.errors.billing_address }}
+                        <Textarea id="billing_address_detail" v-model="profileForm.billing_address_detail" rows="4" />
+                        <p v-if="profileForm.errors.billing_address_detail" class="mt-1 text-xs text-red-500">
+                          {{ profileForm.errors.billing_address_detail }}
                         </p>
                       </div>
                     </div>

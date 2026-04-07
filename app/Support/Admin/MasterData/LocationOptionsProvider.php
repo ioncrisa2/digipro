@@ -5,6 +5,7 @@ namespace App\Support\Admin\MasterData;
 use App\Models\District;
 use App\Models\Province;
 use App\Models\Regency;
+use App\Models\Village;
 
 class LocationOptionsProvider
 {
@@ -60,6 +61,24 @@ class LocationOptionsProvider
             ->map(fn (District $district) => [
                 'value' => (string) $district->id,
                 'label' => $district->name . ' (' . $district->id . ')',
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function villageSelectOptionsByDistrict(?string $districtId): array
+    {
+        if (blank($districtId)) {
+            return [];
+        }
+
+        return Village::query()
+            ->where('district_id', $districtId)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Village $village) => [
+                'value' => (string) $village->id,
+                'label' => $village->name . ' (' . $village->id . ')',
             ])
             ->values()
             ->all();
