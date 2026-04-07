@@ -3,13 +3,12 @@
 namespace App\Http\Requests\Admin;
 
 use App\Support\SystemNavigation;
-use Illuminate\Foundation\Http\FormRequest;
 
-class StoreVillageRequest extends FormRequest
+class StoreVillageRequest extends SectionPermissionFormRequest
 {
-    public function authorize(): bool
+    protected function requiredSectionPermission(): string
     {
-        return SystemNavigation::hasSectionAccess($this->user(), SystemNavigation::MANAGE_ADMIN_MASTER_DATA);
+        return SystemNavigation::MANAGE_ADMIN_MASTER_DATA;
     }
 
     public function rules(): array

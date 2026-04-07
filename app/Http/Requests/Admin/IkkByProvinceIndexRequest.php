@@ -4,15 +4,8 @@ namespace App\Http\Requests\Admin;
 
 use App\Models\GuidelineSet;
 
-class IkkByProvinceIndexRequest extends AdminFormRequest
+class IkkByProvinceIndexRequest extends AdminOrReviewerFormRequest
 {
-    public function authorize(): bool
-    {
-        $user = $this->user();
-
-        return (bool) ($user?->hasAdminAccess() || $user?->isReviewer());
-    }
-
     public function rules(): array
     {
         return [
@@ -27,9 +20,9 @@ class IkkByProvinceIndexRequest extends AdminFormRequest
         $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
 
         return [
-            'guideline_set_id' => (string) ($this->query('guideline_set_id', $activeGuideline?->id ?? '')),
-            'year' => (string) ($this->query('year', $activeGuideline?->year ?? now()->format('Y'))),
-            'province_id' => (string) $this->query('province_id', ''),
+            'guideline_set_id' => $this->queryStringFilter('guideline_set_id', (string) ($activeGuideline?->id ?? '')),
+            'year' => $this->queryStringFilter('year', (string) ($activeGuideline?->year ?? now()->format('Y'))),
+            'province_id' => $this->queryStringFilter('province_id'),
         ];
     }
 

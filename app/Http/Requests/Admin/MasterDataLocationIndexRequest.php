@@ -17,43 +17,26 @@ class MasterDataLocationIndexRequest extends AdminOrReviewerFormRequest
 
     public function filters(array $keys = ['q'], bool $withPerPage = true): array
     {
-        $source = [
-            'q' => trim((string) $this->query('q', '')),
-            'province_id' => (string) $this->query('province_id', 'all'),
-            'regency_id' => (string) $this->query('regency_id', 'all'),
-            'district_id' => (string) $this->query('district_id', 'all'),
-        ];
-
-        $filters = [];
-
-        foreach ($keys as $key) {
-            $filters[$key] = $source[$key];
-        }
-
-        if ($withPerPage) {
-            $filters['per_page'] = (string) $this->resolvePerPage();
-        }
-
-        return $filters;
-    }
-
-    public function perPage(): int
-    {
-        return $this->resolvePerPage();
+        return $this->filtersFromQuery([
+            'q' => '',
+            'province_id' => 'all',
+            'regency_id' => 'all',
+            'district_id' => 'all',
+        ], $keys, $withPerPage);
     }
 
     public function selectedProvinceId(): string
     {
-        return trim((string) $this->query('province_id', ''));
+        return $this->queryStringFilter('province_id');
     }
 
     public function selectedRegencyId(): string
     {
-        return trim((string) $this->query('regency_id', ''));
+        return $this->queryStringFilter('regency_id');
     }
 
     public function selectedDistrictId(): string
     {
-        return trim((string) $this->query('district_id', ''));
+        return $this->queryStringFilter('district_id');
     }
 }

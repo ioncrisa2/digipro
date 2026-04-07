@@ -21,4 +21,35 @@ abstract class AdminFormRequest extends FormRequest
 
         return min($value, $max);
     }
+
+    public function perPage(): int
+    {
+        return $this->resolvePerPage();
+    }
+
+    protected function queryStringFilter(string $key, string $default = ''): string
+    {
+        return trim((string) $this->query($key, $default));
+    }
+
+    protected function filtersFromQuery(array $defaults, ?array $keys = null, bool $withPerPage = true): array
+    {
+        $source = [];
+
+        foreach ($defaults as $key => $default) {
+            $source[$key] = $this->queryStringFilter($key, (string) $default);
+        }
+
+        $filters = [];
+
+        foreach ($keys ?? array_keys($defaults) as $key) {
+            $filters[$key] = $source[$key] ?? '';
+        }
+
+        if ($withPerPage) {
+            $filters['per_page'] = (string) $this->perPage();
+        }
+
+        return $filters;
+    }
 }

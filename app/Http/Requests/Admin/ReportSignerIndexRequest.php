@@ -16,16 +16,10 @@ class ReportSignerIndexRequest extends AdminFormRequest
 
     public function filters(): array
     {
-        return [
-            'q' => trim((string) $this->query('q', '')),
-            'role' => (string) $this->query('role', 'all'),
-            'active' => (string) $this->query('active', 'all'),
-            'per_page' => (string) $this->resolvePerPage(),
-        ];
-    }
-
-    public function perPage(): int
-    {
-        return $this->resolvePerPage();
+        return $this->filtersFromQuery([
+            'q' => '',
+            'role' => 'all',
+            'active' => 'all',
+        ]);
     }
 }

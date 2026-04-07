@@ -16,16 +16,10 @@ class ArticleIndexRequest extends AdminFormRequest
 
     public function filters(): array
     {
-        return [
-            'q' => trim((string) $this->query('q', '')),
-            'status' => (string) $this->query('status', 'all'),
-            'category' => (string) $this->query('category', 'all'),
-            'per_page' => (string) $this->resolvePerPage(),
-        ];
-    }
-
-    public function perPage(): int
-    {
-        return $this->resolvePerPage();
+        return $this->filtersFromQuery([
+            'q' => '',
+            'status' => 'all',
+            'category' => 'all',
+        ]);
     }
 }

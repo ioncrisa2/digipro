@@ -2,15 +2,8 @@
 
 namespace App\Http\Requests\Admin;
 
-class GuidelineSetIndexRequest extends AdminFormRequest
+class GuidelineSetIndexRequest extends AdminOrReviewerFormRequest
 {
-    public function authorize(): bool
-    {
-        $user = $this->user();
-
-        return (bool) ($user?->hasAdminAccess() || $user?->isReviewer());
-    }
-
     public function rules(): array
     {
         return [
@@ -22,20 +15,9 @@ class GuidelineSetIndexRequest extends AdminFormRequest
 
     public function filters(bool $withPerPage = true): array
     {
-        $filters = [
-            'q' => trim((string) $this->query('q', '')),
-            'status' => (string) $this->query('status', 'all'),
-        ];
-
-        if ($withPerPage) {
-            $filters['per_page'] = (string) $this->resolvePerPage();
-        }
-
-        return $filters;
-    }
-
-    public function perPage(): int
-    {
-        return $this->resolvePerPage();
+        return $this->filtersFromQuery([
+            'q' => '',
+            'status' => 'all',
+        ], withPerPage: $withPerPage);
     }
 }

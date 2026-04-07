@@ -15,15 +15,9 @@ class RoleIndexRequest extends AdminFormRequest
 
     public function filters(): array
     {
-        return [
-            'q' => trim((string) $this->query('q', '')),
-            'guard' => (string) $this->query('guard', 'all'),
-            'per_page' => (string) $this->resolvePerPage(),
-        ];
-    }
-
-    public function perPage(): int
-    {
-        return $this->resolvePerPage();
+        return $this->filtersFromQuery([
+            'q' => '',
+            'guard' => 'all',
+        ]);
     }
 }

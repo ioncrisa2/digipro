@@ -15,15 +15,9 @@ class AppraisalUserConsentIndexRequest extends AdminFormRequest
 
     public function filters(): array
     {
-        return [
-            'q' => trim((string) $this->query('q', '')),
-            'code' => (string) $this->query('code', 'all'),
-            'per_page' => (string) $this->resolvePerPage(),
-        ];
-    }
-
-    public function perPage(): int
-    {
-        return $this->resolvePerPage();
+        return $this->filtersFromQuery([
+            'q' => '',
+            'code' => 'all',
+        ]);
     }
 }

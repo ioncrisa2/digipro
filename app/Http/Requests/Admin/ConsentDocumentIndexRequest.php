@@ -14,9 +14,9 @@ class ConsentDocumentIndexRequest extends AdminFormRequest
 
     public function filters(): array
     {
-        return [
-            'q' => trim((string) $this->query('q', '')),
-            'status' => (string) $this->query('status', 'all'),
-        ];
+        return $this->filtersFromQuery([
+            'q' => '',
+            'status' => 'all',
+        ], withPerPage: false);
     }
 }
