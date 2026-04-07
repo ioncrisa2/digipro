@@ -1,13 +1,7 @@
 import { computed, ref } from "vue";
 
 /**
- * Composable untuk halaman detail appraisal request (Penilaian/Show).
- *
- * Target:
- * - UI state (tab)
- * - helper formatting
- * - label/status mapping + stepper
- * - dokumen summary helper
+ * Composable untuk halaman detail appraisal request customer.
  */
 export function useAppraisalRequestShow(props) {
   const tab = ref("overview");
@@ -15,7 +9,6 @@ export function useAppraisalRequestShow(props) {
   const req = computed(() => {
     const r = props?.request ?? {};
     return {
-      // pastikan minimal field selalu ada
       request_number: r.request_number ?? (r.id != null ? `REQ-${r.id}` : "REQ-..."),
       status: r.status ?? "draft",
       status_label: r.status_label,
@@ -77,14 +70,12 @@ export function useAppraisalRequestShow(props) {
     return t.startsWith("photo_") || t === "photos";
   }
 
-  // === Status mapping (fallback kalau backend belum ngirim status_label) ===
   const statusLabel = computed(() => {
     const fromBackend = req.value.status_label;
     if (fromBackend) return fromBackend;
 
     const s = req.value.status;
     const map = {
-      // schema baru
       draft: "Draft",
       submitted: "Terkirim",
       docs_incomplete: "Dokumen Kurang",
@@ -100,10 +91,9 @@ export function useAppraisalRequestShow(props) {
       report_ready: "Laporan Siap",
       completed: "Selesai",
       cancelled: "Dibatalkan",
-
-      // schema lama
       pending: "Menunggu Review",
       in_progress: "Sedang Diproses",
+      cancellation_review_pending: "Menunggu Review Pembatalan",
       rejected: "Ditolak",
     };
 
@@ -120,93 +110,14 @@ export function useAppraisalRequestShow(props) {
     return "outline";
   });
 
-  // normalisasi status lama -> status baru (agar stepper tidak ngaco)
-  const normalizedStatus = computed(() => {
-    const s = req.value.status;
-    const map = {
-      pending: "submitted",
-      in_progress: "valuation_in_progress",
-      rejected: "cancelled",
-    };
-    return map[s] ?? s;
-  });
-
-  // === Stepper ===
-  const stepOrder = computed(() => {
-    // urutan status baru (lebih lengkap)
-    return [
-      "draft",
-      "submitted",
-      "docs_incomplete",
-      "verified",
-      "waiting_offer",
-      "offer_sent",
-      "waiting_signature",
-      "contract_signed",
-      "valuation_in_progress",
-      "preview_ready",
-      "report_preparation",
-      "report_ready",
-      "completed",
-    ];
-  });
-
-  const currentStepIndex = computed(() => {
-    const i = stepOrder.value.indexOf(normalizedStatus.value);
-    return i < 0 ? 0 : i;
-  });
-
-  const stepItems = computed(() => {
-    const labels = {
-      draft: "Draft",
-      submitted: "Terkirim",
-      docs_incomplete: "Dokumen",
-      verified: "Verifikasi",
-      waiting_offer: "Menunggu Offer",
-      offer_sent: "Penawaran",
-      waiting_signature: "TTD",
-      contract_signed: "Kontrak",
-      valuation_in_progress: "Dikerjakan",
-      preview_ready: "Preview",
-      report_preparation: "Finalisasi",
-      report_ready: "Laporan",
-      completed: "Selesai",
-    };
-
-    const idx = currentStepIndex.value;
-
-    // tampilkan ringkas (maks 6 item) agar tidak penuh layar
-    const all = stepOrder.value;
-    const pick = [
-      all[1],
-      all[6],
-      all[7],
-      all[8],
-      all[9],
-      all[10],
-      all[11] ?? "report_ready",
-    ].filter(Boolean);
-
-    return pick.map((key) => {
-      const realIdx = all.indexOf(key);
-      const state = realIdx < idx ? "done" : realIdx === idx ? "current" : "upcoming";
-      return { key, title: labels[key] ?? key, state };
-    });
-  });
-
-  // === Report download ===
-  const canDownloadReport = computed(() => {
-    return Boolean(req.value.report_pdf_url || req.value.report_pdf_path);
-  });
+  const canDownloadReport = computed(() => Boolean(req.value.report_pdf_url || req.value.report_pdf_path));
 
   function downloadReport() {
-    // Ideal: backend sediakan URL public / route download.
     if (req.value.report_pdf_url) {
       window.open(req.value.report_pdf_url, "_blank", "noreferrer");
       return;
     }
 
-    // sementara: tampilkan path saja (tidak bisa dibuka kalau disk local)
     // eslint-disable-next-line no-alert
     alert(`File laporan belum punya URL public. Path: ${req.value.report_pdf_path || "-"}`);
   }
@@ -214,7 +125,7 @@ export function useAppraisalRequestShow(props) {
   function formatArea(value) {
     const num = Number(value);
     if (!Number.isFinite(num)) return "-";
-    return `${num} m²`;
+    return `${num} m2`;
   }
 
   function formatCoordinates(coords) {
@@ -320,12 +231,32 @@ export function useAppraisalRequestShow(props) {
     return Array.isArray(timeline) ? timeline : [];
   });
 
+  const documentWorkspace = computed(() => ({
+    summary: req.value?.document_summary ?? {},
+    requestUploadDocuments: Array.isArray(req.value?.request_upload_documents) ? req.value.request_upload_documents : [],
+    assetSections: Array.isArray(req.value?.asset_sections) ? req.value.asset_sections : [],
+    systemDocuments: Array.isArray(req.value?.system_documents) ? req.value.system_documents : [],
+    legalDocuments: Array.isArray(req.value?.legal_documents) ? req.value.legal_documents : [],
+    billingDocuments: Array.isArray(req.value?.billing_documents) ? req.value.billing_documents : [],
+  }));
+
+  const progressSummary = computed(() => req.value?.progress_summary ?? null);
+  const recentStatusEvents = computed(() => {
+    const events = req.value?.recent_status_events;
+    return Array.isArray(events) ? events : [];
+  });
+  const trackingPageUrl = computed(() => req.value?.tracking_page_url ?? null);
+  const cancellationRequest = computed(() => req.value?.cancellation_request ?? null);
+  const canRequestCancellation = computed(() => Boolean(req.value?.can_request_cancellation));
+  const cancellationBlockers = computed(() => Array.isArray(req.value?.cancellation_blockers) ? req.value.cancellation_blockers : []);
+  const cancellationRequestUrl = computed(() => req.value?.cancellation_request_url ?? null);
+  const supportContact = computed(() => req.value?.support_contact ?? null);
+
   return {
     tab,
     req,
     statusLabel,
     statusVariant,
-    stepItems,
     formatIDR,
     formatBytes,
     formatArea,
@@ -337,6 +268,15 @@ export function useAppraisalRequestShow(props) {
     requestDocuments,
     documentsByAssetSections,
     statusTimeline,
+    documentWorkspace,
+    progressSummary,
+    recentStatusEvents,
+    trackingPageUrl,
+    cancellationRequest,
+    canRequestCancellation,
+    cancellationBlockers,
+    cancellationRequestUrl,
+    supportContact,
     canDownloadReport,
     downloadReport,
   };

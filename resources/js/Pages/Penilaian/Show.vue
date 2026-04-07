@@ -1,13 +1,26 @@
 <script setup>
-import { computed } from "vue";
-import { router } from "@inertiajs/vue3";
+import { computed, ref } from "vue";
+import { Head, router, useForm } from "@inertiajs/vue3";
 import DashboardLayout from "@/layouts/UserDashboardLayout.vue";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import AppraisalProgressMilestone from "@/components/appraisal/AppraisalProgressMilestone.vue";
+import AppraisalStatusTimeline from "@/components/appraisal/AppraisalStatusTimeline.vue";
+import AppraisalDocumentWorkspace from "@/components/appraisal/AppraisalDocumentWorkspace.vue";
+import { useNotification } from "@/composables/useNotification";
 
-import { ArrowLeft, Calendar, CreditCard, FileText, MapPin } from "lucide-vue-next";
+import { ArrowLeft, Calendar, FileText, MapPin, PhoneCall } from "lucide-vue-next";
 import { useAppraisalRequestShow } from "@/composables/useAppraisalRequestShow";
 
 const props = defineProps({
@@ -22,16 +35,21 @@ const {
     formatBytes,
     formatArea,
     formatCoordinates,
-    docTypeLabel,
     documentsSummary,
     documentsShortList,
     documentsImages,
-    requestDocuments,
-    documentsByAssetSections,
-    statusTimeline,
+    documentWorkspace,
+    progressSummary,
+    recentStatusEvents,
+    trackingPageUrl,
+    cancellationRequest,
+    canRequestCancellation,
+    cancellationBlockers,
+    cancellationRequestUrl,
+    supportContact,
     canDownloadReport,
-    downloadReport,
 } = useAppraisalRequestShow(props);
+const { notify } = useNotification();
 
 const subtitle = computed(() => {
     const r = req.value;
@@ -39,53 +57,32 @@ const subtitle = computed(() => {
     return parts.join(" | ");
 });
 
-const offerPageUrl = computed(() => {
-    try {
-        return route("appraisal.offer.page", req.value?.id);
-    } catch (_) {
-        return `/permohonan-penilaian/${req.value?.id}/penawaran`;
-    }
-});
-
-const paymentPageUrl = computed(() => {
-    try {
-        return route("appraisal.payment.page", req.value?.id);
-    } catch (_) {
-        return `/permohonan-penilaian/${req.value?.id}/pembayaran`;
-    }
-});
-
-const invoicePageUrl = computed(() => {
-    try {
-        return route("appraisal.invoice.page", req.value?.id);
-    } catch (_) {
-        return `/permohonan-penilaian/${req.value?.id}/invoice`;
-    }
-});
-
-const paymentSummary = computed(() => {
-    return req.value?.payment_summary ?? {};
-});
 const revisionSummary = computed(() => req.value?.revision_summary ?? {});
 const previewState = computed(() => req.value?.preview_state ?? {});
-
-const canOpenPreviewPage = computed(() => previewState.value?.status === "preview_ready" && Boolean(previewState.value?.page_url));
-
-const canOpenPaymentPage = computed(() => {
-    const status = String(req.value?.status ?? "").toLowerCase();
-    return [
-        "contract_signed",
-        "valuation_in_progress",
-        "valuation_completed",
-        "preview_ready",
-        "report_preparation",
-        "report_ready",
-        "completed",
-    ].includes(status);
+const primaryAction = computed(() => progressSummary.value?.primary_action ?? null);
+const cancellationFormDialog = ref(false);
+const cancellationForm = useForm({
+    reason: "",
 });
-
-const paymentActionLabel = computed(() => {
-    return paymentSummary.value?.is_paid ? "Lihat Invoice" : "Halaman Pembayaran";
+const cancellationDialogOpen = computed({
+    get: () => cancellationFormDialog.value,
+    set: (value) => {
+        cancellationFormDialog.value = value;
+        if (!value) {
+            cancellationForm.reset();
+            cancellationForm.clearErrors();
+        }
+    },
+});
+const hasOpenCancellationRequest = computed(() => Boolean(cancellationRequest.value?.has_open_request));
+const hasPhoneBlocker = computed(() => {
+    return cancellationBlockers.value.some((item) => {
+        const key = typeof item === "string" ? item : item?.key;
+        return key === "missing_phone_number";
+    });
+});
+const canOpenCancellationDialog = computed(() => {
+    return Boolean(canRequestCancellation.value && cancellationRequestUrl.value && !hasOpenCancellationRequest.value);
 });
 
 const goBack = () => {
@@ -94,20 +91,6 @@ const goBack = () => {
     } catch (_) {
         router.visit("/penilaian");
     }
-};
-
-const goOfferPage = () => {
-    if (!req.value?.id) return;
-    router.visit(offerPageUrl.value);
-};
-
-const goPaymentPage = () => {
-    if (!req.value?.id || !canOpenPaymentPage.value) return;
-    if (paymentSummary.value?.is_paid) {
-        router.visit(invoicePageUrl.value);
-        return;
-    }
-    router.visit(paymentPageUrl.value);
 };
 
 const goRevisionPage = () => {
@@ -120,22 +103,54 @@ const goPreviewPage = () => {
     router.visit(previewState.value.page_url);
 };
 
-const downloadIfReady = () => {
-    if (!canDownloadReport.value) return;
-    downloadReport();
+const goTrackingPage = () => {
+    if (!trackingPageUrl.value) return;
+    router.visit(trackingPageUrl.value);
 };
 
-const timelineDotClass = (type) => {
-    const key = String(type ?? "default").toLowerCase();
-    if (["success"].includes(key)) return "bg-emerald-500";
-    if (["danger"].includes(key)) return "bg-red-500";
-    if (["warning"].includes(key)) return "bg-amber-500";
-    if (["offer", "payment", "submitted", "info"].includes(key)) return "bg-sky-500";
-    return "bg-slate-400";
+const goProfilePage = () => {
+    try {
+        router.visit(route("profile.edit"));
+    } catch (_) {
+        router.visit("/profile");
+    }
+};
+
+const runPrimaryAction = () => {
+    if (!primaryAction.value?.url) return;
+
+    if (primaryAction.value.external) {
+        window.open(primaryAction.value.url, "_blank", "noreferrer");
+        return;
+    }
+
+    router.visit(primaryAction.value.url);
+};
+
+const openCancellationDialog = () => {
+    if (!canOpenCancellationDialog.value) return;
+    cancellationDialogOpen.value = true;
+};
+
+const submitCancellationRequest = () => {
+    if (!cancellationRequestUrl.value || cancellationForm.processing) return;
+
+    cancellationForm.post(cancellationRequestUrl.value, {
+        preserveScroll: true,
+        onSuccess: () => {
+            cancellationDialogOpen.value = false;
+            notify("success", "Pengajuan pembatalan berhasil dikirim. Admin akan menghubungi Anda untuk review.");
+        },
+        onError: () => {
+            notify("error", "Pengajuan pembatalan belum berhasil dikirim. Periksa kembali isian Anda.");
+        },
+    });
 };
 </script>
 
 <template>
+    <Head :title="`Detail Request ${req.request_number}`" />
+
     <DashboardLayout>
         <div class="space-y-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -153,57 +168,194 @@ const timelineDotClass = (type) => {
                         <p class="text-sm text-muted-foreground">{{ subtitle }}</p>
                     </div>
                 </div>
-
-                <div class="flex flex-wrap gap-2">
-                    <Button variant="outline" @click="goOfferPage">
-                        <FileText class="mr-2 h-4 w-4" />
-                        Halaman Penawaran
-                    </Button>
-
-                    <Button v-if="canOpenPreviewPage" @click="goPreviewPage">
-                        <FileText class="mr-2 h-4 w-4" />
-                        Review Preview Kajian
-                    </Button>
-
-                    <Button v-if="canOpenPaymentPage" variant="outline" @click="goPaymentPage">
-                        <CreditCard class="mr-2 h-4 w-4" />
-                        {{ paymentActionLabel }}
-                    </Button>
-
-                    <Button variant="outline" :disabled="!canDownloadReport" @click="downloadIfReady">
-                        <FileText class="mr-2 h-4 w-4" />
-                        Download Laporan
-                    </Button>
-                </div>
             </div>
 
-            <Card>
-                <CardHeader class="pb-2">
-                    <CardTitle class="text-base">Timeline Status</CardTitle>
-                    <CardDescription>Riwayat perubahan status dan aktivitas penting permohonan</CardDescription>
+            <Card class="overflow-hidden border-slate-200">
+                <CardHeader class="pb-3">
+                    <CardTitle class="text-base">Progress Permohonan</CardTitle>
+                    <CardDescription>
+                        Ringkasan milestone utama, status aktif, dan tindakan berikutnya untuk permohonan Anda.
+                    </CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <div v-if="!statusTimeline.length" class="rounded-lg border p-3 text-sm text-muted-foreground">
-                        Riwayat status belum tersedia.
+                <CardContent class="space-y-6">
+                    <AppraisalProgressMilestone v-if="progressSummary" :summary="progressSummary" />
+
+                    <div class="flex flex-wrap gap-2">
+                        <Button
+                            v-if="primaryAction"
+                            :variant="primaryAction.variant || 'default'"
+                            @click="runPrimaryAction"
+                        >
+                            <FileText class="mr-2 h-4 w-4" />
+                            {{ primaryAction.label }}
+                        </Button>
+
+                        <Button variant="outline" @click="goTrackingPage">
+                            <FileText class="mr-2 h-4 w-4" />
+                            Lihat Tracking Lengkap
+                        </Button>
                     </div>
 
-                    <div v-else class="space-y-3">
+                    <div class="border-t border-slate-200 pt-6">
+                        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <p class="text-sm font-semibold text-slate-950">3 Event Terbaru</p>
+                                <p class="text-sm text-slate-500">Tampilan ringkas perubahan status terakhir pada permohonan Anda.</p>
+                            </div>
+                        </div>
+
+                        <AppraisalStatusTimeline
+                            :events="recentStatusEvents"
+                            empty-text="Riwayat status belum tersedia."
+                        />
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card class="border-slate-200">
+                <CardHeader class="pb-3">
+                    <CardTitle class="text-base">Tindakan Customer</CardTitle>
+                    <CardDescription>
+                        Kanal resmi untuk pengajuan pembatalan dan bantuan follow-up bila Anda perlu menghentikan proses request ini.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <div
+                        v-if="hasOpenCancellationRequest"
+                        class="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4"
+                    >
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="space-y-1">
+                                <p class="text-sm font-semibold text-amber-950">
+                                    {{ cancellationRequest?.status_label || "Menunggu Review Pembatalan" }}
+                                </p>
+                                <p class="text-sm text-amber-900">
+                                    Admin akan menghubungi Anda untuk review permohonan pembatalan. Proses penilaian sedang ditahan sampai keputusan review selesai.
+                                </p>
+                            </div>
+                            <Button variant="outline" @click="goTrackingPage">Lihat Tracking</Button>
+                        </div>
+
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <div class="rounded-xl border border-amber-200 bg-white/80 p-3">
+                                <div class="text-xs uppercase tracking-[0.18em] text-amber-700">Waktu Pengajuan</div>
+                                <div class="mt-1 text-sm font-medium text-amber-950">
+                                    {{ cancellationRequest?.requested_at || "-" }}
+                                </div>
+                            </div>
+                            <div class="rounded-xl border border-amber-200 bg-white/80 p-3">
+                                <div class="text-xs uppercase tracking-[0.18em] text-amber-700">Review Admin</div>
+                                <div class="mt-1 text-sm font-medium text-amber-950">
+                                    {{ cancellationRequest?.reviewed_by_name || "Belum ditugaskan" }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-xl border border-amber-200 bg-white/80 p-3">
+                            <div class="text-xs uppercase tracking-[0.18em] text-amber-700">Alasan Anda</div>
+                            <div class="mt-2 whitespace-pre-line text-sm text-amber-950">
+                                {{ cancellationRequest?.reason || "-" }}
+                            </div>
+                        </div>
+
                         <div
-                            v-for="item in statusTimeline"
-                            :key="item.key"
-                            class="relative pl-6 pb-3 border-l border-slate-200 last:pb-0"
+                            v-if="cancellationRequest?.review_note"
+                            class="rounded-xl border border-amber-200 bg-white/80 p-3"
                         >
-                            <span
-                                class="absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full"
-                                :class="timelineDotClass(item.type)"
-                            />
-                            <div class="flex flex-wrap items-center justify-between gap-2">
-                                <div class="text-sm font-medium">{{ item.title ?? "-" }}</div>
-                                <div class="text-xs text-muted-foreground">{{ item.at ?? "-" }}</div>
+                            <div class="text-xs uppercase tracking-[0.18em] text-amber-700">Catatan Review</div>
+                            <div class="mt-2 whitespace-pre-line text-sm text-amber-950">
+                                {{ cancellationRequest.review_note }}
                             </div>
-                            <div class="text-xs text-slate-600 mt-1">
-                                {{ item.description ?? "-" }}
+                        </div>
+                    </div>
+
+                    <div
+                        v-else-if="canOpenCancellationDialog"
+                        class="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(240px,0.7fr)]"
+                    >
+                        <div class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <div class="space-y-1">
+                                <p class="text-sm font-semibold text-slate-950">Ajukan Pembatalan ke Admin</p>
+                                <p class="text-sm text-slate-600">
+                                    Pembatalan tidak disarankan. Bila Anda tetap ingin menghentikan proses, admin akan meninjau permintaan ini terlebih dahulu.
+                                </p>
                             </div>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="rounded-xl border bg-white p-3">
+                                    <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Kebijakan Biaya</div>
+                                    <div class="mt-1 text-sm font-medium text-slate-950">
+                                        Biaya yang telah dibayarkan tidak dapat dikembalikan.
+                                    </div>
+                                </div>
+                                <div class="rounded-xl border bg-white p-3">
+                                    <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Alur Review</div>
+                                    <div class="mt-1 text-sm font-medium text-slate-950">
+                                        Admin akan menghubungi Anda sebelum keputusan akhir dibuat.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 p-4">
+                            <div class="space-y-2">
+                                <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Support Contact</p>
+                                <div class="text-sm font-medium text-slate-950">
+                                    {{ supportContact?.name || "Tim Admin DigiPro" }}
+                                </div>
+                                <div class="flex items-center gap-2 text-sm text-slate-600">
+                                    <PhoneCall class="h-4 w-4" />
+                                    <span>{{ supportContact?.phone || "-" }}</span>
+                                </div>
+                                <p class="text-xs text-slate-500">
+                                    {{ supportContact?.availability_label || "Hubungi admin bila Anda memerlukan klarifikasi tambahan." }}
+                                </p>
+                            </div>
+
+                            <Button variant="outline" @click="openCancellationDialog">
+                                Ajukan Pembatalan
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div
+                        v-else
+                        class="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(240px,0.75fr)]"
+                    >
+                        <div class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <div class="space-y-1">
+                                <p class="text-sm font-semibold text-slate-950">Permohonan belum bisa diajukan pembatalan</p>
+                                <p class="text-sm text-slate-600">
+                                    Sistem memeriksa kelengkapan profil dan status permohonan sebelum pengajuan pembatalan bisa diproses.
+                                </p>
+                            </div>
+
+                            <div class="space-y-2">
+                                <div
+                                    v-for="(item, index) in cancellationBlockers"
+                                    :key="`${item?.key || 'blocker'}-${index}`"
+                                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                                >
+                                    {{ item?.message || item }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 p-4">
+                            <div class="space-y-2">
+                                <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Butuh Bantuan</p>
+                                <div class="text-sm font-medium text-slate-950">
+                                    {{ supportContact?.name || "Tim Admin DigiPro" }}
+                                </div>
+                                <div class="flex items-center gap-2 text-sm text-slate-600">
+                                    <PhoneCall class="h-4 w-4" />
+                                    <span>{{ supportContact?.phone || "-" }}</span>
+                                </div>
+                            </div>
+
+                            <Button v-if="hasPhoneBlocker" variant="outline" @click="goProfilePage">
+                                Lengkapi Profil
+                            </Button>
                         </div>
                     </div>
                 </CardContent>
@@ -267,7 +419,7 @@ const timelineDotClass = (type) => {
                     >
                         <div>
                             Preview versi {{ previewState.version || 1 }} sudah siap ditinjau customer.
-                            <span v-if="previewState.appeal_remaining === 0" class="block mt-1 text-fuchsia-800">
+                            <span v-if="previewState.appeal_remaining === 0" class="mt-1 block text-fuchsia-800">
                                 Kesempatan banding sudah digunakan, sehingga preview revisi ini hanya bisa disetujui.
                             </span>
                         </div>
@@ -320,7 +472,7 @@ const timelineDotClass = (type) => {
                                 </div>
                                 <div>
                                     <div class="text-xs text-muted-foreground">Tanggal Request</div>
-                                    <div class="font-medium flex items-center gap-1">
+                                    <div class="flex items-center gap-1 font-medium">
                                         <Calendar class="h-4 w-4" />
                                         {{ req.requested_at ?? "-" }}
                                     </div>
@@ -356,7 +508,7 @@ const timelineDotClass = (type) => {
                             </div>
                         </div>
 
-                        <div class="rounded-lg border p-3 space-y-3">
+                        <div class="space-y-3 rounded-lg border p-3">
                             <div class="grid grid-cols-2 gap-2">
                                 <div class="rounded-md border px-3 py-2">
                                     <div class="text-[11px] text-muted-foreground">Total Berkas</div>
@@ -393,28 +545,16 @@ const timelineDotClass = (type) => {
 
             <Card>
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-base">Dokumen Permohonan</CardTitle>
-                    <CardDescription>Dokumen request level umum, termasuk surat representatif dan file kontrak digital.</CardDescription>
+                    <CardTitle class="text-base">Pusat Dokumen</CardTitle>
+                    <CardDescription>
+                        Semua arsip request, dokumen sistem, invoice, legal final, dan file aset dalam satu workspace yang lebih mudah discan.
+                    </CardDescription>
                 </CardHeader>
-                <CardContent class="space-y-3">
-                    <div v-if="!requestDocuments.length" class="rounded-lg border p-3 text-sm text-muted-foreground">
-                        Dokumen permohonan belum tersedia.
-                    </div>
-
-                    <div v-for="file in requestDocuments" :key="file.id" class="rounded-lg border p-3">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div class="space-y-1">
-                                <div class="text-xs text-muted-foreground">{{ docTypeLabel(file.type) }}</div>
-                                <div class="font-medium">{{ file.original_name ?? '-' }}</div>
-                                <div class="text-xs text-muted-foreground">{{ formatBytes(file.size ?? 0) }} | {{ file.created_at ?? "-" }}</div>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <Button v-if="file.url" variant="outline" size="sm" as-child>
-                                    <a :href="file.url" target="_blank" rel="noreferrer">Buka Dokumen</a>
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
+                <CardContent>
+                    <AppraisalDocumentWorkspace
+                        :workspace="documentWorkspace"
+                        :format-bytes="formatBytes"
+                    />
                 </CardContent>
             </Card>
 
@@ -434,7 +574,7 @@ const timelineDotClass = (type) => {
                             <Badge variant="outline">Aset #{{ assetIndex + 1 }}</Badge>
                         </div>
 
-                        <div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3 text-sm">
+                        <div class="mt-2 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
                             <div>
                                 <div class="text-xs text-muted-foreground">Alamat</div>
                                 <div class="font-medium">{{ a.address ?? "-" }}</div>
@@ -449,7 +589,7 @@ const timelineDotClass = (type) => {
                             </div>
                         </div>
 
-                        <div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3 text-sm">
+                        <div class="mt-2 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
                             <div>
                                 <div class="text-xs text-muted-foreground">Lantai</div>
                                 <div class="font-medium">{{ a.type === "tanah" ? "-" : (a.building_floors ?? "-") }}</div>
@@ -466,94 +606,45 @@ const timelineDotClass = (type) => {
                     </div>
                 </CardContent>
             </Card>
-
-            <Card>
-                <CardHeader class="pb-2">
-                    <CardTitle class="text-base">Dokumen & Foto Aset</CardTitle>
-                    <CardDescription>Tampilan berkas dipisah per aset agar tidak tercampur antar aset</CardDescription>
-                </CardHeader>
-                <CardContent class="space-y-4">
-                    <div v-if="!documentsByAssetSections.length" class="rounded-lg border p-3 text-sm text-muted-foreground">
-                        Belum ada berkas aset.
-                    </div>
-
-                    <div
-                        v-for="section in documentsByAssetSections"
-                        :key="section.key"
-                        class="rounded-lg border p-3 space-y-3"
-                    >
-                        <div class="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                                <div class="text-sm font-semibold">{{ section.title }}</div>
-                                <div class="text-xs text-muted-foreground">
-                                    {{ section.asset?.address ?? "Alamat tidak tersedia" }}
-                                </div>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <Badge variant="outline">Total Dokumen: {{ section.documents.length }}</Badge>
-                                <Badge variant="outline">Total Foto: {{ section.images.length }}</Badge>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            <div class="rounded-lg border p-3 space-y-2">
-                                <div class="text-sm font-medium">Dokumen</div>
-
-                                <div v-if="!section.documents.length" class="rounded-lg border p-3 text-sm text-muted-foreground">
-                                    Belum ada dokumen non-foto untuk aset ini.
-                                </div>
-
-                                <div
-                                    v-for="d in section.documents"
-                                    :key="d.id"
-                                    class="rounded-lg border px-3 py-2"
-                                >
-                                    <div class="text-xs uppercase tracking-wide text-slate-500">
-                                        {{ docTypeLabel(d.type) }}
-                                    </div>
-                                    <div class="text-sm font-medium">{{ d.original_name ?? "-" }}</div>
-                                    <div class="text-xs text-muted-foreground">
-                                        {{ formatBytes(d.size ?? 0) }} | {{ d.created_at ?? "-" }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="rounded-lg border p-3 space-y-2">
-                                <div class="text-sm font-medium">Foto Aset</div>
-
-                                <div v-if="!section.images.length" class="rounded-lg border p-3 text-sm text-muted-foreground">
-                                    Belum ada foto untuk aset ini.
-                                </div>
-
-                                <div v-else class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                    <div
-                                        v-for="d in section.images"
-                                        :key="d.id"
-                                        class="rounded-lg border overflow-hidden"
-                                    >
-                                        <div class="bg-slate-50 aspect-video flex items-center justify-center">
-                                            <img
-                                                v-if="d.url"
-                                                :src="d.url"
-                                                :alt="d.original_name || docTypeLabel(d.type)"
-                                                class="h-full w-full object-cover"
-                                            />
-                                            <div v-else class="text-xs text-muted-foreground">Gambar belum tersedia</div>
-                                        </div>
-                                        <div class="p-2 space-y-1">
-                                            <div class="text-[11px] uppercase tracking-wide text-slate-500">
-                                                {{ docTypeLabel(d.type) }}
-                                            </div>
-                                            <div class="text-xs font-medium">{{ d.original_name ?? "-" }}</div>
-                                            <div class="text-[11px] text-muted-foreground">{{ formatBytes(d.size ?? 0) }}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
         </div>
     </DashboardLayout>
+
+    <Dialog v-model:open="cancellationDialogOpen">
+        <DialogContent class="sm:max-w-xl">
+            <DialogHeader>
+                <DialogTitle>Ajukan Pembatalan Request</DialogTitle>
+                <DialogDescription>
+                    Pengajuan ini akan direview admin terlebih dahulu. Biaya yang telah dibayarkan tidak dapat dikembalikan.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div class="space-y-4">
+                <div class="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-950">
+                    Pembatalan tidak disarankan. Jika tetap diajukan, proses penilaian akan ditahan sambil menunggu review admin.
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-900" for="cancellation-reason">Alasan pembatalan</label>
+                    <Textarea
+                        id="cancellation-reason"
+                        v-model="cancellationForm.reason"
+                        rows="5"
+                        placeholder="Jelaskan alasan Anda mengajukan pembatalan request penilaian."
+                    />
+                    <p v-if="cancellationForm.errors.reason" class="text-xs text-red-600">
+                        {{ cancellationForm.errors.reason }}
+                    </p>
+                </div>
+            </div>
+
+            <DialogFooter class="gap-2">
+                <Button type="button" variant="outline" @click="cancellationDialogOpen = false">
+                    Kembali
+                </Button>
+                <Button type="button" :disabled="cancellationForm.processing" @click="submitCancellationRequest">
+                    Kirim Pengajuan Pembatalan
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

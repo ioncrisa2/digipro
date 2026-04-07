@@ -17,12 +17,12 @@ const emit = defineEmits(["view"]);
 
 <template>
   <div
-    @click="emit('view', request.id)"
-    class="p-4 hover:bg-slate-50 transition-colors cursor-pointer group"
+    @click="emit('view', request)"
+    class="cursor-pointer px-6 py-5 transition-colors hover:bg-slate-50 group sm:px-8"
   >
     <div class="flex items-start justify-between gap-4">
       <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-3 mb-2">
+        <div class="mb-2 flex items-center gap-3">
           <span class="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-slate-900">
             <FileText class="w-4 h-4 text-slate-400" />
             {{ request.code }}
@@ -40,12 +40,12 @@ const emit = defineEmits(["view"]);
           </span>
         </div>
 
-        <p class="text-sm text-slate-700 mb-2 flex items-start gap-2">
+        <p class="mb-3 flex items-start gap-2 text-sm text-slate-700">
           <MapPin class="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
           <span class="line-clamp-1">{{ request.property }}</span>
         </p>
 
-        <div class="flex items-center gap-4 text-xs text-slate-500">
+        <div class="flex flex-wrap items-center gap-4 text-xs text-slate-500">
           <span class="flex items-center gap-1">
             <Calendar class="w-3.5 h-3.5" />
             {{ request.created_at }}

@@ -21,6 +21,7 @@ enum AppraisalStatusEnum: string
     case PreviewReady           = 'preview_ready';
     case ReportPreparation      = 'report_preparation';
     case ReportReady            = 'report_ready';
+    case CancellationReviewPending = 'cancellation_review_pending';
     case Completed              = 'completed';
     case Cancelled               = 'cancelled';
 
@@ -40,6 +41,7 @@ enum AppraisalStatusEnum: string
             self::PreviewReady          => 'Preview Kajian Siap',
             self::ReportPreparation     => 'Laporan Sedang Disiapkan',
             self::ReportReady           => 'Laporan Siap',
+            self::CancellationReviewPending => 'Menunggu Review Pembatalan',
             self::Completed             => 'Selesai',
             self::Cancelled             => 'Dibatalkan',
         };

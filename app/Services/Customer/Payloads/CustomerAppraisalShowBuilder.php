@@ -8,8 +8,10 @@ use App\Enums\ContractStatusEnum;
 use App\Enums\ReportTypeEnum;
 use App\Enums\ValuationObjectiveEnum;
 use App\Models\AppraisalRequest;
+use App\Services\AppraisalRequestCancellationService;
 use App\Services\Payments\MidtransSnapService;
 use App\Services\Revisions\AppraisalRequestRevisionSubmissionService;
+use App\Support\SupportContact;
 use Illuminate\Support\Facades\Storage;
 
 class CustomerAppraisalShowBuilder
@@ -20,8 +22,10 @@ class CustomerAppraisalShowBuilder
         private readonly AppraisalContractDocumentBuilder $contractDocumentBuilder,
         private readonly AppraisalStatusTimelineBuilder $statusTimelineBuilder,
         private readonly AppraisalPreviewStateBuilder $previewStateBuilder,
+        private readonly AppraisalProgressSummaryBuilder $progressSummaryBuilder,
         private readonly MidtransSnapService $midtransSnapService,
         private readonly AppraisalRequestRevisionSubmissionService $revisionSubmissionService,
+        private readonly AppraisalRequestCancellationService $cancellationService,
     ) {
     }
 
@@ -34,8 +38,23 @@ class CustomerAppraisalShowBuilder
                 'offerNegotiations as negotiation_rounds_used' => fn ($query) => $query->where('action', 'counter_request'),
             ])
             ->with([
-                'user:id,name,email',
+                'user:id,name,email,phone_number,whatsapp_number',
                 'cancelledBy:id,name',
+                'latestCancellationRequest' => function ($query): void {
+                    $query->select([
+                        'appraisal_request_cancellations.id',
+                        'appraisal_request_cancellations.appraisal_request_id',
+                        'appraisal_request_cancellations.status_before_request',
+                        'appraisal_request_cancellations.review_status',
+                        'appraisal_request_cancellations.reason',
+                        'appraisal_request_cancellations.review_note',
+                        'appraisal_request_cancellations.contacted_at',
+                        'appraisal_request_cancellations.reviewed_by',
+                        'appraisal_request_cancellations.reviewed_at',
+                        'appraisal_request_cancellations.created_at',
+                        'appraisal_request_cancellations.updated_at',
+                    ])->with('reviewedBy:id,name');
+                },
                 'assets:id,appraisal_request_id,asset_type,peruntukan,title_document,land_shape,land_position,land_condition,topography,frontage_width,access_road_width,land_area,building_area,building_floors,build_year,renovation_year,address,coordinates_lat,coordinates_lng,province_id,regency_id,district_id,village_id',
                 'assets.files:id,appraisal_asset_id,type,path,original_name,mime,size,created_at',
                 'offerNegotiations:id,appraisal_request_id,user_id,action,round,offered_fee,expected_fee,selected_fee,reason,meta,created_at',
@@ -86,6 +105,7 @@ class CustomerAppraisalShowBuilder
         })->values();
 
         $collections = $this->documentCatalogBuilder->resolveCollections($record);
+        $documentSummary = $this->documentCatalogBuilder->buildSummary($collections);
         $documents = collect($collections['documents']);
         $requestFiles = collect($collections['request_files']);
         $firstAddress = $collections['first_asset_address'];
@@ -141,9 +161,16 @@ class CustomerAppraisalShowBuilder
         $latestPayment = $record->payments->sortByDesc('id')->first();
         $revisionSummary = $this->revisionSubmissionService->buildSummary($record);
         $previewState = $this->previewStateBuilder->build($record);
+        $recentStatusEvents = collect($statusTimeline)
+            ->reverse()
+            ->take(3)
+            ->values()
+            ->all();
         $paymentStatus = $latestPayment?->status;
         $paymentStatusLabel = $this->midtransSnapService->paymentStatusLabel($latestPayment);
         $invoiceNumber = data_get($latestPayment?->metadata, 'invoice_number');
+        $latestCancellationRequest = $record->latestCancellationRequest;
+        $cancellationBlockers = $this->cancellationService->customerBlockers($record, $record->user);
 
         if (! filled($invoiceNumber) && $latestPayment) {
             $invoiceNumber = 'INV-' . now()->format('Y') . '-' . str_pad((string) $latestPayment->id, 5, '0', STR_PAD_LEFT);
@@ -186,6 +213,12 @@ class CustomerAppraisalShowBuilder
                 'assets' => $assets,
                 'documents' => $documents,
                 'request_files' => $requestFiles,
+                'request_upload_documents' => $collections['request_upload_documents'],
+                'asset_sections' => $collections['asset_sections'],
+                'system_documents' => $collections['system_documents'],
+                'legal_documents' => $collections['legal_documents'],
+                'billing_documents' => $collections['billing_documents'],
+                'document_summary' => $documentSummary,
                 'report_generated_at' => optional($record->report_generated_at)->toDateTimeString(),
                 'report_pdf_path' => $record->report_pdf_path,
                 'report_pdf_url' => $reportPdfUrl,
@@ -198,8 +231,43 @@ class CustomerAppraisalShowBuilder
                 'preview_page_url' => $previewState['page_url'],
                 'appeal_remaining' => $previewState['appeal_remaining'],
                 'latest_preview_version' => $previewState['version'],
+                'progress_summary' => $this->progressSummaryBuilder->build(
+                    $record,
+                    $revisionSummary,
+                    $previewState,
+                    $latestPayment,
+                    $statusTimeline,
+                    $reportPdfUrl
+                ),
+                'recent_status_events' => $recentStatusEvents,
+                'tracking_page_url' => route('appraisal.tracking.page', ['id' => $record->id]),
                 'status_timeline' => $statusTimeline,
                 'revision_summary' => $revisionSummary,
+                'support_contact' => SupportContact::payload(),
+                'cancellation_request_url' => route('appraisal.cancellation-request.store', ['id' => $record->id]),
+                'can_request_cancellation' => $this->cancellationService->canCustomerSubmit($record, $record->user),
+                'cancellation_blockers' => array_values(array_map(
+                    fn (array $blocker) => [
+                        'key' => $blocker['key'] ?? null,
+                        'message' => $blocker['message'] ?? null,
+                    ],
+                    $cancellationBlockers
+                )),
+                'cancellation_request' => [
+                    'has_open_request' => in_array($latestCancellationRequest?->review_status, ['pending', 'in_progress'], true),
+                    'status' => $latestCancellationRequest?->review_status,
+                    'status_label' => match ($latestCancellationRequest?->review_status) {
+                        'pending' => 'Menunggu Review Pembatalan',
+                        'in_progress' => 'Sedang Dihubungi Admin',
+                        'approved' => 'Pembatalan Disetujui',
+                        'rejected' => 'Pengajuan Ditolak',
+                        default => null,
+                    },
+                    'requested_at' => optional($latestCancellationRequest?->created_at)->toDateTimeString(),
+                    'reason' => $latestCancellationRequest?->reason,
+                    'review_note' => $latestCancellationRequest?->review_note,
+                    'reviewed_by_name' => $latestCancellationRequest?->reviewedBy?->name,
+                ],
                 'payment_summary' => [
                     'id' => $latestPayment?->id,
                     'status' => $paymentStatus,

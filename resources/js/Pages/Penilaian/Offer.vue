@@ -19,7 +19,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, FileText, HandCoins, XCircle, Clock3 } from "lucide-vue-next";
+import { ArrowLeft, FileText, HandCoins, Clock3 } from "lucide-vue-next";
 import { useAppraisalRequestShow } from "@/composables/useAppraisalRequestShow";
 
 const props = defineProps({
@@ -37,7 +37,6 @@ const acceptActionLoading = ref(false);
 const negotiationDialogOpen = ref(false);
 const negotiationSubmitLoading = ref(false);
 const selectOfferLoading = ref(false);
-const cancelRequestLoading = ref(false);
 
 const negotiationReason = ref("");
 const negotiationExpectedFee = ref("");
@@ -189,14 +188,6 @@ const offerSelectUrl = computed(() => {
     }
 });
 
-const offerCancelUrl = computed(() => {
-    try {
-        return route("appraisal.offer.cancel", req.value?.id);
-    } catch (_) {
-        return `/permohonan-penilaian/${req.value?.id}/offer/cancel`;
-    }
-});
-
 const contractPageUrl = computed(() => {
     try {
         return route("appraisal.contract.page", req.value?.id);
@@ -318,29 +309,6 @@ const continueWithSelectedOffer = async () => {
             },
         }
     );
-};
-
-const cancelRequest = async () => {
-    if (!req.value?.id || cancelRequestLoading.value) return;
-
-    const confirmed = await dialog.confirmDestruct({
-        title: "Batalkan Permohonan?",
-        description: "Permohonan akan dibatalkan jika Anda tidak melanjutkan penawaran ini.",
-        confirmText: "Ya, Batalkan",
-        cancelText: "Kembali",
-    });
-    if (!confirmed) return;
-
-    cancelRequestLoading.value = true;
-    router.post(offerCancelUrl.value, {}, {
-        preserveScroll: true,
-        onError: (errors) => {
-            notify("error", firstValidationMessage(errors) || "Gagal membatalkan permohonan.");
-        },
-        onFinish: () => {
-            cancelRequestLoading.value = false;
-        },
-    });
 };
 
 const negotiationActionLabel = (action) => {
@@ -494,7 +462,7 @@ const negotiationActionClass = (action) => {
                             <div class="space-y-1">
                                 <div class="text-sm font-medium">Batas Negosiasi Tercapai</div>
                                 <p class="text-xs text-muted-foreground">
-                                    Negosiasi sudah mencapai 3 putaran. Pilih penawaran fee yang ingin Anda lanjutkan, atau batalkan permohonan.
+                                    Negosiasi sudah mencapai 3 putaran. Pilih penawaran fee yang ingin Anda lanjutkan, atau buka detail request untuk mengajukan pembatalan ke admin.
                                 </p>
                             </div>
 
@@ -531,9 +499,8 @@ const negotiationActionClass = (action) => {
                                 <Button :disabled="!selectedOfferOptionId || selectOfferLoading" @click="continueWithSelectedOffer">
                                     {{ selectOfferLoading ? "Memproses..." : "Pakai Penawaran Terpilih" }}
                                 </Button>
-                                <Button variant="destructive" :disabled="cancelRequestLoading" @click="cancelRequest">
-                                    <XCircle class="mr-2 h-4 w-4" />
-                                    {{ cancelRequestLoading ? "Memproses..." : "Batalkan Permohonan" }}
+                                <Button variant="outline" @click="goBack">
+                                    Buka Detail Request
                                 </Button>
                             </div>
                         </div>

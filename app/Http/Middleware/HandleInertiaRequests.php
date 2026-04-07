@@ -48,6 +48,11 @@ class HandleInertiaRequests extends Middleware
                     'id' => $request->user()->id,
                     'name' => $request->user()->name,
                     'email' => $request->user()->email,
+                    'phone_number' => $request->user()->phone_number,
+                    'whatsapp_number' => $request->user()->whatsapp_number,
+                    'address' => $request->user()->address,
+                    'company_name' => $request->user()->company_name,
+                    'billing_address' => $request->user()->billing_address,
                     'avatar_url' => $request->user()->avatar_url
                         ? Storage::disk('public')->url($request->user()->avatar_url)
                         : null,

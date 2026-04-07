@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -29,6 +30,8 @@ const { notify } = useNotification();
 
 const user = computed(() => page.props.auth?.user || {});
 const layoutContext = computed(() => page.props.layoutContext || "customer");
+const isCustomer = computed(() => layoutContext.value === "customer");
+const supportContact = computed(() => page.props.supportContact || null);
 const profileRoutes = computed(() => page.props.profileRoutes || {
   edit: "/profile",
   update: "/profile",
@@ -76,6 +79,11 @@ const twoFactorState = ref({
 const profileForm = useForm({
   name: user.value.name || "",
   email: user.value.email || "",
+  phone_number: user.value.phone_number || "",
+  whatsapp_number: user.value.whatsapp_number || "",
+  address: user.value.address || "",
+  company_name: user.value.company_name || "",
+  billing_address: user.value.billing_address || "",
 });
 
 const avatarForm = useForm({
@@ -127,6 +135,11 @@ const focusProfileForm = () => {
 const cancelProfileEdit = () => {
   profileForm.name = user.value.name || "";
   profileForm.email = user.value.email || "";
+  profileForm.phone_number = user.value.phone_number || "";
+  profileForm.whatsapp_number = user.value.whatsapp_number || "";
+  profileForm.address = user.value.address || "";
+  profileForm.company_name = user.value.company_name || "";
+  profileForm.billing_address = user.value.billing_address || "";
   profileForm.clearErrors();
   profileEditing.value = false;
 };
@@ -511,9 +524,15 @@ watch(activeTab, (val) => {
                       {{ (user.name || "U").slice(0, 1).toUpperCase() }}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
+                  <div class="space-y-1">
                     <div class="text-lg font-semibold text-slate-900">{{ user.name || "-" }}</div>
                     <div class="text-sm text-slate-500">{{ user.email || "-" }}</div>
+                    <div
+                      v-if="isCustomer && !user.phone_number"
+                      class="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800"
+                    >
+                      Nomor telepon belum diatur. Mohon lengkapi profil.
+                    </div>
                   </div>
                 </div>
 
@@ -552,39 +571,159 @@ watch(activeTab, (val) => {
               <Separator />
 
               <div ref="profileFormRef">
-                <form @submit.prevent="submitProfile" class="space-y-4">
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="space-y-2">
-                      <Label for="name">Nama Lengkap</Label>
-                      <div v-if="!profileEditing" class="text-sm text-slate-900">
-                        {{ user.name || "-" }}
+                <form @submit.prevent="submitProfile" class="space-y-6">
+                  <section class="space-y-4">
+                    <div>
+                      <h3 class="text-sm font-semibold text-slate-900">Akun Dasar</h3>
+                      <p class="text-xs text-slate-500">Informasi identitas utama yang tampil di akun Anda.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div class="space-y-2">
+                        <Label for="name">Nama Lengkap</Label>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ user.name || "-" }}
+                        </div>
+                        <div v-else>
+                          <Input id="name" v-model="profileForm.name" autocomplete="name" />
+                          <p v-if="profileForm.errors.name" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.name }}
+                          </p>
+                        </div>
                       </div>
-                      <div v-else>
-                        <Input id="name" v-model="profileForm.name" autocomplete="name" />
-                        <p v-if="profileForm.errors.name" class="text-xs text-red-500 mt-1">
-                          {{ profileForm.errors.name }}
-                        </p>
+
+                      <div class="space-y-2">
+                        <Label for="email">Email</Label>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ user.email || "-" }}
+                        </div>
+                        <div v-else>
+                          <Input
+                            id="email"
+                            type="email"
+                            v-model="profileForm.email"
+                            autocomplete="email"
+                          />
+                          <p v-if="profileForm.errors.email" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.email }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="space-y-4">
+                    <div>
+                      <h3 class="text-sm font-semibold text-slate-900">Kontak Utama</h3>
+                      <p class="text-xs text-slate-500">Nomor telepon dipakai untuk follow-up operasional seperti review pembatalan dan klarifikasi admin.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div class="space-y-2">
+                        <Label for="phone_number">Nomor Telepon</Label>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ user.phone_number || "-" }}
+                        </div>
+                        <div v-else>
+                          <Input id="phone_number" v-model="profileForm.phone_number" autocomplete="tel" />
+                          <p v-if="profileForm.errors.phone_number" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.phone_number }}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div class="space-y-2">
+                        <Label for="whatsapp_number">Nomor WhatsApp</Label>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ user.whatsapp_number || "-" }}
+                        </div>
+                        <div v-else>
+                          <Input id="whatsapp_number" v-model="profileForm.whatsapp_number" autocomplete="tel" />
+                          <p v-if="profileForm.errors.whatsapp_number" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.whatsapp_number }}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
                     <div class="space-y-2">
-                      <Label for="email">Email</Label>
-                      <div v-if="!profileEditing" class="text-sm text-slate-900">
-                        {{ user.email || "-" }}
+                      <Label for="address">Alamat</Label>
+                      <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                        {{ user.address || "-" }}
                       </div>
                       <div v-else>
-                        <Input
-                          id="email"
-                          type="email"
-                          v-model="profileForm.email"
-                          autocomplete="email"
-                        />
-                        <p v-if="profileForm.errors.email" class="text-xs text-red-500 mt-1">
-                          {{ profileForm.errors.email }}
+                        <Textarea id="address" v-model="profileForm.address" rows="4" />
+                        <p v-if="profileForm.errors.address" class="mt-1 text-xs text-red-500">
+                          {{ profileForm.errors.address }}
                         </p>
                       </div>
                     </div>
-                  </div>
+                  </section>
+
+                  <section v-if="isCustomer" class="space-y-4">
+                    <div>
+                      <h3 class="text-sm font-semibold text-slate-900">Billing Ringkas</h3>
+                      <p class="text-xs text-slate-500">Data ini membantu penyiapan invoice, kontrak, dan kebutuhan penagihan dasar.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div class="space-y-2">
+                        <Label for="company_name">Nama Perusahaan / Instansi</Label>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ user.company_name || "-" }}
+                        </div>
+                        <div v-else>
+                          <Input id="company_name" v-model="profileForm.company_name" />
+                          <p v-if="profileForm.errors.company_name" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.company_name }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="space-y-2">
+                      <Label for="billing_address">Alamat Billing</Label>
+                      <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                        {{ user.billing_address || "-" }}
+                      </div>
+                      <div v-else>
+                        <Textarea id="billing_address" v-model="profileForm.billing_address" rows="4" />
+                        <p v-if="profileForm.errors.billing_address" class="mt-1 text-xs text-red-500">
+                          {{ profileForm.errors.billing_address }}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section v-if="isCustomer && supportContact" class="space-y-4">
+                    <div>
+                      <h3 class="text-sm font-semibold text-slate-900">Butuh Bantuan</h3>
+                      <p class="text-xs text-slate-500">Gunakan kontak resmi ini bila Anda membutuhkan klarifikasi langsung dari tim admin.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 md:grid-cols-2">
+                      <div class="space-y-1">
+                        <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Contact Person</div>
+                        <div class="text-sm font-medium text-slate-950">{{ supportContact.name || "-" }}</div>
+                      </div>
+                      <div class="space-y-1">
+                        <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Nomor Telepon</div>
+                        <div class="text-sm font-medium text-slate-950">{{ supportContact.phone || "-" }}</div>
+                      </div>
+                      <div class="space-y-1">
+                        <div class="text-xs uppercase tracking-[0.18em] text-slate-500">WhatsApp</div>
+                        <div class="text-sm font-medium text-slate-950">{{ supportContact.whatsapp || "-" }}</div>
+                      </div>
+                      <div class="space-y-1">
+                        <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Email</div>
+                        <div class="text-sm font-medium text-slate-950">{{ supportContact.email || "-" }}</div>
+                      </div>
+                      <div class="space-y-1 md:col-span-2">
+                        <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Jam Layanan</div>
+                        <div class="text-sm font-medium text-slate-950">{{ supportContact.availability_label || "-" }}</div>
+                      </div>
+                    </div>
+                  </section>
 
                   <div v-if="profileEditing" class="flex justify-end gap-2">
                     <Button type="button" variant="outline" @click="cancelProfileEdit">

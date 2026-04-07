@@ -12,6 +12,7 @@ use App\Http\Requests\Customer\CustomerAccessRequest;
 use App\Http\Requests\Customer\SelectOfferRequest;
 use App\Http\Requests\Customer\SignContractRequest;
 use App\Http\Requests\Customer\StoreAppraisalRequest;
+use App\Http\Requests\Customer\StoreCustomerAppraisalCancellationRequest;
 use App\Http\Requests\Customer\SubmitAppraisalRevisionBatchRequest;
 use App\Http\Requests\Customer\SubmitMarketPreviewAppealRequest;
 use App\Http\Requests\Customer\SubmitOfferNegotiationRequest;
@@ -20,6 +21,7 @@ use App\Models\AppraisalRequest;
 use App\Models\User;
 use App\Notifications\AdminActionNotification;
 use App\Notifications\AppraisalStatusUpdated;
+use App\Services\AppraisalRequestCancellationService;
 use App\Services\Admin\AdminNotificationService;
 use App\Services\Customer\AppraisalRequestService;
 use App\Services\Customer\AppraisalService;
@@ -89,6 +91,46 @@ class AppraisalController extends Controller
         $payload = $appraisalService->buildShowPayload($userId, $id);
 
         return inertia('Penilaian/Show', $payload);
+    }
+
+    public function trackingPage(CustomerAccessRequest $request, int $id, AppraisalService $appraisalService)
+    {
+        $userId = $request->user()->id;
+        $payload = $appraisalService->buildTrackingPayload($userId, $id);
+
+        return inertia('Penilaian/Tracking', $payload);
+    }
+
+    public function submitCancellationRequest(
+        StoreCustomerAppraisalCancellationRequest $request,
+        int $id,
+        AppraisalRequestCancellationService $cancellationService
+    ) {
+        $record = $this->resolveUserAppraisalRequest($request, $id);
+
+        try {
+            $cancellation = $cancellationService->submitByCustomer(
+                $record,
+                $request->user(),
+                (string) $request->validated('reason')
+            );
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.show', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
+
+        app(AdminNotificationService::class)->notifyAdmins(
+            'Pengajuan pembatalan baru',
+            ($record->request_number ?? ('#' . $record->id)) . ' mengajukan pembatalan request dan menunggu review admin.',
+            route('admin.appraisal-requests.cancellations.show', $cancellation),
+            'heroicon-o-exclamation-triangle',
+            $request->user()?->id,
+        );
+
+        return redirect()
+            ->route('appraisal.show', ['id' => $record->id])
+            ->with('success', 'Pengajuan pembatalan berhasil dikirim. Admin akan menghubungi Anda untuk review lebih lanjut.');
     }
 
     public function marketPreviewPage(CustomerAccessRequest $request, int $id, AppraisalService $appraisalService)
@@ -303,45 +345,9 @@ class AppraisalController extends Controller
 
     public function cancelOffer(CancelOfferRequest $request, int $id)
     {
-        $record = $this->resolveUserAppraisalRequest($request, $id);
-        $status = $this->getStatusValue($record);
-
-        if (! in_array($status, [
-            AppraisalStatusEnum::OfferSent->value,
-            AppraisalStatusEnum::WaitingOffer->value,
-        ], true)) {
-            return redirect()
-                ->route('appraisal.offer.page', ['id' => $record->id])
-                ->with('error', 'Permohonan tidak dapat dibatalkan pada status saat ini.');
-        }
-
-        $data = $request->validated();
-
-        $record->offerNegotiations()->create([
-            'user_id' => $request->user()->id,
-            'action' => 'cancel_request',
-            'round' => $this->countNegotiationRounds($record),
-            'offered_fee' => $record->fee_total,
-            'reason' => isset($data['reason']) ? trim((string) $data['reason']) : null,
-            'meta' => ['flow' => 'cancel_from_offer_page'],
-        ]);
-
-        $record->update([
-            'status' => AppraisalStatusEnum::Cancelled,
-            'contract_status' => ContractStatusEnum::Cancelled,
-        ]);
-
-        $this->notifyAdmins(
-            $request,
-            $record,
-            'Permohonan dibatalkan oleh user',
-            ($record->request_number ?? ('#' . $record->id)) . ' dibatalkan dari halaman penawaran.',
-            'heroicon-o-x-circle'
-        );
-
         return redirect()
-            ->route('appraisal.show', ['id' => $record->id])
-            ->with('success', 'Permohonan berhasil dibatalkan.');
+            ->route('appraisal.show', ['id' => $id])
+            ->with('error', 'Pembatalan langsung tidak tersedia. Gunakan fitur Ajukan Pembatalan dari halaman detail request.');
     }
 
     public function contractSignaturePage(CustomerAccessRequest $request, int $id, AppraisalService $appraisalService)

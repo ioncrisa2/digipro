@@ -15,16 +15,21 @@ defineProps({
 </script>
 
 <template>
-  <Card class="shadow-sm">
-    <CardHeader class="border-b bg-slate-50/50">
-      <CardTitle class="text-lg font-semibold text-slate-900">
-        Aksi Cepat
-      </CardTitle>
+  <Card class="rounded-[2rem] border-slate-200 shadow-none">
+    <CardHeader class="border-b border-slate-200 px-6 py-5">
+      <div class="space-y-1">
+        <CardTitle class="text-lg font-semibold text-slate-900">
+          Aksi Cepat
+        </CardTitle>
+        <p class="text-sm text-slate-500">
+          Buka daftar request atau mulai permohonan baru dari satu tempat.
+        </p>
+      </div>
     </CardHeader>
-    <CardContent class="p-6 space-y-3">
+    <CardContent class="space-y-3 p-6">
       <button
         @click="onNewRequest"
-        class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition-colors shadow-sm"
+        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800"
       >
         <Plus class="w-4 h-4" />
         Ajukan Permohonan Baru
@@ -32,7 +37,7 @@ defineProps({
 
       <button
         @click="onRequestList"
-        class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+        class="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
       >
         <List class="w-4 h-4" />
         Lihat Semua Permohonan

@@ -1,6 +1,4 @@
 <script setup>
-import { Card, CardContent } from "@/components/ui/card";
-
 defineProps({
   label: {
     type: String,
@@ -10,7 +8,7 @@ defineProps({
     type: [String, Number],
     default: 0,
   },
-  borderClass: {
+  accentClass: {
     type: String,
     required: true,
   },
@@ -38,25 +36,24 @@ defineProps({
 </script>
 
 <template>
-  <Card :class="`border-l-4 ${borderClass} shadow-sm hover:shadow-md transition-shadow`">
-    <CardContent class="p-6">
-      <div class="flex items-start justify-between">
-        <div class="flex-1">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-            {{ label }}
-          </p>
-          <h3 class="text-3xl font-bold text-slate-900 mb-1">
-            {{ value }}
-          </h3>
-          <p class="text-xs text-slate-400 flex items-center gap-1">
-            <component :is="subIcon" class="w-3 h-3" />
-            {{ subtext }}
-          </p>
-        </div>
-        <div :class="`p-3 rounded-lg ${tileClass}`">
-          <component :is="icon" class="w-6 h-6" :class="iconClass" />
-        </div>
+  <div class="flex h-full items-start justify-between gap-4 px-5 py-5 sm:px-6">
+    <div class="space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="h-2.5 w-2.5 rounded-full" :class="accentClass" />
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+          {{ label }}
+        </p>
       </div>
-    </CardContent>
-  </Card>
+      <h3 class="text-3xl font-semibold tracking-tight text-slate-950">
+        {{ value }}
+      </h3>
+      <p class="flex items-center gap-1 text-xs text-slate-500">
+        <component :is="subIcon" class="h-3.5 w-3.5" />
+        {{ subtext }}
+      </p>
+    </div>
+    <div :class="`rounded-2xl p-3 ${tileClass}`">
+      <component :is="icon" class="h-5 w-5" :class="iconClass" />
+    </div>
+  </div>
 </template>

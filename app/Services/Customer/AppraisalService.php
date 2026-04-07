@@ -11,6 +11,7 @@ use App\Services\Customer\Payloads\CustomerAppraisalDocumentBuilder;
 use App\Services\Customer\Payloads\CustomerAppraisalIndexBuilder;
 use App\Services\Customer\Payloads\CustomerAppraisalMarketPreviewBuilder;
 use App\Services\Customer\Payloads\CustomerAppraisalShowBuilder;
+use App\Services\Customer\Payloads\CustomerAppraisalTrackingBuilder;
 use App\Services\Customer\Payloads\CustomerRepresentativeLetterBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ class AppraisalService
         private readonly CustomerAppraisalCreateBuilder $createBuilder,
         private readonly CustomerAppraisalDocumentBuilder $documentBuilder,
         private readonly CustomerAppraisalShowBuilder $showBuilder,
+        private readonly CustomerAppraisalTrackingBuilder $trackingBuilder,
         private readonly CustomerAppraisalMarketPreviewBuilder $marketPreviewBuilder,
         private readonly AppraisalContractDocumentBuilder $contractDocumentBuilder,
         private readonly CustomerRepresentativeLetterBuilder $representativeLetterBuilder,
@@ -55,6 +57,11 @@ class AppraisalService
     public function buildShowPayload(int $userId, int $id): array
     {
         return $this->showBuilder->build($userId, $id);
+    }
+
+    public function buildTrackingPayload(int $userId, int $id): array
+    {
+        return $this->trackingBuilder->build($userId, $id);
     }
 
     public function buildMarketPreviewPayload(int $userId, int $id): array

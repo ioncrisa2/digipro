@@ -4,10 +4,10 @@ import { AlertCircle } from "lucide-vue-next";
 </script>
 
 <template>
-  <Card class="shadow-sm bg-slate-50 border-slate-200">
+  <Card class="rounded-[2rem] border-dashed border-slate-300 bg-slate-50 shadow-none">
     <CardContent class="p-6">
       <div class="flex items-start gap-3">
-        <div class="bg-slate-200 p-2 rounded-lg">
+        <div class="rounded-xl bg-white p-2">
           <AlertCircle class="w-5 h-5 text-slate-600" />
         </div>
         <div class="flex-1">

@@ -8,6 +8,7 @@ use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Notifications\Notifiable;
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -24,6 +25,11 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $fillable = [
         'name',
         'email',
+        'phone_number',
+        'whatsapp_number',
+        'address',
+        'company_name',
+        'billing_address',
         'password',
         'avatar_url'
     ];
@@ -79,6 +85,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function systemSectionPermissions(): array
     {
         return SystemNavigation::permissionsForUser($this);
+    }
+
+    public function cancellationRequests(): HasMany
+    {
+        return $this->hasMany(AppraisalRequestCancellation::class);
     }
 
     // public function sendPasswordResetNotification($token): void

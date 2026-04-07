@@ -112,6 +112,7 @@ class AppraisalRequestWorkflowService
         }
 
         return ! in_array($this->statusValue($record), [
+            AppraisalStatusEnum::CancellationReviewPending->value,
             AppraisalStatusEnum::Cancelled->value,
             AppraisalStatusEnum::ReportReady->value,
             AppraisalStatusEnum::Completed->value,

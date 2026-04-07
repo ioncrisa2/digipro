@@ -31,6 +31,7 @@ class CustomerAppraisalIndexBuilder
 
         $inProgressStatuses = array_filter([
             AppraisalStatusEnum::ContractSigned->value ?? null,
+            AppraisalStatusEnum::CancellationReviewPending->value ?? null,
             AppraisalStatusEnum::ValuationOnProgress->value ?? null,
             AppraisalStatusEnum::ValuationCompleted->value ?? null,
             AppraisalStatusEnum::PreviewReady->value ?? null,

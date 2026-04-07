@@ -55,14 +55,14 @@ const getStatusConfig = (color) => statusConfig[color] || statusConfig.secondary
 </script>
 
 <template>
-  <Card class="lg:col-span-2 shadow-sm">
-    <CardHeader class="border-b bg-slate-50/50">
+  <Card class="rounded-[2rem] border-slate-200 shadow-none">
+    <CardHeader class="border-b border-slate-200 px-6 py-5 sm:px-8">
       <div class="flex items-center justify-between">
         <div>
           <CardTitle class="text-lg font-semibold text-slate-900">
             Permohonan Terbaru
           </CardTitle>
-          <p class="text-sm text-slate-500 mt-1">
+          <p class="mt-1 text-sm text-slate-500">
             5 permohonan penilaian terakhir
           </p>
         </div>
@@ -81,7 +81,7 @@ const getStatusConfig = (color) => statusConfig[color] || statusConfig.secondary
         :on-new-request="onNewRequest"
       />
 
-      <div v-else class="divide-y">
+      <div v-else class="divide-y divide-slate-200">
         <RecentRequestRow
           v-for="req in props.recentRequests"
           :key="req.id"

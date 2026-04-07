@@ -47,6 +47,44 @@ class AppraisalStatusTimelineBuilder
             'submitted'
         );
 
+        $latestCancellationRequest = $record->latestCancellationRequest;
+
+        if ($latestCancellationRequest) {
+            $append(
+                'cancellation_request_submitted',
+                'Pengajuan Pembatalan Dikirim',
+                'Customer mengajukan pembatalan dan menunggu review admin.',
+                $latestCancellationRequest->created_at,
+                'warning'
+            );
+
+            if ($latestCancellationRequest->contacted_at) {
+                $append(
+                    'cancellation_request_contacted',
+                    'Admin Sedang Menghubungi Customer',
+                    'Admin menindaklanjuti pengajuan pembatalan melalui kontak customer yang tersedia.',
+                    $latestCancellationRequest->contacted_at,
+                    'info'
+                );
+            }
+
+            if ($latestCancellationRequest->review_status === 'rejected') {
+                $description = 'Pengajuan pembatalan ditolak dan permohonan dikembalikan ke status sebelumnya.';
+
+                if (filled($latestCancellationRequest->review_note)) {
+                    $description .= ' Catatan admin: ' . $latestCancellationRequest->review_note;
+                }
+
+                $append(
+                    'cancellation_request_rejected',
+                    'Pengajuan Pembatalan Ditolak',
+                    $description,
+                    $latestCancellationRequest->reviewed_at ?? $latestCancellationRequest->updated_at,
+                    'danger'
+                );
+            }
+        }
+
         if ($record->verified_at) {
             $append(
                 'docs_verified',
@@ -283,6 +321,16 @@ class AppraisalStatusTimelineBuilder
                 'Seluruh proses penilaian telah selesai.',
                 $record->updated_at,
                 'success'
+            );
+        }
+
+        if (($record->status?->value ?? $record->status) === AppraisalStatusEnum::CancellationReviewPending->value) {
+            $append(
+                'cancellation_review_pending',
+                'Menunggu Review Pembatalan',
+                'Permohonan sedang ditahan sementara sampai admin menyelesaikan review pembatalan.',
+                $latestCancellationRequest?->created_at ?? $record->updated_at,
+                'warning'
             );
         }
 

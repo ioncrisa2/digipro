@@ -14,6 +14,7 @@ Route::middleware(['auth', 'verified', 'customer.role'])
         Route::get('/buat-permohonan', [AppraisalController::class, 'create'])->name('appraisal.create');
         Route::post('/buat-permohonan', [AppraisalController::class, 'store'])->name('appraisal.store');
         Route::get('/permohonan-penilaian/{id}', [AppraisalController::class, 'show'])->name('appraisal.show');
+        Route::get('/permohonan-penilaian/{id}/tracking', [AppraisalController::class, 'trackingPage'])->name('appraisal.tracking.page');
         Route::get('/permohonan-penilaian/{id}/revisi-dokumen', [AppraisalController::class, 'revisionPage'])->name('appraisal.revisions.page');
         Route::post('/permohonan-penilaian/{id}/revisi-dokumen', [AppraisalController::class, 'submitRevision'])->name('appraisal.revisions.submit');
         Route::get('/permohonan-penilaian/{id}/penawaran', [AppraisalController::class, 'offerPage'])->name('appraisal.offer.page');
@@ -21,6 +22,7 @@ Route::middleware(['auth', 'verified', 'customer.role'])
         Route::post('/permohonan-penilaian/{id}/offer/negotiate', [AppraisalController::class, 'submitOfferNegotiation'])->name('appraisal.offer.negotiate');
         Route::post('/permohonan-penilaian/{id}/offer/select', [AppraisalController::class, 'selectOffer'])->name('appraisal.offer.select');
         Route::post('/permohonan-penilaian/{id}/offer/cancel', [AppraisalController::class, 'cancelOffer'])->name('appraisal.offer.cancel');
+        Route::post('/permohonan-penilaian/{id}/cancellation-request', [AppraisalController::class, 'submitCancellationRequest'])->name('appraisal.cancellation-request.store');
         Route::get('/permohonan-penilaian/{id}/kontrak', [AppraisalController::class, 'contractSignaturePage'])->name('appraisal.contract.page');
         Route::get('/permohonan-penilaian/{id}/kontrak/pdf', [AppraisalController::class, 'downloadContractPdf'])->name('appraisal.contract.pdf');
         Route::post('/permohonan-penilaian/{id}/kontrak/sign', [AppraisalController::class, 'signContract'])->name('appraisal.contract.sign');

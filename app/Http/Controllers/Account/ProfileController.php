@@ -8,6 +8,7 @@ use App\Http\Requests\Account\PasswordUpdateRequest;
 use App\Http\Requests\Account\ProfileUpdateRequest;
 use App\Http\Requests\Account\UpdateAvatarRequest;
 use App\Http\Requests\Account\VerifyCurrentPasswordRequest;
+use App\Support\SupportContact;
 use App\Support\SystemNavigation;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -37,6 +38,7 @@ class ProfileController extends Controller
                 'avatar' => $isReviewer ? route('reviewer.profile.avatar') : route('profile.avatar'),
                 'avatarRemove' => $isReviewer ? route('reviewer.profile.avatar.remove') : route('profile.avatar.remove'),
             ],
+            'supportContact' => SupportContact::payload(),
         ]);
     }
 

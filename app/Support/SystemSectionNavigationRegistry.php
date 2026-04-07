@@ -56,6 +56,24 @@ class SystemSectionNavigationRegistry
                 'activePatterns' => ['admin.appraisal-requests.*'],
                 'pathPrefixes' => ['/admin/permohonan-penilaian'],
                 'requiredPermission' => SystemNavigation::MANAGE_ADMIN_APPRAISAL_REQUESTS,
+                'subItems' => [
+                    [
+                        'key' => 'admin.requests.index',
+                        'label' => 'Request',
+                        'icon' => 'ClipboardList',
+                        'routeName' => 'admin.appraisal-requests.index',
+                        'activePatterns' => ['admin.appraisal-requests.index', 'admin.appraisal-requests.show', 'admin.appraisal-requests.edit', 'admin.appraisal-requests.update', 'admin.appraisal-requests.actions.*', 'admin.appraisal-requests.revision-batches.*', 'admin.appraisal-requests.field-corrections.*', 'admin.appraisal-requests.revision-items.*'],
+                        'pathPrefixes' => ['/admin/permohonan-penilaian'],
+                    ],
+                    [
+                        'key' => 'admin.requests.cancellations',
+                        'label' => 'Pembatalan Request',
+                        'icon' => 'CircleSlash2',
+                        'routeName' => 'admin.appraisal-requests.cancellations.index',
+                        'activePatterns' => ['admin.appraisal-requests.cancellations.*'],
+                        'pathPrefixes' => ['/admin/permohonan-penilaian/pembatalan'],
+                    ],
+                ],
             ],
             [
                 'key' => 'admin.finance',

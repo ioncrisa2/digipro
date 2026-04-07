@@ -21,6 +21,11 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 'unique:users,email,' . $this->user()->id,
             ],
+            'phone_number' => ['nullable', 'string', 'max:30'],
+            'whatsapp_number' => ['nullable', 'string', 'max:30'],
+            'address' => ['nullable', 'string'],
+            'company_name' => ['nullable', 'string', 'max:255'],
+            'billing_address' => ['nullable', 'string'],
         ];
     }
 }

@@ -22,7 +22,7 @@ const cards = computed(() => {
     {
       label: "Total Permohonan",
       value: stats.total_requests ?? 0,
-      borderClass: "border-slate-500",
+      accentClass: "bg-slate-900",
       tileClass: "bg-slate-100",
       icon: FileText,
       iconClass: "text-slate-600",
@@ -32,7 +32,7 @@ const cards = computed(() => {
     {
       label: "Sedang Proses",
       value: stats.in_progress ?? 0,
-      borderClass: "border-amber-500",
+      accentClass: "bg-amber-500",
       tileClass: "bg-amber-100",
       icon: Clock,
       iconClass: "text-amber-600",
@@ -42,7 +42,7 @@ const cards = computed(() => {
     {
       label: "Selesai",
       value: stats.completed ?? 0,
-      borderClass: "border-emerald-500",
+      accentClass: "bg-emerald-500",
       tileClass: "bg-emerald-100",
       icon: CheckCircle2,
       iconClass: "text-emerald-600",
@@ -52,7 +52,7 @@ const cards = computed(() => {
     {
       label: "Perlu Revisi",
       value: stats.need_revision ?? 0,
-      borderClass: "border-rose-500",
+      accentClass: "bg-rose-500",
       tileClass: "bg-rose-100",
       icon: AlertCircle,
       iconClass: "text-rose-600",
@@ -64,11 +64,13 @@ const cards = computed(() => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <section class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
+    <div class="grid divide-slate-200 sm:grid-cols-2 sm:divide-x xl:grid-cols-4">
     <DashboardStatCard
       v-for="card in cards"
       :key="card.label"
       v-bind="card"
     />
-  </div>
+    </div>
+  </section>
 </template>

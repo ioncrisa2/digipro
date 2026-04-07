@@ -107,7 +107,7 @@ class MidtransSnapService
             'customer_details' => [
                 'first_name' => (string) ($request->client_name ?: ($request->user?->name ?? 'Customer')),
                 'email' => (string) ($request->user?->email ?? 'no-reply@example.com'),
-                'phone' => (string) data_get($request->user, 'phone', ''),
+                'phone' => (string) data_get($request->user, 'phone_number', ''),
             ],
             'enabled_payments' => $this->enabledPayments(),
             'expiry' => [

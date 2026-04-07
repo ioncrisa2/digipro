@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AccessControlController;
 use App\Http\Controllers\Admin\AppraisalRequestController;
+use App\Http\Controllers\Admin\AppraisalRequestCancellationController;
 use App\Http\Controllers\Admin\AppraisalRequestWorkflowController;
 use App\Http\Controllers\Admin\BuildingEconomicLifeController;
 use App\Http\Controllers\Admin\CommunicationController;
@@ -27,6 +28,11 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
             ->prefix('permohonan-penilaian')
             ->name('appraisal-requests.')
             ->group(function (): void {
+                Route::get('/pembatalan', [AppraisalRequestCancellationController::class, 'index'])->name('cancellations.index');
+                Route::get('/pembatalan/{cancellationRequest}', [AppraisalRequestCancellationController::class, 'show'])->name('cancellations.show');
+                Route::post('/pembatalan/{cancellationRequest}/in-progress', [AppraisalRequestCancellationController::class, 'markInProgress'])->name('cancellations.in-progress');
+                Route::post('/pembatalan/{cancellationRequest}/approve', [AppraisalRequestCancellationController::class, 'approve'])->name('cancellations.approve');
+                Route::post('/pembatalan/{cancellationRequest}/reject', [AppraisalRequestCancellationController::class, 'reject'])->name('cancellations.reject');
                 Route::get('/', [AppraisalRequestController::class, 'appraisalRequestsIndex'])->name('index');
                 Route::get('/{appraisalRequest}', [AppraisalRequestController::class, 'appraisalRequestsShow'])->name('show');
                 Route::get('/{appraisalRequest}/edit', [AppraisalRequestController::class, 'appraisalRequestsEdit'])->name('edit');

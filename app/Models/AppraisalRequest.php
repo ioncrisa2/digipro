@@ -11,6 +11,7 @@ use App\Enums\ValuationObjectiveEnum;
 use App\Traits\HasRequestNumber;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
@@ -227,6 +228,16 @@ class AppraisalRequest extends Model
     public function offerNegotiations(): HasMany
     {
         return $this->hasMany(AppraisalOfferNegotiation::class);
+    }
+
+    public function cancellationRequests(): HasMany
+    {
+        return $this->hasMany(AppraisalRequestCancellation::class);
+    }
+
+    public function latestCancellationRequest(): HasOne
+    {
+        return $this->hasOne(AppraisalRequestCancellation::class)->latestOfMany();
     }
 
     public function payments(): HasMany
