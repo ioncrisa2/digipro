@@ -2,13 +2,8 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
-
-class AppraisalStatusUpdated extends Notification
+class AppraisalStatusUpdated extends DatabaseNotification
 {
-    use Queueable;
-
     public function __construct(
         public int $appraisalId,
         public string $requestNumber,
@@ -18,12 +13,7 @@ class AppraisalStatusUpdated extends Notification
     ) {
     }
 
-    public function via($notifiable): array
-    {
-        return ['database'];
-    }
-
-    public function toDatabase($notifiable): array
+    protected function databasePayload(object $notifiable): array
     {
         $message = "Permohonan {$this->requestNumber} berubah: {$this->oldStatus} -> {$this->newStatus}.";
 

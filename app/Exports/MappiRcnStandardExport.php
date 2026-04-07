@@ -2,28 +2,11 @@
 
 namespace App\Exports;
 
-use Illuminate\Database\Eloquent\Builder;
-use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithMapping;
 
-class MappiRcnStandardExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize
+class MappiRcnStandardExport extends BaseMappedQueryExport implements ShouldAutoSize
 {
-    public function __construct(protected Builder $query) {}
-
-    public function query()
-    {
-        return $this->query->select([
-            'building_type',
-            'building_class',
-            'storey_pattern',
-            'rcn_value',
-            'notes',
-        ]);
-    }
-
-    public function headings(): array
+    protected function columns(): array
     {
         return [
             'building_type',
@@ -34,7 +17,7 @@ class MappiRcnStandardExport implements FromQuery, WithHeadings, WithMapping, Sh
         ];
     }
 
-    public function map($row): array
+    protected function mapRow(mixed $row): array
     {
         return [
             $row->building_type,

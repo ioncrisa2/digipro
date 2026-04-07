@@ -2,13 +2,8 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
-
-class AppraisalPaymentStatusNotification extends Notification
+class AppraisalPaymentStatusNotification extends DatabaseNotification
 {
-    use Queueable;
-
     public function __construct(
         public int $appraisalId,
         public string $requestNumber,
@@ -17,12 +12,7 @@ class AppraisalPaymentStatusNotification extends Notification
     ) {
     }
 
-    public function via(object $notifiable): array
-    {
-        return ['database'];
-    }
-
-    public function toDatabase(object $notifiable): array
+    protected function databasePayload(object $notifiable): array
     {
         $isVerified = $this->status === 'verified';
 

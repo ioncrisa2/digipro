@@ -2,13 +2,8 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
-
-class AppraisalRevisionRequestedNotification extends Notification
+class AppraisalRevisionRequestedNotification extends DatabaseNotification
 {
-    use Queueable;
-
     public function __construct(
         public int $appraisalId,
         public int $revisionBatchId,
@@ -18,12 +13,7 @@ class AppraisalRevisionRequestedNotification extends Notification
     ) {
     }
 
-    public function via(object $notifiable): array
-    {
-        return ['database'];
-    }
-
-    public function toDatabase(object $notifiable): array
+    protected function databasePayload(object $notifiable): array
     {
         $message = "Admin meminta revisi {$this->itemsCount} data/dokumen untuk {$this->requestNumber}.";
 

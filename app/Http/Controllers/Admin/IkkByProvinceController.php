@@ -6,24 +6,27 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\IkkByProvinceIndexRequest;
 use App\Http\Requests\Admin\SaveIkkByProvinceRequest;
 use App\Models\ConstructionCostIndex;
-use App\Models\GuidelineSet;
-use App\Models\Province;
 use App\Models\Regency;
+use App\Support\Admin\ReferenceGuideData\ReferenceGuideOptionsProvider;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Response;
 
 class IkkByProvinceController extends Controller
 {
+    public function __construct(
+        private readonly ReferenceGuideOptionsProvider $options,
+    ) {
+    }
+
     public function index(IkkByProvinceIndexRequest $request): Response
     {
         $filters = $request->filters();
 
         return inertia('Admin/IkkByProvince/Index', [
             'filters' => $filters,
-            'guidelineSetOptions' => $this->guidelineSetOptions(),
-            'provinceOptions' => $this->provinceOptions(),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(),
+            'provinceOptions' => $this->options->provinceSelectOptions(withCode: false),
             'items' => $this->items(
                 $request->guidelineSetId(),
                 $request->yearValue(),
@@ -109,30 +112,4 @@ class IkkByProvinceController extends Controller
             ->all();
     }
 
-    private function guidelineSetOptions(): array
-    {
-        return GuidelineSet::query()
-            ->orderByDesc('year')
-            ->get(['id', 'name', 'year', 'is_active'])
-            ->map(fn (GuidelineSet $guidelineSet) => [
-                'value' => (string) $guidelineSet->id,
-                'label' => $guidelineSet->name . ' (' . $guidelineSet->year . ')' . ($guidelineSet->is_active ? ' - aktif' : ''),
-                'year' => (int) $guidelineSet->year,
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function provinceOptions(): array
-    {
-        return Province::query()
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (Province $province) => [
-                'value' => (string) $province->id,
-                'label' => $province->name,
-            ])
-            ->values()
-            ->all();
-    }
 }

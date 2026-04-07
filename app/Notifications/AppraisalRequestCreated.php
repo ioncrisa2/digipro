@@ -2,34 +2,15 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
-
-class AppraisalRequestCreated extends Notification
+class AppraisalRequestCreated extends DatabaseNotification
 {
-    use Queueable;
-
-    /**
-     * Create a new notification instance.
-     */
     public function __construct(
         public int $appraisalId,
         public string $requestNumber
-    ) {}
-
-    /**
-     * Get the notification's delivery channels.
-     *
-     * @return array<int, string>
-     */
-    public function via(object $notifiable): array
-    {
-        return ['database'];
+    ) {
     }
 
-    public function toDatabase($notifiable): array
+    protected function databasePayload(object $notifiable): array
     {
         return [
             'title'         => 'Permohonan berhasil dibuat',

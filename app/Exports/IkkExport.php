@@ -2,32 +2,26 @@
 
 namespace App\Exports;
 
-use Illuminate\Database\Eloquent\Builder;
-use Maatwebsite\Excel\Concerns\FromQuery;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 
-class IkkExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithColumnFormatting
+class IkkExport extends BaseMappedQueryExport implements ShouldAutoSize, WithColumnFormatting
 {
-    public function __construct(protected Builder $query) {}
-
-    public function query()
+    protected function columns(): array
     {
-        return $this->query->select([
+        return [
             'region_code',
             'region_name',
             'ikk_value',
-        ]);
+        ];
     }
 
-    public function headings(): array
+    protected function headingsList(): array
     {
         return ['kode', 'nama_provinsi_kota_kabupaten', 'ikk_mappi'];
     }
 
-    public function map($row): array
+    protected function mapRow(mixed $row): array
     {
         return [
             $row->region_code,

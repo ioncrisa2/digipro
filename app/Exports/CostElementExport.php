@@ -3,31 +3,10 @@
 namespace App\Exports;
 
 use App\Models\CostElement;
-use Illuminate\Database\Eloquent\Builder;
-use Maatwebsite\Excel\Concerns\FromQuery;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithMapping;
 
-class CostElementExport implements FromQuery, WithHeadings, WithMapping
+class CostElementExport extends BaseMappedQueryExport
 {
-    public function __construct(protected Builder $query) {}
-
-    public function query()
-    {
-        return $this->query->select([
-            'group',
-            'element_code',
-            'element_name',
-            'building_type',
-            'building_class',
-            'storey_pattern',
-            'unit',
-            'unit_cost',
-            'spec_json',
-        ]);
-    }
-
-    public function headings(): array
+    protected function columns(): array
     {
         return [
             'group',
@@ -42,7 +21,7 @@ class CostElementExport implements FromQuery, WithHeadings, WithMapping
         ];
     }
 
-    public function map($row): array
+    protected function mapRow(mixed $row): array
     {
         /** @var CostElement $row */
         return [

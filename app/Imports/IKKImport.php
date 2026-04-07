@@ -2,7 +2,6 @@
 
 namespace App\Imports;
 
-use App\Models\GuidelineSet;
 use App\Models\Regency;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -11,12 +10,8 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 
-class IKKImport implements ToCollection, WithHeadingRow, WithChunkReading, SkipsEmptyRows
+class IKKImport extends BaseSpreadsheetImport implements ToCollection, WithHeadingRow, WithChunkReading, SkipsEmptyRows
 {
-    public int $inserted = 0;
-    public int $updated = 0;
-    public int $skipped = 0;
-
     public function __construct(
         public int $guidelineSetId,
         public int $year,
@@ -104,22 +99,5 @@ class IKKImport implements ToCollection, WithHeadingRow, WithChunkReading, Skips
     public function chunkSize(): int
     {
         return 500;
-    }
-
-    private function parseDecimal($value): float
-    {
-        $v = trim((string) $value);
-        // hapus karakter non angka kecuali . , -
-        $v = preg_replace('/[^\d\.,-]/', '', $v);
-
-        // kalau pakai koma sebagai desimal
-        if (str_contains($v, ',') && ! str_contains($v, '.')) {
-            $v = str_replace(',', '.', $v);
-        } else {
-            // kalau ada ribuan dengan koma, buang komanya
-            $v = str_replace(',', '', $v);
-        }
-
-        return (float) $v;
     }
 }

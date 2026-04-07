@@ -8,11 +8,8 @@ use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
-class FloorIndexImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
+class FloorIndexImport extends BaseSpreadsheetImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 {
-    public int $processed = 0;
-    public int $skipped = 0;
-
     public function __construct(
         protected int $guidelineSetId,
         protected int $year,
@@ -21,13 +18,10 @@ class FloorIndexImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
     public function collection(Collection $rows): void
     {
         DB::transaction(function() use ($rows){
-
             $now = now();
 
             foreach ($rows as $row) {
-                $norm = fn ($v) => isset($v) && trim((string) $v) !== '' ? (string) $v : null;
-
-                $buildingClass = $norm($row['building_class'] ?? null);
+                $buildingClass = $this->normalizeNullableString($row['building_class'] ?? null);
                 $floorCountRaw = $row['floor_count'] ?? null;
                 $ilValueRaw    = $row['il_value'] ?? null;
 
@@ -52,7 +46,6 @@ class FloorIndexImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 
                 $this->processed++;
             }
-
         });
     }
 }

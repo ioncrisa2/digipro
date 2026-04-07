@@ -25,8 +25,9 @@ use App\Models\CostElement;
 use App\Models\FloorIndex;
 use App\Models\GuidelineSet;
 use App\Models\MappiRcnStandard;
-use App\Models\Province;
-use App\Models\Regency;
+use App\Support\Admin\ReferenceGuideData\ReferenceGuideFilteredQueryFactory;
+use App\Support\Admin\ReferenceGuideData\ReferenceGuideOptionsProvider;
+use App\Support\Admin\ReferenceGuideData\ReferenceGuideRowPresenter;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Response;
@@ -36,12 +37,19 @@ use Throwable;
 
 class ReferenceGuideDataController extends Controller
 {
+    public function __construct(
+        private readonly ReferenceGuideFilteredQueryFactory $filteredQueries,
+        private readonly ReferenceGuideOptionsProvider $options,
+        private readonly ReferenceGuideRowPresenter $rows,
+    ) {
+    }
+
     public function constructionCostIndicesIndex(ReferenceGuideDataIndexRequest $request): Response
     {
         $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
         $filters = $request->filters(['q', 'guideline_set_id', 'year', 'province_id']);
 
-        $records = $this->constructionCostIndicesFilteredQuery($filters)
+        $records = $this->filteredQueries->constructionCostIndices($filters)
             ->with([
                 'guidelineSet:id,name,year,is_active',
                 'regency:id,name,province_id',
@@ -52,13 +60,17 @@ class ReferenceGuideDataController extends Controller
             ->paginate($request->perPage())
             ->withQueryString();
 
-        $records->through(fn (ConstructionCostIndex $record) => $this->transformConstructionCostIndexRow($record));
+        $records->through(fn (ConstructionCostIndex $record) => $this->rows->constructionCostIndex(
+            $record,
+            $this->workspaceRoute('ref-guidelines.construction-cost-indices.edit', $record),
+            $this->workspaceRoute('ref-guidelines.construction-cost-indices.destroy', $record),
+        ));
 
         return inertia('Admin/ConstructionCostIndices/Index', [
             'filters' => $filters,
-            'guidelineSetOptions' => $this->guidelineSetOptions(includeAll: true),
-            'yearOptions' => $this->constructionCostIndexYearOptions(),
-            'provinceOptions' => $this->provinceFilterOptions(includeAll: true),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(includeAll: true),
+            'yearOptions' => $this->options->constructionCostIndexYearOptions(),
+            'provinceOptions' => $this->options->provinceFilterOptions(includeAll: true),
             'summary' => [
                 'total' => ConstructionCostIndex::query()->count(),
                 'guideline_sets' => ConstructionCostIndex::query()->distinct('guideline_set_id')->count('guideline_set_id'),
@@ -98,7 +110,7 @@ class ReferenceGuideDataController extends Controller
     {
         $filters = $request->filters(['q', 'guideline_set_id', 'year', 'province_id'], false);
 
-        $query = $this->constructionCostIndicesFilteredQuery($filters)->orderByDesc('year')->orderBy('region_code');
+        $query = $this->filteredQueries->constructionCostIndices($filters)->orderByDesc('year')->orderBy('region_code');
 
         return Excel::download(
             new IkkExport($query),
@@ -119,8 +131,8 @@ class ReferenceGuideDataController extends Controller
                 'region_code' => '',
                 'ikk_value' => '',
             ],
-            'guidelineSetOptions' => $this->guidelineSetOptions(),
-            'provinceOptions' => $this->provinceSelectOptions(),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(),
+            'provinceOptions' => $this->options->provinceSelectOptions(),
             'regencyOptions' => [],
             'submitUrl' => $this->workspaceRoute('ref-guidelines.construction-cost-indices.store'),
             'indexUrl' => $this->workspaceRoute('ref-guidelines.construction-cost-indices.index'),
@@ -190,9 +202,9 @@ class ReferenceGuideDataController extends Controller
                 'region_code' => (string) $constructionCostIndex->region_code,
                 'ikk_value' => (float) $constructionCostIndex->ikk_value,
             ],
-            'guidelineSetOptions' => $this->guidelineSetOptions(),
-            'provinceOptions' => $this->provinceSelectOptions(),
-            'regencyOptions' => $this->regencySelectOptionsByProvince($constructionCostIndex->regency?->province_id),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(),
+            'provinceOptions' => $this->options->provinceSelectOptions(),
+            'regencyOptions' => $this->options->regencySelectOptionsByProvince($constructionCostIndex->regency?->province_id),
             'submitUrl' => $this->workspaceRoute('ref-guidelines.construction-cost-indices.update', $constructionCostIndex),
             'indexUrl' => $this->workspaceRoute('ref-guidelines.construction-cost-indices.index'),
             'ikkByProvinceUrl' => $this->workspaceRoute('ref-guidelines.ikk-by-province.index'),
@@ -237,7 +249,7 @@ class ReferenceGuideDataController extends Controller
         $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
         $filters = $request->filters(['q', 'guideline_set_id', 'year', 'base_region', 'group']);
 
-        $records = $this->costElementsFilteredQuery($filters)
+        $records = $this->filteredQueries->costElements($filters)
             ->with('guidelineSet:id,name,year,is_active')
             ->orderByDesc('year')
             ->orderBy('group')
@@ -245,14 +257,18 @@ class ReferenceGuideDataController extends Controller
             ->paginate($request->perPage())
             ->withQueryString();
 
-        $records->through(fn (CostElement $record) => $this->transformCostElementRow($record));
+        $records->through(fn (CostElement $record) => $this->rows->costElement(
+            $record,
+            $this->workspaceRoute('ref-guidelines.cost-elements.edit', $record),
+            $this->workspaceRoute('ref-guidelines.cost-elements.destroy', $record),
+        ));
 
         return inertia('Admin/CostElements/Index', [
             'filters' => $filters,
-            'guidelineSetOptions' => $this->guidelineSetOptions(includeAll: true),
-            'yearOptions' => $this->costElementYearOptions(),
-            'baseRegionOptions' => $this->costElementBaseRegionOptions(includeAll: true),
-            'groupOptions' => $this->costElementGroupOptions(includeAll: true),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(includeAll: true),
+            'yearOptions' => $this->options->costElementYearOptions(),
+            'baseRegionOptions' => $this->options->costElementBaseRegionOptions(includeAll: true),
+            'groupOptions' => $this->options->costElementGroupOptions(includeAll: true),
             'summary' => [
                 'total' => CostElement::query()->count(),
                 'guideline_sets' => CostElement::query()->distinct('guideline_set_id')->count('guideline_set_id'),
@@ -290,7 +306,7 @@ class ReferenceGuideDataController extends Controller
     {
         $filters = $request->filters(['q', 'guideline_set_id', 'year', 'base_region', 'group'], false);
 
-        $query = $this->costElementsFilteredQuery($filters)
+        $query = $this->filteredQueries->costElements($filters)
             ->orderByDesc('year')
             ->orderBy('group')
             ->orderBy('element_code');
@@ -321,8 +337,8 @@ class ReferenceGuideDataController extends Controller
                 'unit_cost' => '',
                 'spec_json' => '',
             ],
-            'guidelineSetOptions' => $this->guidelineSetOptions(),
-            'formOptions' => $this->costElementFormOptions(),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(),
+            'formOptions' => $this->options->costElementFormOptions(),
             'submitUrl' => $this->workspaceRoute('ref-guidelines.cost-elements.store'),
             'indexUrl' => $this->workspaceRoute('ref-guidelines.cost-elements.index'),
         ]);
@@ -403,8 +419,8 @@ class ReferenceGuideDataController extends Controller
                     ? json_encode($costElement->spec_json, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
                     : '',
             ],
-            'guidelineSetOptions' => $this->guidelineSetOptions(),
-            'formOptions' => $this->costElementFormOptions(),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(),
+            'formOptions' => $this->options->costElementFormOptions(),
             'submitUrl' => $this->workspaceRoute('ref-guidelines.cost-elements.update', $costElement),
             'indexUrl' => $this->workspaceRoute('ref-guidelines.cost-elements.index'),
         ]);
@@ -454,7 +470,7 @@ class ReferenceGuideDataController extends Controller
         $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
         $filters = $request->filters(['q', 'guideline_set_id', 'year', 'building_class']);
 
-        $records = $this->floorIndicesFilteredQuery($filters)
+        $records = $this->filteredQueries->floorIndices($filters)
             ->with('guidelineSet:id,name,year,is_active')
             ->orderByDesc('year')
             ->orderBy('building_class')
@@ -462,13 +478,17 @@ class ReferenceGuideDataController extends Controller
             ->paginate($request->perPage())
             ->withQueryString();
 
-        $records->through(fn (FloorIndex $record) => $this->transformFloorIndexRow($record));
+        $records->through(fn (FloorIndex $record) => $this->rows->floorIndex(
+            $record,
+            $this->workspaceRoute('ref-guidelines.floor-indices.edit', $record),
+            $this->workspaceRoute('ref-guidelines.floor-indices.destroy', $record),
+        ));
 
         return inertia('Admin/FloorIndices/Index', [
             'filters' => $filters,
-            'guidelineSetOptions' => $this->guidelineSetOptions(includeAll: true),
-            'yearOptions' => $this->floorIndexYearOptions(includeAll: true),
-            'buildingClassOptions' => $this->floorIndexBuildingClassOptions(includeAll: true),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(includeAll: true),
+            'yearOptions' => $this->options->floorIndexYearOptions(includeAll: true),
+            'buildingClassOptions' => $this->options->floorIndexBuildingClassOptions(includeAll: true),
             'summary' => [
                 'total' => FloorIndex::query()->count(),
                 'guideline_sets' => FloorIndex::query()->distinct('guideline_set_id')->count('guideline_set_id'),
@@ -502,7 +522,7 @@ class ReferenceGuideDataController extends Controller
     {
         $filters = $request->filters(['q', 'guideline_set_id', 'year', 'building_class'], false);
 
-        $query = $this->floorIndicesFilteredQuery($filters)
+        $query = $this->filteredQueries->floorIndices($filters)
             ->orderByDesc('year')
             ->orderBy('building_class')
             ->orderBy('floor_count');
@@ -526,8 +546,8 @@ class ReferenceGuideDataController extends Controller
                 'floor_count' => '',
                 'il_value' => '',
             ],
-            'guidelineSetOptions' => $this->guidelineSetOptions(),
-            'buildingClassOptions' => $this->floorIndexBuildingClassOptions(),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(),
+            'buildingClassOptions' => $this->options->floorIndexBuildingClassOptions(),
             'submitUrl' => $this->workspaceRoute('ref-guidelines.floor-indices.store'),
             'indexUrl' => $this->workspaceRoute('ref-guidelines.floor-indices.index'),
         ]);
@@ -590,8 +610,8 @@ class ReferenceGuideDataController extends Controller
                 'floor_count' => (int) $floorIndex->floor_count,
                 'il_value' => (float) $floorIndex->il_value,
             ],
-            'guidelineSetOptions' => $this->guidelineSetOptions(),
-            'buildingClassOptions' => $this->floorIndexBuildingClassOptions(),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(),
+            'buildingClassOptions' => $this->options->floorIndexBuildingClassOptions(),
             'submitUrl' => $this->workspaceRoute('ref-guidelines.floor-indices.update', $floorIndex),
             'indexUrl' => $this->workspaceRoute('ref-guidelines.floor-indices.index'),
         ]);
@@ -634,7 +654,7 @@ class ReferenceGuideDataController extends Controller
         $activeGuideline = GuidelineSet::query()->where('is_active', true)->first();
         $filters = $request->filters(['q', 'guideline_set_id', 'year', 'building_type', 'building_class']);
 
-        $records = $this->mappiRcnStandardsFilteredQuery($filters)
+        $records = $this->filteredQueries->mappiRcnStandards($filters)
             ->with('guidelineSet:id,name,year,is_active')
             ->orderByDesc('year')
             ->orderBy('building_type')
@@ -642,14 +662,18 @@ class ReferenceGuideDataController extends Controller
             ->paginate($request->perPage())
             ->withQueryString();
 
-        $records->through(fn (MappiRcnStandard $record) => $this->transformMappiRcnStandardRow($record));
+        $records->through(fn (MappiRcnStandard $record) => $this->rows->mappiRcnStandard(
+            $record,
+            $this->workspaceRoute('ref-guidelines.mappi-rcn-standards.edit', $record),
+            $this->workspaceRoute('ref-guidelines.mappi-rcn-standards.destroy', $record),
+        ));
 
         return inertia('Admin/MappiRcnStandards/Index', [
             'filters' => $filters,
-            'guidelineSetOptions' => $this->guidelineSetOptions(includeAll: true),
-            'yearOptions' => $this->mappiRcnYearOptions(includeAll: true),
-            'buildingTypeOptions' => $this->mappiRcnBuildingTypeOptions(includeAll: true),
-            'buildingClassOptions' => $this->mappiRcnBuildingClassOptions(includeAll: true),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(includeAll: true),
+            'yearOptions' => $this->options->mappiRcnYearOptions(includeAll: true),
+            'buildingTypeOptions' => $this->options->mappiRcnBuildingTypeOptions(includeAll: true),
+            'buildingClassOptions' => $this->options->mappiRcnBuildingClassOptions(includeAll: true),
             'summary' => [
                 'total' => MappiRcnStandard::query()->count(),
                 'guideline_sets' => MappiRcnStandard::query()->distinct('guideline_set_id')->count('guideline_set_id'),
@@ -685,7 +709,7 @@ class ReferenceGuideDataController extends Controller
     {
         $filters = $request->filters(['q', 'guideline_set_id', 'year', 'building_type', 'building_class'], false);
 
-        $query = $this->mappiRcnStandardsFilteredQuery($filters)
+        $query = $this->filteredQueries->mappiRcnStandards($filters)
             ->orderByDesc('year')
             ->orderBy('building_type')
             ->orderBy('building_class');
@@ -712,8 +736,8 @@ class ReferenceGuideDataController extends Controller
                 'rcn_value' => '',
                 'notes' => '',
             ],
-            'guidelineSetOptions' => $this->guidelineSetOptions(),
-            'formOptions' => $this->mappiRcnFormOptions(),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(),
+            'formOptions' => $this->options->mappiRcnFormOptions(),
             'submitUrl' => $this->workspaceRoute('ref-guidelines.mappi-rcn-standards.store'),
             'indexUrl' => $this->workspaceRoute('ref-guidelines.mappi-rcn-standards.index'),
         ]);
@@ -783,8 +807,8 @@ class ReferenceGuideDataController extends Controller
                 'rcn_value' => (int) $mappiRcnStandard->rcn_value,
                 'notes' => $mappiRcnStandard->notes,
             ],
-            'guidelineSetOptions' => $this->guidelineSetOptions(),
-            'formOptions' => $this->mappiRcnFormOptions(),
+            'guidelineSetOptions' => $this->options->guidelineSetOptions(),
+            'formOptions' => $this->options->mappiRcnFormOptions(),
             'submitUrl' => $this->workspaceRoute('ref-guidelines.mappi-rcn-standards.update', $mappiRcnStandard),
             'indexUrl' => $this->workspaceRoute('ref-guidelines.mappi-rcn-standards.index'),
         ]);
@@ -825,557 +849,4 @@ class ReferenceGuideDataController extends Controller
             ->with('success', 'MAPPI RCN berhasil dihapus.');
     }
 
-    private function transformConstructionCostIndexRow(ConstructionCostIndex $constructionCostIndex): array
-    {
-        $constructionCostIndex->loadMissing([
-            'guidelineSet:id,name,is_active',
-            'regency:id,name,province_id',
-            'regency.province:id,name',
-        ]);
-
-        return [
-            'id' => $constructionCostIndex->id,
-            'guideline_set_name' => $constructionCostIndex->guidelineSet?->name ?? '-',
-            'guideline_is_active' => (bool) ($constructionCostIndex->guidelineSet?->is_active ?? false),
-            'year' => (int) $constructionCostIndex->year,
-            'province_name' => $constructionCostIndex->regency?->province?->name ?? '-',
-            'region_code' => (string) $constructionCostIndex->region_code,
-            'region_name' => $constructionCostIndex->region_name,
-            'ikk_value' => (float) $constructionCostIndex->ikk_value,
-            'updated_at' => $constructionCostIndex->updated_at?->toIso8601String(),
-            'edit_url' => $this->workspaceRoute('ref-guidelines.construction-cost-indices.edit', $constructionCostIndex),
-            'destroy_url' => $this->workspaceRoute('ref-guidelines.construction-cost-indices.destroy', $constructionCostIndex),
-        ];
-    }
-
-    private function transformCostElementRow(CostElement $costElement): array
-    {
-        $costElement->loadMissing('guidelineSet:id,name,is_active');
-
-        return [
-            'id' => $costElement->id,
-            'guideline_set_name' => $costElement->guidelineSet?->name ?? '-',
-            'guideline_is_active' => (bool) ($costElement->guidelineSet?->is_active ?? false),
-            'year' => (int) $costElement->year,
-            'base_region' => $costElement->base_region,
-            'group' => $costElement->group,
-            'element_code' => $costElement->element_code,
-            'element_name' => $costElement->element_name,
-            'building_type' => $costElement->building_type,
-            'building_class' => $costElement->building_class,
-            'storey_pattern' => $costElement->storey_pattern,
-            'unit' => $costElement->unit,
-            'unit_cost' => (int) $costElement->unit_cost,
-            'spec_json' => $costElement->spec_json,
-            'updated_at' => $costElement->updated_at?->toIso8601String(),
-            'edit_url' => $this->workspaceRoute('ref-guidelines.cost-elements.edit', $costElement),
-            'destroy_url' => $this->workspaceRoute('ref-guidelines.cost-elements.destroy', $costElement),
-        ];
-    }
-
-    private function transformFloorIndexRow(FloorIndex $floorIndex): array
-    {
-        $floorIndex->loadMissing('guidelineSet:id,name,is_active');
-
-        return [
-            'id' => $floorIndex->id,
-            'guideline_set_name' => $floorIndex->guidelineSet?->name ?? '-',
-            'guideline_is_active' => (bool) ($floorIndex->guidelineSet?->is_active ?? false),
-            'year' => (int) $floorIndex->year,
-            'building_class' => $floorIndex->building_class,
-            'floor_count' => (int) $floorIndex->floor_count,
-            'il_value' => (float) $floorIndex->il_value,
-            'updated_at' => $floorIndex->updated_at?->toIso8601String(),
-            'edit_url' => $this->workspaceRoute('ref-guidelines.floor-indices.edit', $floorIndex),
-            'destroy_url' => $this->workspaceRoute('ref-guidelines.floor-indices.destroy', $floorIndex),
-        ];
-    }
-
-    private function transformMappiRcnStandardRow(MappiRcnStandard $mappiRcnStandard): array
-    {
-        $mappiRcnStandard->loadMissing('guidelineSet:id,name,is_active');
-
-        return [
-            'id' => $mappiRcnStandard->id,
-            'guideline_set_name' => $mappiRcnStandard->guidelineSet?->name ?? '-',
-            'guideline_is_active' => (bool) ($mappiRcnStandard->guidelineSet?->is_active ?? false),
-            'year' => (int) $mappiRcnStandard->year,
-            'reference_region' => $mappiRcnStandard->reference_region,
-            'building_type' => $mappiRcnStandard->building_type,
-            'building_class' => $mappiRcnStandard->building_class,
-            'storey_pattern' => $mappiRcnStandard->storey_pattern,
-            'rcn_value' => (int) $mappiRcnStandard->rcn_value,
-            'notes' => $mappiRcnStandard->notes,
-            'updated_at' => $mappiRcnStandard->updated_at?->toIso8601String(),
-            'edit_url' => $this->workspaceRoute('ref-guidelines.mappi-rcn-standards.edit', $mappiRcnStandard),
-            'destroy_url' => $this->workspaceRoute('ref-guidelines.mappi-rcn-standards.destroy', $mappiRcnStandard),
-        ];
-    }
-
-    private function constructionCostIndicesFilteredQuery(array $filters)
-    {
-        return ConstructionCostIndex::query()
-            ->when($filters['q'] !== '', function ($query) use ($filters): void {
-                $query->where(function ($innerQuery) use ($filters): void {
-                    $innerQuery
-                        ->where('region_code', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('region_name', 'like', '%' . $filters['q'] . '%');
-                });
-            })
-            ->when(
-                $filters['guideline_set_id'] !== 'all',
-                fn ($query) => $query->where('guideline_set_id', (int) $filters['guideline_set_id'])
-            )
-            ->when(
-                $filters['year'] !== 'all',
-                fn ($query) => $query->where('year', (int) $filters['year'])
-            )
-            ->when(
-                $filters['province_id'] !== 'all',
-                fn ($query) => $query->whereHas('regency', fn ($regencyQuery) => $regencyQuery->where('province_id', $filters['province_id']))
-            );
-    }
-
-    private function costElementsFilteredQuery(array $filters)
-    {
-        return CostElement::query()
-            ->when($filters['q'] !== '', function ($query) use ($filters): void {
-                $query->where(function ($innerQuery) use ($filters): void {
-                    $innerQuery
-                        ->where('group', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('element_code', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('element_name', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('building_type', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('building_class', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('storey_pattern', 'like', '%' . $filters['q'] . '%');
-                });
-            })
-            ->when(
-                $filters['guideline_set_id'] !== 'all',
-                fn ($query) => $query->where('guideline_set_id', (int) $filters['guideline_set_id'])
-            )
-            ->when(
-                $filters['year'] !== 'all',
-                fn ($query) => $query->where('year', (int) $filters['year'])
-            )
-            ->when(
-                $filters['base_region'] !== 'all',
-                fn ($query) => $query->where('base_region', $filters['base_region'])
-            )
-            ->when(
-                $filters['group'] !== 'all',
-                fn ($query) => $query->where('group', $filters['group'])
-            );
-    }
-
-    private function floorIndicesFilteredQuery(array $filters)
-    {
-        return FloorIndex::query()
-            ->when($filters['q'] !== '', function ($query) use ($filters): void {
-                $query->where(function ($innerQuery) use ($filters): void {
-                    $innerQuery
-                        ->where('building_class', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('floor_count', 'like', '%' . $filters['q'] . '%');
-                });
-            })
-            ->when(
-                $filters['guideline_set_id'] !== 'all',
-                fn ($query) => $query->where('guideline_set_id', (int) $filters['guideline_set_id'])
-            )
-            ->when(
-                $filters['year'] !== 'all',
-                fn ($query) => $query->where('year', (int) $filters['year'])
-            )
-            ->when(
-                $filters['building_class'] !== 'all',
-                fn ($query) => $query->where('building_class', $filters['building_class'])
-            );
-    }
-
-    private function mappiRcnStandardsFilteredQuery(array $filters)
-    {
-        return MappiRcnStandard::query()
-            ->when($filters['q'] !== '', function ($query) use ($filters): void {
-                $query->where(function ($innerQuery) use ($filters): void {
-                    $innerQuery
-                        ->where('building_type', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('building_class', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('storey_pattern', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('notes', 'like', '%' . $filters['q'] . '%');
-                });
-            })
-            ->when(
-                $filters['guideline_set_id'] !== 'all',
-                fn ($query) => $query->where('guideline_set_id', (int) $filters['guideline_set_id'])
-            )
-            ->when(
-                $filters['year'] !== 'all',
-                fn ($query) => $query->where('year', (int) $filters['year'])
-            )
-            ->when(
-                $filters['building_type'] !== 'all',
-                fn ($query) => $query->where('building_type', $filters['building_type'])
-            )
-            ->when(
-                $filters['building_class'] !== 'all',
-                fn ($query) => $query->where('building_class', $filters['building_class'])
-            );
-    }
-
-    private function guidelineSetOptions(bool $includeAll = false): array
-    {
-        $options = GuidelineSet::query()
-            ->orderByDesc('year')
-            ->get(['id', 'name', 'year', 'is_active'])
-            ->map(fn (GuidelineSet $guidelineSet) => [
-                'value' => (string) $guidelineSet->id,
-                'label' => $guidelineSet->name . ' (' . $guidelineSet->year . ')' . ($guidelineSet->is_active ? ' - aktif' : ''),
-                'year' => (int) $guidelineSet->year,
-            ])
-            ->values()
-            ->all();
-
-        if (! $includeAll) {
-            return $options;
-        }
-
-        return [
-            ['value' => 'all', 'label' => 'Semua Guideline Set'],
-            ...$options,
-        ];
-    }
-
-    private function constructionCostIndexYearOptions(): array
-    {
-        return ConstructionCostIndex::query()
-            ->distinct()
-            ->orderByDesc('year')
-            ->pluck('year')
-            ->map(fn ($year) => [
-                'value' => (string) $year,
-                'label' => (string) $year,
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function costElementYearOptions(): array
-    {
-        return CostElement::query()
-            ->distinct()
-            ->orderByDesc('year')
-            ->pluck('year')
-            ->map(fn ($year) => [
-                'value' => (string) $year,
-                'label' => (string) $year,
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function floorIndexYearOptions(bool $includeAll = false): array
-    {
-        $options = FloorIndex::query()
-            ->distinct()
-            ->orderByDesc('year')
-            ->pluck('year')
-            ->map(fn ($year) => [
-                'value' => (string) $year,
-                'label' => (string) $year,
-            ])
-            ->values()
-            ->all();
-
-        if (! $includeAll) {
-            return $options;
-        }
-
-        return [
-            ['value' => 'all', 'label' => 'Semua Tahun'],
-            ...$options,
-        ];
-    }
-
-    private function floorIndexBuildingClassOptions(bool $includeAll = false): array
-    {
-        $options = FloorIndex::query()
-            ->whereNotNull('building_class')
-            ->where('building_class', '<>', '')
-            ->distinct()
-            ->orderBy('building_class')
-            ->pluck('building_class')
-            ->map(fn (string $value) => [
-                'value' => $value,
-                'label' => $value,
-            ])
-            ->values()
-            ->all();
-
-        if (! $includeAll) {
-            return $options;
-        }
-
-        return [
-            ['value' => 'all', 'label' => 'Semua Class'],
-            ...$options,
-        ];
-    }
-
-    private function mappiRcnYearOptions(bool $includeAll = false): array
-    {
-        $options = MappiRcnStandard::query()
-            ->distinct()
-            ->orderByDesc('year')
-            ->pluck('year')
-            ->map(fn ($year) => [
-                'value' => (string) $year,
-                'label' => (string) $year,
-            ])
-            ->values()
-            ->all();
-
-        if (! $includeAll) {
-            return $options;
-        }
-
-        return [
-            ['value' => 'all', 'label' => 'Semua Tahun'],
-            ...$options,
-        ];
-    }
-
-    private function mappiRcnBuildingTypeOptions(bool $includeAll = false): array
-    {
-        $options = MappiRcnStandard::query()
-            ->whereNotNull('building_type')
-            ->where('building_type', '<>', '')
-            ->distinct()
-            ->orderBy('building_type')
-            ->pluck('building_type')
-            ->map(fn (string $value) => [
-                'value' => $value,
-                'label' => $value,
-            ])
-            ->values()
-            ->all();
-
-        if (! $includeAll) {
-            return $options;
-        }
-
-        return [
-            ['value' => 'all', 'label' => 'Semua Building Type'],
-            ...$options,
-        ];
-    }
-
-    private function mappiRcnBuildingClassOptions(bool $includeAll = false): array
-    {
-        $options = MappiRcnStandard::query()
-            ->whereNotNull('building_class')
-            ->where('building_class', '<>', '')
-            ->distinct()
-            ->orderBy('building_class')
-            ->pluck('building_class')
-            ->map(fn (string $value) => [
-                'value' => $value,
-                'label' => $value,
-            ])
-            ->values()
-            ->all();
-
-        if (! $includeAll) {
-            return $options;
-        }
-
-        return [
-            ['value' => 'all', 'label' => 'Semua Building Class'],
-            ...$options,
-        ];
-    }
-
-    private function mappiRcnFormOptions(): array
-    {
-        return [
-            'building_types' => MappiRcnStandard::query()
-                ->whereNotNull('building_type')
-                ->where('building_type', '<>', '')
-                ->distinct()
-                ->orderBy('building_type')
-                ->pluck('building_type')
-                ->values()
-                ->all(),
-            'building_classes' => MappiRcnStandard::query()
-                ->whereNotNull('building_class')
-                ->where('building_class', '<>', '')
-                ->distinct()
-                ->orderBy('building_class')
-                ->pluck('building_class')
-                ->values()
-                ->all(),
-            'storey_patterns' => MappiRcnStandard::query()
-                ->whereNotNull('storey_pattern')
-                ->where('storey_pattern', '<>', '')
-                ->distinct()
-                ->orderBy('storey_pattern')
-                ->pluck('storey_pattern')
-                ->values()
-                ->all(),
-        ];
-    }
-
-    private function costElementBaseRegionOptions(bool $includeAll = false): array
-    {
-        $options = CostElement::query()
-            ->whereNotNull('base_region')
-            ->where('base_region', '<>', '')
-            ->distinct()
-            ->orderBy('base_region')
-            ->pluck('base_region')
-            ->map(fn (string $value) => [
-                'value' => $value,
-                'label' => $value,
-            ])
-            ->values()
-            ->all();
-
-        if (! $includeAll) {
-            return $options;
-        }
-
-        return [
-            ['value' => 'all', 'label' => 'Semua Base Region'],
-            ...$options,
-        ];
-    }
-
-    private function costElementGroupOptions(bool $includeAll = false): array
-    {
-        $options = CostElement::query()
-            ->whereNotNull('group')
-            ->where('group', '<>', '')
-            ->distinct()
-            ->orderBy('group')
-            ->pluck('group')
-            ->map(fn (string $value) => [
-                'value' => $value,
-                'label' => $value,
-            ])
-            ->values()
-            ->all();
-
-        if (! $includeAll) {
-            return $options;
-        }
-
-        return [
-            ['value' => 'all', 'label' => 'Semua Group'],
-            ...$options,
-        ];
-    }
-
-    private function costElementFormOptions(): array
-    {
-        return [
-            'groups' => CostElement::query()
-                ->whereNotNull('group')
-                ->where('group', '<>', '')
-                ->distinct()
-                ->orderBy('group')
-                ->limit(300)
-                ->pluck('group')
-                ->values()
-                ->all(),
-            'element_codes' => CostElement::query()
-                ->whereNotNull('element_code')
-                ->where('element_code', '<>', '')
-                ->distinct()
-                ->orderBy('element_code')
-                ->limit(500)
-                ->pluck('element_code')
-                ->values()
-                ->all(),
-            'element_names' => CostElement::query()
-                ->whereNotNull('element_name')
-                ->where('element_name', '<>', '')
-                ->distinct()
-                ->orderBy('element_name')
-                ->limit(500)
-                ->pluck('element_name')
-                ->values()
-                ->all(),
-            'building_types' => CostElement::query()
-                ->whereNotNull('building_type')
-                ->where('building_type', '<>', '')
-                ->distinct()
-                ->orderBy('building_type')
-                ->limit(200)
-                ->pluck('building_type')
-                ->values()
-                ->all(),
-            'building_classes' => CostElement::query()
-                ->whereNotNull('building_class')
-                ->where('building_class', '<>', '')
-                ->distinct()
-                ->orderBy('building_class')
-                ->limit(200)
-                ->pluck('building_class')
-                ->values()
-                ->all(),
-            'storey_patterns' => CostElement::query()
-                ->whereNotNull('storey_pattern')
-                ->where('storey_pattern', '<>', '')
-                ->distinct()
-                ->orderBy('storey_pattern')
-                ->limit(200)
-                ->pluck('storey_pattern')
-                ->values()
-                ->all(),
-        ];
-    }
-
-    private function provinceSelectOptions(): array
-    {
-        return Province::query()
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (Province $province) => [
-                'value' => (string) $province->id,
-                'label' => $province->name . ' (' . $province->id . ')',
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function provinceFilterOptions(bool $includeAll = false): array
-    {
-        $options = $this->provinceSelectOptions();
-
-        if (! $includeAll) {
-            return $options;
-        }
-
-        return [
-            ['value' => 'all', 'label' => 'Semua Provinsi'],
-            ...$options,
-        ];
-    }
-
-    private function regencySelectOptionsByProvince(?string $provinceId): array
-    {
-        if (blank($provinceId)) {
-            return [];
-        }
-
-        return Regency::query()
-            ->where('province_id', $provinceId)
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (Regency $regency) => [
-                'value' => (string) $regency->id,
-                'label' => $regency->name . ' (' . $regency->id . ')',
-            ])
-            ->values()
-            ->all();
-    }
 }

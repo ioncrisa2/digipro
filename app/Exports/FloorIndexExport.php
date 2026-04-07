@@ -2,25 +2,9 @@
 
 namespace App\Exports;
 
-use Illuminate\Database\Eloquent\Builder;
-use Maatwebsite\Excel\Concerns\FromQuery;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithMapping;
-
-class FloorIndexExport implements FromQuery, WithHeadings, WithMapping
+class FloorIndexExport extends BaseMappedQueryExport
 {
-    public function __construct(protected Builder $query) {}
-
-    public function query()
-    {
-        return $this->query->select([
-            'building_class',
-            'floor_count',
-            'il_value',
-        ]);
-    }
-
-    public function headings(): array
+    protected function columns(): array
     {
         return [
             'building_class',
@@ -29,7 +13,7 @@ class FloorIndexExport implements FromQuery, WithHeadings, WithMapping
         ];
     }
 
-    public function map($row): array
+    protected function mapRow(mixed $row): array
     {
         return [
             $row->building_class,

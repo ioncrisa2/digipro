@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+
 use App\Http\Requests\Admin\LocationIdPreviewRequest;
 use App\Http\Requests\Admin\LocationOptionsRequest;
 use App\Http\Requests\Admin\MasterDataLocationIndexRequest;
@@ -12,29 +13,44 @@ use App\Http\Requests\Admin\StoreRegencyRequest;
 use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\StoreVillageRequest;
 use App\Http\Requests\Admin\UsersIndexRequest;
+
 use App\Models\District;
 use App\Models\Province;
 use App\Models\Regency;
 use App\Models\User;
 use App\Models\Village;
+
 use App\Services\Location\LocationIdGenerator;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\QueryException;
+
+use App\Support\Admin\MasterData\LocationDestroyer;
+use App\Support\Admin\MasterData\LocationOptionsProvider;
+use App\Support\Admin\MasterData\LocationResourceRegistry;
+use App\Support\Admin\MasterData\LocationRowPresenter;
+use App\Support\Admin\MasterData\UserManagementService;
+
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Response;
-use Spatie\Permission\Models\Role;
 
 class MasterDataController extends Controller
 {
+    public function __construct(
+        private readonly UserManagementService $userManagement,
+        private readonly LocationOptionsProvider $locationOptions,
+        private readonly LocationResourceRegistry $locationResources,
+        private readonly LocationRowPresenter $locationRows,
+        private readonly LocationDestroyer $locationDestroyer,
+    ) {
+    }
+
     public function usersIndex(UsersIndexRequest $request): Response
     {
         $filters = $request->filters();
 
-        $baseQuery = $this->manageableUsersQuery();
+        $baseQuery = $this->userManagement->manageableUsersQuery();
 
-        $records = $this->manageableUsersQuery()
+        $records = $this->userManagement->manageableUsersQuery()
             ->with('roles:id,name')
             ->when($filters['q'] !== '', function ($query) use ($filters): void {
                 $query->where(function ($innerQuery) use ($filters): void {
@@ -50,31 +66,26 @@ class MasterDataController extends Controller
             ->paginate($request->perPage())
             ->withQueryString();
 
-        $records->through(fn (User $user) => $this->transformUserRow($user));
+        $records->through(fn (User $user) => $this->userManagement->transformUserRow($user));
 
         return inertia('Admin/Users/Index', [
             'filters' => $filters,
-            'roleOptions' => $this->roleSelectOptions(),
+            'roleOptions' => $this->userManagement->roleSelectOptions(),
             'verifiedOptions' => [
                 ['value' => 'all', 'label' => 'Semua Status'],
                 ['value' => 'verified', 'label' => 'Verified'],
                 ['value' => 'unverified', 'label' => 'Belum Verified'],
             ],
-            'summary' => [
-                'total' => (clone $baseQuery)->count(),
-                'verified' => (clone $baseQuery)->whereNotNull('email_verified_at')->count(),
-                'admins' => (clone $baseQuery)->role(['admin', $this->superAdminRoleName()])->count(),
-                'reviewers' => (clone $baseQuery)->role('Reviewer')->count(),
-            ],
+            'summary' => $this->userManagement->summary($baseQuery),
             'records' => $this->paginatedRecordsPayload($records),
-            'canCreate' => $this->canManageUsersCreate(),
+            'canCreate' => $this->userManagement->canManageUsersCreate(),
             'createUrl' => route('admin.master-data.users.create'),
         ]);
     }
 
     public function usersCreate(): Response
     {
-        abort_unless($this->canManageUsersCreate(), 403);
+        abort_unless($this->userManagement->canManageUsersCreate(), 403);
 
         return inertia('Admin/Users/Form', [
             'mode' => 'create',
@@ -82,9 +93,9 @@ class MasterDataController extends Controller
                 'name' => '',
                 'email' => '',
                 'email_verified_at' => '',
-                'roles' => $this->isSuperAdmin(auth()->user()) ? [] : ['customer'],
+                'roles' => $this->userManagement->defaultCreateRoles(),
             ],
-            'roleOptions' => $this->roleSelectOptions(),
+            'roleOptions' => $this->userManagement->roleSelectOptions(),
             'indexUrl' => route('admin.master-data.users.index'),
             'submitUrl' => route('admin.master-data.users.store'),
         ]);
@@ -92,7 +103,7 @@ class MasterDataController extends Controller
 
     public function usersStore(StoreUserRequest $request): RedirectResponse
     {
-        abort_unless($this->canManageUsersCreate(), 403);
+        abort_unless($this->userManagement->canManageUsersCreate(), 403);
 
         $validated = $request->validated();
 
@@ -105,7 +116,7 @@ class MasterDataController extends Controller
         ]);
         $user->save();
 
-        $user->syncRoles($this->assignableRolesPayload($validated));
+        $user->syncRoles($this->userManagement->assignableRolesPayload($validated));
 
         return redirect()
             ->route('admin.master-data.users.show', $user)
@@ -114,21 +125,21 @@ class MasterDataController extends Controller
 
     public function usersShow(User $user): Response
     {
-        abort_unless($this->canManageUser($user), 403);
+        abort_unless($this->userManagement->canManageUser($user), 403);
 
         $user->loadMissing('roles:id,name');
 
         return inertia('Admin/Users/Show', [
-            'record' => $this->userShowPayload($user),
+            'record' => $this->userManagement->showPayload($user),
             'indexUrl' => route('admin.master-data.users.index'),
             'editUrl' => route('admin.master-data.users.edit', $user),
-            'destroyUrl' => $this->canDeleteUser($user) ? route('admin.master-data.users.destroy', $user) : null,
+            'destroyUrl' => $this->userManagement->canDeleteUser($user) ? route('admin.master-data.users.destroy', $user) : null,
         ]);
     }
 
     public function usersEdit(User $user): Response
     {
-        abort_unless($this->canManageUser($user), 403);
+        abort_unless($this->userManagement->canManageUser($user), 403);
 
         $user->loadMissing('roles:id,name');
 
@@ -141,7 +152,7 @@ class MasterDataController extends Controller
                 'email_verified_at' => $user->email_verified_at?->format('Y-m-d\\TH:i'),
                 'roles' => $user->roles->pluck('name')->values()->all(),
             ],
-            'roleOptions' => $this->roleSelectOptions(),
+            'roleOptions' => $this->userManagement->roleSelectOptions(),
             'indexUrl' => route('admin.master-data.users.index'),
             'submitUrl' => route('admin.master-data.users.update', $user),
         ]);
@@ -149,7 +160,7 @@ class MasterDataController extends Controller
 
     public function usersUpdate(StoreUserRequest $request, User $user): RedirectResponse
     {
-        abort_unless($this->canManageUser($user), 403);
+        abort_unless($this->userManagement->canManageUser($user), 403);
 
         $validated = $request->validated();
 
@@ -164,7 +175,7 @@ class MasterDataController extends Controller
         }
 
         $user->forceFill($payload)->save();
-        $user->syncRoles($this->assignableRolesPayload($validated));
+        $user->syncRoles($this->userManagement->assignableRolesPayload($validated));
 
         return redirect()
             ->route('admin.master-data.users.show', $user)
@@ -173,7 +184,7 @@ class MasterDataController extends Controller
 
     public function usersDestroy(User $user): RedirectResponse
     {
-        abort_unless($this->canDeleteUser($user), 403);
+        abort_unless($this->userManagement->canDeleteUser($user), 403);
 
         $user->delete();
 
@@ -211,9 +222,9 @@ class MasterDataController extends Controller
         $validated = $request->validated();
 
         $options = match ($validated['type']) {
-            'provinces' => $this->provinceSelectOptions(),
-            'regencies' => $this->regencySelectOptionsByProvince($validated['province_id'] ?? null),
-            'districts' => $this->districtSelectOptionsByRegency($validated['regency_id'] ?? null),
+            'provinces' => $this->locationOptions->provinceSelectOptions(),
+            'regencies' => $this->locationOptions->regencySelectOptionsByProvince($validated['province_id'] ?? null),
+            'districts' => $this->locationOptions->districtSelectOptionsByRegency($validated['regency_id'] ?? null),
         };
 
         return response()->json([
@@ -238,10 +249,14 @@ class MasterDataController extends Controller
             ->paginate($request->perPage())
             ->withQueryString();
 
-        $records->through(fn (Province $province) => $this->transformProvinceRow($province));
+        $records->through(fn (Province $province) => $this->locationRows->province(
+            $province,
+            $this->workspaceRoute('master-data.provinces.edit', $province),
+            $this->workspaceRoute('master-data.provinces.destroy', $province),
+        ));
 
         return inertia('Admin/Locations/Index', [
-            'resource' => $this->locationResourceDefinition('provinces'),
+            'resource' => $this->locationResources->definition('provinces'),
             'filters' => $filters,
             'filterOptions' => [],
             'summaryCards' => [
@@ -258,14 +273,14 @@ class MasterDataController extends Controller
     public function provincesCreate(LocationIdGenerator $generator): Response
     {
         return inertia('Admin/Locations/Form', [
-            'resource' => $this->locationResourceDefinition('provinces'),
+            'resource' => $this->locationResources->definition('provinces'),
             'mode' => 'create',
             'record' => [
                 'id' => $this->locationGeneratedIdPreview('province', [], $generator),
                 'name' => '',
             ],
             'selectFields' => [],
-            'generator' => $this->locationGeneratorProps('province'),
+            'generator' => $this->locationResources->generatorProps('province', $this->workspaceRoute('master-data.locations.id-preview')),
             'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.provinces.index'),
             'submitUrl' => $this->workspaceRoute('master-data.provinces.store'),
@@ -291,7 +306,7 @@ class MasterDataController extends Controller
     public function provincesEdit(Province $province): Response
     {
         return inertia('Admin/Locations/Form', [
-            'resource' => $this->locationResourceDefinition('provinces'),
+            'resource' => $this->locationResources->definition('provinces'),
             'mode' => 'edit',
             'record' => [
                 'id' => $province->id,
@@ -320,7 +335,7 @@ class MasterDataController extends Controller
 
     public function provincesDestroy(Province $province): RedirectResponse
     {
-        return $this->destroyLocationRecord($province, 'master-data.provinces.index', 'Provinsi');
+        return $this->locationDestroyer->destroy($province, $this->workspaceRouteName('master-data.provinces.index'), 'Provinsi');
     }
 
     public function regenciesIndex(MasterDataLocationIndexRequest $request): Response
@@ -342,16 +357,20 @@ class MasterDataController extends Controller
             ->paginate($request->perPage())
             ->withQueryString();
 
-        $records->through(fn (Regency $regency) => $this->transformRegencyRow($regency));
+        $records->through(fn (Regency $regency) => $this->locationRows->regency(
+            $regency,
+            $this->workspaceRoute('master-data.regencies.edit', $regency),
+            $this->workspaceRoute('master-data.regencies.destroy', $regency),
+        ));
 
         return inertia('Admin/Locations/Index', [
-            'resource' => $this->locationResourceDefinition('regencies'),
+            'resource' => $this->locationResources->definition('regencies'),
             'filters' => $filters,
             'filterOptions' => [[
                 'key' => 'province_id',
                 'label' => 'Provinsi',
                 'defaultValue' => 'all',
-                'options' => $this->provinceFilterOptions(),
+                'options' => $this->locationOptions->provinceFilterOptions(),
             ]],
             'summaryCards' => [
                 ['label' => 'Total Kabupaten/Kota', 'value' => Regency::query()->count()],
@@ -369,7 +388,7 @@ class MasterDataController extends Controller
         $selectedProvinceId = $request->selectedProvinceId();
 
         return inertia('Admin/Locations/Form', [
-            'resource' => $this->locationResourceDefinition('regencies'),
+            'resource' => $this->locationResources->definition('regencies'),
             'mode' => 'create',
             'record' => [
                 'id' => $this->locationGeneratedIdPreview('regency', ['province_id' => $selectedProvinceId], $generator),
@@ -380,9 +399,9 @@ class MasterDataController extends Controller
                 'key' => 'province_id',
                 'label' => 'Provinsi',
                 'placeholder' => 'Pilih provinsi',
-                'options' => $this->provinceSelectOptions(),
+                'options' => $this->locationOptions->provinceSelectOptions(),
             ]],
-            'generator' => $this->locationGeneratorProps('regency', 'province_id'),
+            'generator' => $this->locationResources->generatorProps('regency', $this->workspaceRoute('master-data.locations.id-preview'), 'province_id'),
             'showIdField' => false,
             'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.regencies.index'),
@@ -412,7 +431,7 @@ class MasterDataController extends Controller
         $regency->loadMissing('province:id,name');
 
         return inertia('Admin/Locations/Form', [
-            'resource' => $this->locationResourceDefinition('regencies'),
+            'resource' => $this->locationResources->definition('regencies'),
             'mode' => 'edit',
             'record' => [
                 'id' => $regency->id,
@@ -423,7 +442,7 @@ class MasterDataController extends Controller
                 'key' => 'province_id',
                 'label' => 'Provinsi',
                 'placeholder' => 'Pilih provinsi',
-                'options' => $this->provinceSelectOptions(),
+                'options' => $this->locationOptions->provinceSelectOptions(),
             ]],
             'generator' => null,
             'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
@@ -448,7 +467,7 @@ class MasterDataController extends Controller
 
     public function regenciesDestroy(Regency $regency): RedirectResponse
     {
-        return $this->destroyLocationRecord($regency, 'master-data.regencies.index', 'Kabupaten/Kota');
+        return $this->locationDestroyer->destroy($regency, $this->workspaceRouteName('master-data.regencies.index'), 'Kabupaten/Kota');
     }
 
     public function districtsIndex(MasterDataLocationIndexRequest $request): Response
@@ -473,23 +492,27 @@ class MasterDataController extends Controller
             ->paginate($request->perPage())
             ->withQueryString();
 
-        $records->through(fn (District $district) => $this->transformDistrictRow($district));
+        $records->through(fn (District $district) => $this->locationRows->district(
+            $district,
+            $this->workspaceRoute('master-data.districts.edit', $district),
+            $this->workspaceRoute('master-data.districts.destroy', $district),
+        ));
 
         return inertia('Admin/Locations/Index', [
-            'resource' => $this->locationResourceDefinition('districts'),
+            'resource' => $this->locationResources->definition('districts'),
             'filters' => $filters,
             'filterOptions' => [
                 [
                     'key' => 'province_id',
                     'label' => 'Provinsi',
                     'defaultValue' => 'all',
-                    'options' => $this->provinceFilterOptions(),
+                    'options' => $this->locationOptions->provinceFilterOptions(),
                 ],
                 [
                     'key' => 'regency_id',
                     'label' => 'Kabupaten/Kota',
                     'defaultValue' => 'all',
-                    'options' => $this->regencyFilterOptions(),
+                    'options' => $this->locationOptions->regencyFilterOptions(),
                 ],
             ],
             'summaryCards' => [
@@ -515,7 +538,7 @@ class MasterDataController extends Controller
         }
 
         return inertia('Admin/Locations/Form', [
-            'resource' => $this->locationResourceDefinition('districts'),
+            'resource' => $this->locationResources->definition('districts'),
             'mode' => 'create',
             'record' => [
                 'id' => $this->locationGeneratedIdPreview('district', ['regency_id' => $selectedRegencyId], $generator),
@@ -528,19 +551,19 @@ class MasterDataController extends Controller
                     'key' => 'province_id',
                     'label' => 'Provinsi',
                     'placeholder' => 'Pilih provinsi',
-                    'options' => $this->provinceSelectOptions(),
+                    'options' => $this->locationOptions->provinceSelectOptions(),
                 ],
                 [
                     'key' => 'regency_id',
                     'label' => 'Kabupaten/Kota',
                     'placeholder' => 'Pilih kabupaten/kota',
-                    'options' => $this->regencySelectOptionsByProvince($selectedProvinceId),
+                    'options' => $this->locationOptions->regencySelectOptionsByProvince($selectedProvinceId),
                     'depends_on' => 'province_id',
                     'endpoint_type' => 'regencies',
                     'parent_param' => 'province_id',
                 ],
             ],
-            'generator' => $this->locationGeneratorProps('district', 'regency_id'),
+            'generator' => $this->locationResources->generatorProps('district', $this->workspaceRoute('master-data.locations.id-preview'), 'regency_id'),
             'showIdField' => false,
             'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.districts.index'),
@@ -571,7 +594,7 @@ class MasterDataController extends Controller
         $selectedProvinceId = (string) ($district->regency?->province_id ?? '');
 
         return inertia('Admin/Locations/Form', [
-            'resource' => $this->locationResourceDefinition('districts'),
+            'resource' => $this->locationResources->definition('districts'),
             'mode' => 'edit',
             'record' => [
                 'id' => $district->id,
@@ -584,13 +607,13 @@ class MasterDataController extends Controller
                     'key' => 'province_id',
                     'label' => 'Provinsi',
                     'placeholder' => 'Pilih provinsi',
-                    'options' => $this->provinceSelectOptions(),
+                    'options' => $this->locationOptions->provinceSelectOptions(),
                 ],
                 [
                     'key' => 'regency_id',
                     'label' => 'Kabupaten/Kota',
                     'placeholder' => 'Pilih kabupaten/kota',
-                    'options' => $this->regencySelectOptionsByProvince($selectedProvinceId),
+                    'options' => $this->locationOptions->regencySelectOptionsByProvince($selectedProvinceId),
                     'depends_on' => 'province_id',
                     'endpoint_type' => 'regencies',
                     'parent_param' => 'province_id',
@@ -619,7 +642,7 @@ class MasterDataController extends Controller
 
     public function districtsDestroy(District $district): RedirectResponse
     {
-        return $this->destroyLocationRecord($district, 'master-data.districts.index', 'Kecamatan');
+        return $this->locationDestroyer->destroy($district, $this->workspaceRouteName('master-data.districts.index'), 'Kecamatan');
     }
 
     public function villagesIndex(MasterDataLocationIndexRequest $request): Response
@@ -646,29 +669,33 @@ class MasterDataController extends Controller
             ->paginate($request->perPage())
             ->withQueryString();
 
-        $records->through(fn (Village $village) => $this->transformVillageRow($village));
+        $records->through(fn (Village $village) => $this->locationRows->village(
+            $village,
+            $this->workspaceRoute('master-data.villages.edit', $village),
+            $this->workspaceRoute('master-data.villages.destroy', $village),
+        ));
 
         return inertia('Admin/Locations/Index', [
-            'resource' => $this->locationResourceDefinition('villages'),
+            'resource' => $this->locationResources->definition('villages'),
             'filters' => $filters,
             'filterOptions' => [
                 [
                     'key' => 'province_id',
                     'label' => 'Provinsi',
                     'defaultValue' => 'all',
-                    'options' => $this->provinceFilterOptions(),
+                    'options' => $this->locationOptions->provinceFilterOptions(),
                 ],
                 [
                     'key' => 'regency_id',
                     'label' => 'Kabupaten/Kota',
                     'defaultValue' => 'all',
-                    'options' => $this->regencyFilterOptions(),
+                    'options' => $this->locationOptions->regencyFilterOptions(),
                 ],
                 [
                     'key' => 'district_id',
                     'label' => 'Kecamatan',
                     'defaultValue' => 'all',
-                    'options' => $this->districtFilterOptions(),
+                    'options' => $this->locationOptions->districtFilterOptions(),
                 ],
             ],
             'summaryCards' => [
@@ -698,7 +725,7 @@ class MasterDataController extends Controller
         }
 
         return inertia('Admin/Locations/Form', [
-            'resource' => $this->locationResourceDefinition('villages'),
+            'resource' => $this->locationResources->definition('villages'),
             'mode' => 'create',
             'record' => [
                 'id' => $this->locationGeneratedIdPreview('village', ['district_id' => $selectedDistrictId], $generator),
@@ -712,13 +739,13 @@ class MasterDataController extends Controller
                     'key' => 'province_id',
                     'label' => 'Provinsi',
                     'placeholder' => 'Pilih provinsi',
-                    'options' => $this->provinceSelectOptions(),
+                    'options' => $this->locationOptions->provinceSelectOptions(),
                 ],
                 [
                     'key' => 'regency_id',
                     'label' => 'Kabupaten/Kota',
                     'placeholder' => 'Pilih kabupaten/kota',
-                    'options' => $this->regencySelectOptionsByProvince($selectedProvinceId),
+                    'options' => $this->locationOptions->regencySelectOptionsByProvince($selectedProvinceId),
                     'depends_on' => 'province_id',
                     'endpoint_type' => 'regencies',
                     'parent_param' => 'province_id',
@@ -727,13 +754,13 @@ class MasterDataController extends Controller
                     'key' => 'district_id',
                     'label' => 'Kecamatan',
                     'placeholder' => 'Pilih kecamatan',
-                    'options' => $this->districtSelectOptionsByRegency($selectedRegencyId),
+                    'options' => $this->locationOptions->districtSelectOptionsByRegency($selectedRegencyId),
                     'depends_on' => 'regency_id',
                     'endpoint_type' => 'districts',
                     'parent_param' => 'regency_id',
                 ],
             ],
-            'generator' => $this->locationGeneratorProps('village', 'district_id'),
+            'generator' => $this->locationResources->generatorProps('village', $this->workspaceRoute('master-data.locations.id-preview'), 'district_id'),
             'showIdField' => false,
             'optionsUrl' => $this->workspaceRoute('master-data.locations.options'),
             'indexUrl' => $this->workspaceRoute('master-data.villages.index'),
@@ -765,7 +792,7 @@ class MasterDataController extends Controller
         $selectedProvinceId = (string) ($village->district?->regency?->province_id ?? '');
 
         return inertia('Admin/Locations/Form', [
-            'resource' => $this->locationResourceDefinition('villages'),
+            'resource' => $this->locationResources->definition('villages'),
             'mode' => 'edit',
             'record' => [
                 'id' => $village->id,
@@ -779,13 +806,13 @@ class MasterDataController extends Controller
                     'key' => 'province_id',
                     'label' => 'Provinsi',
                     'placeholder' => 'Pilih provinsi',
-                    'options' => $this->provinceSelectOptions(),
+                    'options' => $this->locationOptions->provinceSelectOptions(),
                 ],
                 [
                     'key' => 'regency_id',
                     'label' => 'Kabupaten/Kota',
                     'placeholder' => 'Pilih kabupaten/kota',
-                    'options' => $this->regencySelectOptionsByProvince($selectedProvinceId),
+                    'options' => $this->locationOptions->regencySelectOptionsByProvince($selectedProvinceId),
                     'depends_on' => 'province_id',
                     'endpoint_type' => 'regencies',
                     'parent_param' => 'province_id',
@@ -794,7 +821,7 @@ class MasterDataController extends Controller
                     'key' => 'district_id',
                     'label' => 'Kecamatan',
                     'placeholder' => 'Pilih kecamatan',
-                    'options' => $this->districtSelectOptionsByRegency($selectedRegencyId),
+                    'options' => $this->locationOptions->districtSelectOptionsByRegency($selectedRegencyId),
                     'depends_on' => 'regency_id',
                     'endpoint_type' => 'districts',
                     'parent_param' => 'regency_id',
@@ -823,160 +850,7 @@ class MasterDataController extends Controller
 
     public function villagesDestroy(Village $village): RedirectResponse
     {
-        return $this->destroyLocationRecord($village, 'master-data.villages.index', 'Kelurahan/Desa');
-    }
-
-    private function canManageUsersCreate(): bool
-    {
-        $user = auth()->user();
-
-        return $user !== null && $user->hasAdminAccess();
-    }
-
-    private function superAdminRoleName(): string
-    {
-        return (string) config('access-control.super_admin.name', 'super_admin');
-    }
-
-    private function roleSelectOptions(): array
-    {
-        return Role::query()
-            ->where('guard_name', 'web')
-            ->when(! $this->isSuperAdmin(auth()->user()), fn ($query) => $query->where('name', 'customer'))
-            ->orderBy('name')
-            ->get(['name'])
-            ->map(fn (Role $role) => [
-                'value' => $role->name,
-                'label' => $role->name,
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function transformUserRow(User $user): array
-    {
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role_names' => $user->roles->pluck('name')->values()->all(),
-            'is_verified' => filled($user->email_verified_at),
-            'created_at' => $user->created_at?->toIso8601String(),
-            'show_url' => route('admin.master-data.users.show', $user),
-            'edit_url' => route('admin.master-data.users.edit', $user),
-            'destroy_url' => $this->canDeleteUser($user) ? route('admin.master-data.users.destroy', $user) : null,
-        ];
-    }
-
-    private function userShowPayload(User $user): array
-    {
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'email_verified_at' => $user->email_verified_at?->toIso8601String(),
-            'role_names' => $user->roles->pluck('name')->values()->all(),
-            'created_at' => $user->created_at?->toIso8601String(),
-            'updated_at' => $user->updated_at?->toIso8601String(),
-        ];
-    }
-
-    private function manageableUsersQuery()
-    {
-        $query = User::query();
-
-        if ($this->isSuperAdmin(auth()->user())) {
-            return $query;
-        }
-
-        return $query
-            ->whereHas('roles', fn ($roleQuery) => $roleQuery->where('name', 'customer'))
-            ->whereDoesntHave('roles', fn ($roleQuery) => $roleQuery->where('name', '<>', 'customer'));
-    }
-
-    private function assignableRolesPayload(array $validated): array
-    {
-        if ($this->isSuperAdmin(auth()->user())) {
-            return $validated['roles'] ?? [];
-        }
-
-        return ['customer'];
-    }
-
-    private function canManageUser(User $user): bool
-    {
-        $authUser = auth()->user();
-
-        if (! ($authUser?->hasAdminAccess() ?? false)) {
-            return false;
-        }
-
-        if ($this->isSuperAdmin($authUser)) {
-            return true;
-        }
-
-        $roleNames = $user->roles()->pluck('name')->all();
-
-        return $roleNames === ['customer'];
-    }
-
-    private function canDeleteUser(User $user): bool
-    {
-        $authUser = auth()->user();
-
-        return $this->isSuperAdmin($authUser) && $authUser?->id !== $user->id;
-    }
-
-    private function isSuperAdmin(?User $user): bool
-    {
-        return $user !== null && $user->hasRole($this->superAdminRoleName());
-    }
-
-    private function locationResourceDefinition(string $key): array
-    {
-        return match ($key) {
-            'provinces' => [
-                'key' => 'provinces',
-                'title' => 'Provinsi',
-                'singular' => 'Provinsi',
-                'description' => 'Kelola daftar nama provinsi untuk dipakai lintas flow penilaian.',
-                'create_label' => 'Tambah Provinsi',
-                'code_label' => 'Kode Provinsi',
-            ],
-            'regencies' => [
-                'key' => 'regencies',
-                'title' => 'Kabupaten/Kota',
-                'singular' => 'Kabupaten/Kota',
-                'description' => 'Kelola daftar kabupaten dan kota per provinsi.',
-                'create_label' => 'Tambah Kabupaten/Kota',
-                'code_label' => 'Kode Kabupaten/Kota',
-            ],
-            'districts' => [
-                'key' => 'districts',
-                'title' => 'Kecamatan',
-                'singular' => 'Kecamatan',
-                'description' => 'Kelola daftar kecamatan per kabupaten/kota.',
-                'create_label' => 'Tambah Kecamatan',
-                'code_label' => 'Kode Kecamatan',
-            ],
-            default => [
-                'key' => 'villages',
-                'title' => 'Kelurahan/Desa',
-                'singular' => 'Kelurahan/Desa',
-                'description' => 'Kelola daftar kelurahan dan desa per kecamatan.',
-                'create_label' => 'Tambah Kelurahan/Desa',
-                'code_label' => 'Kode Kelurahan/Desa',
-            ],
-        };
-    }
-
-    private function locationGeneratorProps(string $type, ?string $parentField = null): array
-    {
-        return [
-            'type' => $type,
-            'parent_field' => $parentField,
-            'preview_url' => $this->workspaceRoute('master-data.locations.id-preview'),
-        ];
+        return $this->locationDestroyer->destroy($village, $this->workspaceRouteName('master-data.villages.index'), 'Kelurahan/Desa');
     }
 
     private function locationGeneratedIdPreview(string $type, array $context, LocationIdGenerator $generator): ?string
@@ -1000,176 +874,5 @@ class MasterDataController extends Controller
         } catch (\Throwable) {
             return null;
         }
-    }
-
-    private function provinceSelectOptions(): array
-    {
-        return Province::query()
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (Province $province) => [
-                'value' => (string) $province->id,
-                'label' => $province->name . ' (' . $province->id . ')',
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function provinceFilterOptions(): array
-    {
-        return [
-            ['value' => 'all', 'label' => 'Semua Provinsi'],
-            ...$this->provinceSelectOptions(),
-        ];
-    }
-
-    private function regencySelectOptionsByProvince(?string $provinceId): array
-    {
-        if (blank($provinceId)) {
-            return [];
-        }
-
-        return Regency::query()
-            ->where('province_id', $provinceId)
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (Regency $regency) => [
-                'value' => (string) $regency->id,
-                'label' => $regency->name . ' (' . $regency->id . ')',
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function districtSelectOptionsByRegency(?string $regencyId): array
-    {
-        if (blank($regencyId)) {
-            return [];
-        }
-
-        return District::query()
-            ->where('regency_id', $regencyId)
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (District $district) => [
-                'value' => (string) $district->id,
-                'label' => $district->name . ' (' . $district->id . ')',
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function regencyFilterOptions(): array
-    {
-        return Regency::query()
-            ->with('province:id,name')
-            ->orderBy('name')
-            ->get(['id', 'name', 'province_id'])
-            ->map(fn (Regency $regency) => [
-                'value' => (string) $regency->id,
-                'label' => $regency->name . ' - ' . ($regency->province?->name ?? '-'),
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function districtFilterOptions(): array
-    {
-        return District::query()
-            ->with(['regency:id,name,province_id', 'regency.province:id,name'])
-            ->orderBy('name')
-            ->get(['id', 'name', 'regency_id'])
-            ->map(fn (District $district) => [
-                'value' => (string) $district->id,
-                'label' => $district->name
-                    . ' - '
-                    . ($district->regency?->name ?? '-')
-                    . ' / '
-                    . ($district->regency?->province?->name ?? '-'),
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function transformProvinceRow(Province $province): array
-    {
-        return [
-            'id' => $province->id,
-            'code' => $province->id,
-            'name' => $province->name,
-            'details' => [],
-            'stats' => [
-                ['label' => 'Kabupaten/Kota', 'value' => (int) ($province->regencies_count ?? 0)],
-            ],
-            'edit_url' => $this->workspaceRoute('master-data.provinces.edit', $province),
-            'destroy_url' => $this->workspaceRoute('master-data.provinces.destroy', $province),
-        ];
-    }
-
-    private function transformRegencyRow(Regency $regency): array
-    {
-        return [
-            'id' => $regency->id,
-            'code' => $regency->id,
-            'name' => $regency->name,
-            'details' => [
-                'Provinsi: ' . ($regency->province?->name ?? '-'),
-            ],
-            'stats' => [
-                ['label' => 'Kecamatan', 'value' => (int) ($regency->districts_count ?? 0)],
-            ],
-            'edit_url' => $this->workspaceRoute('master-data.regencies.edit', $regency),
-            'destroy_url' => $this->workspaceRoute('master-data.regencies.destroy', $regency),
-        ];
-    }
-
-    private function transformDistrictRow(District $district): array
-    {
-        return [
-            'id' => $district->id,
-            'code' => $district->id,
-            'name' => $district->name,
-            'details' => [
-                'Kabupaten/Kota: ' . ($district->regency?->name ?? '-'),
-                'Provinsi: ' . ($district->regency?->province?->name ?? '-'),
-            ],
-            'stats' => [
-                ['label' => 'Kelurahan/Desa', 'value' => (int) ($district->villages_count ?? 0)],
-            ],
-            'edit_url' => $this->workspaceRoute('master-data.districts.edit', $district),
-            'destroy_url' => $this->workspaceRoute('master-data.districts.destroy', $district),
-        ];
-    }
-
-    private function transformVillageRow(Village $village): array
-    {
-        return [
-            'id' => $village->id,
-            'code' => $village->id,
-            'name' => $village->name,
-            'details' => [
-                'Kecamatan: ' . ($village->district?->name ?? '-'),
-                'Kabupaten/Kota: ' . ($village->district?->regency?->name ?? '-'),
-                'Provinsi: ' . ($village->district?->regency?->province?->name ?? '-'),
-            ],
-            'stats' => [],
-            'edit_url' => $this->workspaceRoute('master-data.villages.edit', $village),
-            'destroy_url' => $this->workspaceRoute('master-data.villages.destroy', $village),
-        ];
-    }
-
-    private function destroyLocationRecord(Model $record, string $routeName, string $label): RedirectResponse
-    {
-        try {
-            $record->delete();
-        } catch (QueryException) {
-            return redirect()
-                ->route($this->workspaceRouteName($routeName))
-                ->with('error', $label . ' tidak bisa dihapus karena masih dipakai data turunan.');
-        }
-
-        return redirect()
-            ->route($this->workspaceRouteName($routeName))
-            ->with('success', $label . ' berhasil dihapus.');
     }
 }

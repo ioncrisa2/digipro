@@ -2,13 +2,8 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
-
-class AppraisalOfferNotification extends Notification
+class AppraisalOfferNotification extends DatabaseNotification
 {
-    use Queueable;
-
     public function __construct(
         public int $appraisalId,
         public string $requestNumber,
@@ -17,12 +12,7 @@ class AppraisalOfferNotification extends Notification
     ) {
     }
 
-    public function via(object $notifiable): array
-    {
-        return ['database'];
-    }
-
-    public function toDatabase(object $notifiable): array
+    protected function databasePayload(object $notifiable): array
     {
         $title = match ($this->mode) {
             'finalized' => 'Negosiasi disetujui admin',

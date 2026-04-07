@@ -9,12 +9,8 @@ use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
-class MappiRcnStandardImport implements ToCollection, WithHeadingRow, WithChunkReading, SkipsEmptyRows
+class MappiRcnStandardImport extends BaseSpreadsheetImport implements ToCollection, WithHeadingRow, WithChunkReading, SkipsEmptyRows
 {
-    public int $inserted = 0;
-    public int $updated = 0;
-    public int $skipped = 0;
-
     public function __construct(
         public int $guidelineSetId,
         public int $year,
@@ -100,26 +96,5 @@ class MappiRcnStandardImport implements ToCollection, WithHeadingRow, WithChunkR
     public function chunkSize(): int
     {
         return 500;
-    }
-
-    private function normalizeNullableString(mixed $value): ?string
-    {
-        $text = trim((string) $value);
-
-        return $text === '' ? null : $text;
-    }
-
-    private function parseIntegerCurrency(mixed $value): int
-    {
-        $text = trim((string) $value);
-        $text = preg_replace('/[^\d\.,-]/', '', $text) ?? '';
-
-        if (str_contains($text, ',') && ! str_contains($text, '.')) {
-            $text = str_replace(',', '.', $text);
-        } else {
-            $text = str_replace(',', '', $text);
-        }
-
-        return (int) round((float) $text);
     }
 }

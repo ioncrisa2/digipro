@@ -9,12 +9,8 @@ use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
-class CostElementImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
+class CostElementImport extends BaseSpreadsheetImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 {
-    public int $inserted = 0;
-    public int $updated = 0;
-    public int $skipped = 0;
-
     public function __construct(
         protected int $guidelineSetId,
         protected int $year,
@@ -25,11 +21,9 @@ class CostElementImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
     {
         DB::transaction(function () use ($rows): void {
             foreach ($rows as $row) {
-                $norm = fn ($value) => isset($value) && trim((string) $value) !== '' ? trim((string) $value) : null;
-
-                $group = $norm($row['group'] ?? null);
-                $elementCode = $norm($row['element_code'] ?? null);
-                $elementName = $norm($row['element_name'] ?? null);
+                $group = $this->normalizeNullableString($row['group'] ?? null);
+                $elementCode = $this->normalizeNullableString($row['element_code'] ?? null);
+                $elementName = $this->normalizeNullableString($row['element_name'] ?? null);
                 $unitCostRaw = $row['unit_cost'] ?? null;
 
                 if (! $group || ! $elementCode || ! $elementName || $unitCostRaw === null || $unitCostRaw === '') {
@@ -47,9 +41,9 @@ class CostElementImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                     'guideline_set_id' => $this->guidelineSetId,
                     'year' => $this->year,
                     'base_region' => $this->baseRegion,
-                    'building_type' => $norm($row['building_type'] ?? null),
-                    'building_class' => $norm($row['building_class'] ?? null),
-                    'storey_pattern' => $norm($row['storey_pattern'] ?? null),
+                    'building_type' => $this->normalizeNullableString($row['building_type'] ?? null),
+                    'building_class' => $this->normalizeNullableString($row['building_class'] ?? null),
+                    'storey_pattern' => $this->normalizeNullableString($row['storey_pattern'] ?? null),
                     'element_code' => $elementCode,
                 ];
 
@@ -70,7 +64,7 @@ class CostElementImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                     [
                         'group' => $group,
                         'element_name' => $elementName,
-                        'unit' => $norm($row['unit'] ?? null) ?? 'm2',
+                        'unit' => $this->normalizeNullableString($row['unit'] ?? null) ?? 'm2',
                         'unit_cost' => (int) round((float) $unitCostRaw),
                         'spec_json' => $specJson,
                     ]
