@@ -119,6 +119,34 @@ class AppraisalRequestWorkflowService
         ], true);
     }
 
+    public function physicalReportState(AppraisalRequest $record): array
+    {
+        $requiresPhysicalReport = ($record->report_format ?? 'digital') !== 'digital'
+            || (int) ($record->physical_copies_count ?? 0) > 0;
+
+        if (! $requiresPhysicalReport) {
+            return [
+                'show' => false,
+                'ready' => false,
+                'message' => 'Permohonan ini tidak meminta pengiriman hard copy.',
+            ];
+        }
+
+        if (! $record->report_generated_at && ! filled($record->report_pdf_path)) {
+            return [
+                'show' => true,
+                'ready' => false,
+                'message' => 'Pengiriman hard copy dapat dicatat setelah laporan final tersedia.',
+            ];
+        }
+
+        return [
+            'show' => true,
+            'ready' => true,
+            'message' => null,
+        ];
+    }
+
     public function resolveOfferDefaults(AppraisalRequest $record): array
     {
         $latestCounter = $this->latestCounterRequest($record);
@@ -422,6 +450,66 @@ class AppraisalRequestWorkflowService
             'fee_total' => $approvedFee,
             'counter_request_id' => $latestCounter->id,
         ];
+    }
+
+    public function updatePhysicalReport(AppraisalRequest $record, int $actorId, array $data): array
+    {
+        $state = $this->physicalReportState($record);
+
+        if (! ($state['show'] ?? false)) {
+            throw new RuntimeException($state['message'] ?? 'Permohonan ini tidak memakai hard copy.');
+        }
+
+        if (! ($state['ready'] ?? false)) {
+            throw new RuntimeException($state['message'] ?? 'Pengiriman hard copy belum bisa dicatat.');
+        }
+
+        $action = (string) ($data['action'] ?? 'save_details');
+
+        return DB::transaction(function () use ($record, $actorId, $data, $action): array {
+            $attributes = [
+                'physical_report_courier' => $data['courier'] ?? $record->physical_report_courier,
+                'physical_report_tracking_number' => $data['tracking_number'] ?? $record->physical_report_tracking_number,
+                'physical_report_notes' => $data['notes'] ?? $record->physical_report_notes,
+            ];
+
+            $event = 'details_saved';
+            $message = 'Detail pengiriman hard copy berhasil diperbarui.';
+
+            if ($action === 'mark_printed') {
+                $attributes['physical_report_printed_at'] = $record->physical_report_printed_at ?? now();
+                $attributes['physical_report_printed_by'] = $record->physical_report_printed_by ?? $actorId;
+                $event = 'printed';
+                $message = 'Hard copy berhasil ditandai sudah dicetak.';
+            }
+
+            if ($action === 'mark_shipped') {
+                $attributes['physical_report_printed_at'] = $record->physical_report_printed_at ?? now();
+                $attributes['physical_report_printed_by'] = $record->physical_report_printed_by ?? $actorId;
+                $attributes['physical_report_shipped_at'] = $record->physical_report_shipped_at ?? now();
+                $event = 'shipped';
+                $message = 'Hard copy berhasil ditandai sudah dikirim.';
+            }
+
+            if ($action === 'mark_delivered') {
+                if (! $record->physical_report_shipped_at) {
+                    throw new RuntimeException('Hard copy harus ditandai dikirim terlebih dahulu sebelum bisa ditandai diterima.');
+                }
+
+                $attributes['physical_report_delivered_at'] = $record->physical_report_delivered_at ?? now();
+                $event = 'delivered';
+                $message = 'Hard copy berhasil ditandai sudah diterima.';
+            }
+
+            $record->update($attributes);
+
+            return [
+                'event' => $event,
+                'message' => $message,
+                'courier' => $record->fresh()?->physical_report_courier,
+                'tracking_number' => $record->fresh()?->physical_report_tracking_number,
+            ];
+        });
     }
 
     public function latestCounterRequest(AppraisalRequest $record): ?AppraisalOfferNegotiation

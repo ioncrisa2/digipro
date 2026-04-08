@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import AppraisalProgressMilestone from "@/components/appraisal/AppraisalProgressMilestone.vue";
 import AppraisalStatusTimeline from "@/components/appraisal/AppraisalStatusTimeline.vue";
+import AppraisalPhysicalDeliveryStatus from "@/components/appraisal/AppraisalPhysicalDeliveryStatus.vue";
 import { ArrowLeft } from "lucide-vue-next";
 
 const props = defineProps({
@@ -15,8 +16,10 @@ const props = defineProps({
 
 const req = computed(() => props.request ?? {});
 const progressSummary = computed(() => req.value?.progress_summary ?? null);
+const physicalReport = computed(() => req.value?.physical_report ?? null);
 const trackingContext = computed(() => req.value?.tracking_context ?? {});
 const cancellationRequest = computed(() => req.value?.cancellation_request ?? null);
+const showPhysicalReport = computed(() => Boolean(physicalReport.value?.needs_physical_report));
 const subtitle = computed(() => {
     const parts = [req.value?.report_type_label, `${req.value?.assets_count ?? 0} aset`].filter(Boolean);
     return parts.join(" | ");
@@ -114,6 +117,18 @@ const goBack = () => {
                             {{ cancellationRequest.review_note }}
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card v-if="showPhysicalReport">
+                <CardHeader class="pb-3">
+                    <CardTitle class="text-base">Pengiriman Hard Copy</CardTitle>
+                    <CardDescription>
+                        Status manual pengiriman laporan fisik berdasarkan catatan operasional admin.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <AppraisalPhysicalDeliveryStatus :summary="physicalReport" />
                 </CardContent>
             </Card>
 

@@ -22,6 +22,7 @@ class AppraisalRequestService
         private readonly AppraisalRequestSubmitterResolver $submitterResolver,
         private readonly GuidelineSetResolver $guidelineSetResolver,
         private readonly ConsentSnapshotResolver $consentSnapshotResolver,
+        private readonly ReportDeliverySnapshotResolver $reportDeliverySnapshotResolver,
         private readonly AppraisalAssetPayloadNormalizer $assetPayloadNormalizer,
         private readonly AppraisalAssetFileStorage $assetFileStorage,
         private readonly AdminNotificationService $adminNotificationService,
@@ -36,9 +37,15 @@ class AppraisalRequestService
 
         $submitter = $this->submitterResolver->resolve($request);
 
-        $format = 'digital';
-        $copies = 0;
-        $reportType = 'terinci';
+        $format = in_array(($validated['report_format'] ?? 'both'), ['digital', 'physical', 'both'], true)
+            ? (string) $validated['report_format']
+            : 'both';
+        $copies = $format === 'digital'
+            ? 0
+            : max(1, (int) ($validated['physical_copies_count'] ?? 1));
+        $reportType = in_array(($validated['report_type'] ?? 'terinci'), ['terinci', 'singkat'], true)
+            ? (string) $validated['report_type']
+            : 'terinci';
 
         // Kolom `purpose` masih wajib di schema, jadi set default aman.
         $purpose = $validated['purpose'] ?? 'jual_beli';
@@ -53,7 +60,12 @@ class AppraisalRequestService
             ]);
         }
 
-        $appraisalRequest = DB::transaction(function () use ($request, $validated, $format, $copies, $reportType, $purpose, $clientName, $submitter, $guidelineSetId, $consentSnapshot) {
+        $deliverySnapshot = $this->reportDeliverySnapshotResolver->resolve(
+            $submitter,
+            in_array($format, ['physical', 'both'], true)
+        );
+
+        $appraisalRequest = DB::transaction(function () use ($request, $validated, $format, $copies, $reportType, $purpose, $clientName, $submitter, $guidelineSetId, $consentSnapshot, $deliverySnapshot) {
 
             $appraisalRequest = AppraisalRequest::create([
                 'user_id' => $submitter?->getKey() ?? Auth::id(),
@@ -69,6 +81,9 @@ class AppraisalRequestService
                 'report_type' => $reportType,
                 'report_format' => $format,
                 'physical_copies_count' => $copies,
+                'report_delivery_address' => $deliverySnapshot['address'],
+                'report_delivery_recipient_name' => $deliverySnapshot['recipient_name'],
+                'report_delivery_recipient_phone' => $deliverySnapshot['recipient_phone'],
                 'requested_at' => now(),
                 'consent_accepted_at' => $consentSnapshot['accepted_at'],
                 'consent_version' => $consentSnapshot['version'],

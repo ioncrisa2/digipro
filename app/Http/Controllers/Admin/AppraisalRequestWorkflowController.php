@@ -12,9 +12,11 @@ use App\Http\Requests\Admin\StoreAppraisalFieldCorrectionRequest;
 use App\Http\Requests\Admin\StoreAppraisalRequestRevisionBatchRequest;
 use App\Http\Requests\Admin\StoreAppraisalOfferRequest;
 use App\Http\Requests\Admin\UploadFinalReportRequest;
+use App\Http\Requests\Admin\UpdateAppraisalPhysicalReportRequest;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestRevisionItem;
 use App\Models\ReportSigner;
+use App\Notifications\AppraisalPhysicalReportUpdated;
 use App\Notifications\AppraisalStatusUpdated;
 use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestRevisionReviewService;
@@ -133,6 +135,38 @@ class AppraisalRequestWorkflowController extends Controller
         } catch (\RuntimeException $exception) {
             return back()->with('error', $exception->getMessage());
         }
+    }
+
+    public function updatePhysicalReport(
+        UpdateAppraisalPhysicalReportRequest $request,
+        AppraisalRequest $appraisalRequest,
+        AppraisalRequestWorkflowService $workflowService
+    ): RedirectResponse {
+        try {
+            $result = $workflowService->updatePhysicalReport(
+                $appraisalRequest,
+                (int) $request->user()->id,
+                $request->validated()
+            );
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        $freshRecord = $appraisalRequest->fresh(['user']);
+        if (
+            $freshRecord?->user
+            && in_array($result['event'] ?? null, ['printed', 'shipped', 'delivered'], true)
+        ) {
+            $freshRecord->user->notify(new AppraisalPhysicalReportUpdated(
+                appraisalId: (int) $freshRecord->id,
+                requestNumber: (string) ($freshRecord->request_number ?? ('REQ-' . $freshRecord->id)),
+                event: (string) $result['event'],
+                courier: $result['courier'] ?? null,
+                trackingNumber: $result['tracking_number'] ?? null,
+            ));
+        }
+
+        return back()->with('success', (string) ($result['message'] ?? 'Detail pengiriman hard copy berhasil diperbarui.'));
     }
 
     public function cancelRequest(

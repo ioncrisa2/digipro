@@ -18,6 +18,7 @@ import {
 import AppraisalProgressMilestone from "@/components/appraisal/AppraisalProgressMilestone.vue";
 import AppraisalStatusTimeline from "@/components/appraisal/AppraisalStatusTimeline.vue";
 import AppraisalDocumentWorkspace from "@/components/appraisal/AppraisalDocumentWorkspace.vue";
+import AppraisalPhysicalDeliveryStatus from "@/components/appraisal/AppraisalPhysicalDeliveryStatus.vue";
 import { useNotification } from "@/composables/useNotification";
 
 import { ArrowLeft, Calendar, FileText, MapPin, PhoneCall } from "lucide-vue-next";
@@ -40,6 +41,7 @@ const {
     documentsImages,
     documentWorkspace,
     progressSummary,
+    physicalReport,
     recentStatusEvents,
     trackingPageUrl,
     cancellationRequest,
@@ -60,6 +62,7 @@ const subtitle = computed(() => {
 const revisionSummary = computed(() => req.value?.revision_summary ?? {});
 const previewState = computed(() => req.value?.preview_state ?? {});
 const primaryAction = computed(() => progressSummary.value?.primary_action ?? null);
+const showPhysicalReport = computed(() => Boolean(physicalReport.value?.needs_physical_report));
 const cancellationFormDialog = ref(false);
 const cancellationForm = useForm({
     reason: "",
@@ -209,6 +212,21 @@ const submitCancellationRequest = () => {
                             empty-text="Riwayat status belum tersedia."
                         />
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card
+                v-if="showPhysicalReport"
+                class="border-slate-200"
+            >
+                <CardHeader class="pb-3">
+                    <CardTitle class="text-base">Pengiriman Hard Copy</CardTitle>
+                    <CardDescription>
+                        Ringkasan manual pengiriman laporan fisik yang dicatat oleh admin.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <AppraisalPhysicalDeliveryStatus :summary="physicalReport" />
                 </CardContent>
             </Card>
 

@@ -43,6 +43,8 @@ class StoreAppraisalRequest extends CustomerFormRequest
         return [
             'sertifikat_on_hand_confirmed' => ['accepted'],
             'certificate_not_encumbered_confirmed' => ['accepted'],
+            'report_format' => ['required', 'in:both'],
+            'physical_copies_count' => ['required', 'integer', 'min:1', 'max:20'],
             'assets' => ['required', 'array', 'min:1'],
             'assets.*.type' => ['required', 'string'],
 
@@ -94,6 +96,7 @@ class StoreAppraisalRequest extends CustomerFormRequest
     {
         $validator->after(function ($v) {
             $assets = (array) $this->input('assets', []);
+            $physicalCopiesCount = (int) ($this->input('physical_copies_count') ?? 0);
 
             foreach ($assets as $i => $asset) {
                 $typeRaw = data_get($asset, 'type');
@@ -143,6 +146,36 @@ class StoreAppraisalRequest extends CustomerFormRequest
                 $v->errors()->add(
                     'assets',
                     "Jumlah file yang diterima server mencapai batas ({$maxFileUploads} file per submit). Kurangi jumlah file per aset, atau minta admin menaikkan konfigurasi max_file_uploads di PHP."
+                );
+            }
+
+            if ($physicalCopiesCount < 1) {
+                $v->errors()->add(
+                    'physical_copies_count',
+                    'Jumlah hard copy minimal 1 untuk setiap permohonan.'
+                );
+            }
+
+            $user = $this->user();
+
+            if (! filled($user?->phone_number)) {
+                $v->errors()->add(
+                    'report_format',
+                    'Nomor telepon profil wajib diisi sebelum permohonan dapat diproses untuk pengiriman hard copy.'
+                );
+            }
+
+            if (! filled($user?->billing_recipient_name)) {
+                $v->errors()->add(
+                    'report_format',
+                    'Nama billing atau penerima laporan di profil wajib diisi untuk pengiriman hard copy.'
+                );
+            }
+
+            if (! filled($user?->billing_address_detail)) {
+                $v->errors()->add(
+                    'report_format',
+                    'Alamat detail billing di profil wajib diisi untuk pengiriman hard copy.'
                 );
             }
         });
@@ -207,6 +240,12 @@ class StoreAppraisalRequest extends CustomerFormRequest
             'assets.min' => 'Mohon tambahkan minimal satu aset.',
             'sertifikat_on_hand_confirmed.accepted' => 'Anda harus menyatakan bahwa sertifikat fisik tersedia / on hand.',
             'certificate_not_encumbered_confirmed.accepted' => 'Permohonan tidak dapat dilanjutkan jika sertifikat sedang dijaminkan. Centang pernyataan bahwa sertifikat tidak sedang dijaminkan.',
+            'report_format.required' => 'Format pengiriman laporan wajib disertakan.',
+            'report_format.in' => 'Format laporan untuk permohonan ini harus digital dan hard copy.',
+            'physical_copies_count.integer' => 'Jumlah hard copy harus berupa angka bulat.',
+            'physical_copies_count.required' => 'Jumlah hard copy wajib diisi.',
+            'physical_copies_count.min' => 'Jumlah hard copy minimal 1.',
+            'physical_copies_count.max' => 'Jumlah hard copy terlalu besar untuk satu permohonan.',
 
             'assets.*.land_area.required' => 'Luas tanah wajib diisi.',
             'assets.*.land_area.numeric' => 'Luas tanah harus berupa angka.',

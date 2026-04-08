@@ -203,6 +203,27 @@ class AppraisalProgressSummaryBuilder
         }
 
         if (in_array($status, [AppraisalStatusEnum::ReportReady->value, AppraisalStatusEnum::Completed->value], true)) {
+            if ($record->physical_report_delivered_at) {
+                return [
+                    'label' => 'Hard copy sudah diterima',
+                    'tone' => 'success',
+                ];
+            }
+
+            if ($record->physical_report_shipped_at) {
+                return [
+                    'label' => 'Hard copy sedang dikirim',
+                    'tone' => 'info',
+                ];
+            }
+
+            if ($record->physical_report_printed_at) {
+                return [
+                    'label' => 'Hard copy siap dikirim',
+                    'tone' => 'info',
+                ];
+            }
+
             return [
                 'label' => 'Laporan siap diunduh',
                 'tone' => 'success',
@@ -280,10 +301,32 @@ class AppraisalProgressSummaryBuilder
         }
 
         if ($status === AppraisalStatusEnum::ReportReady->value) {
+            if ($record->physical_report_delivered_at) {
+                return 'Laporan final tersedia, dan hard copy sudah ditandai diterima oleh customer.';
+            }
+
+            if ($record->physical_report_shipped_at) {
+                $courier = filled($record->physical_report_courier) ? ' via ' . $record->physical_report_courier : '';
+
+                return 'Laporan final tersedia, dan hard copy sedang dikirim' . $courier . '.';
+            }
+
+            if ($record->physical_report_printed_at) {
+                return 'Laporan final tersedia, dan hard copy sudah dicetak untuk proses pengiriman.';
+            }
+
             return 'Laporan final sudah tersedia dan dapat diunduh dari permohonan ini.';
         }
 
         if ($status === AppraisalStatusEnum::Completed->value) {
+            if ($record->physical_report_delivered_at) {
+                return 'Seluruh proses permohonan selesai. Laporan digital tersedia dan hard copy sudah diterima.';
+            }
+
+            if ($record->physical_report_shipped_at) {
+                return 'Proses utama permohonan selesai. Laporan digital tersedia dan hard copy sedang dalam pengiriman.';
+            }
+
             return 'Seluruh proses permohonan penilaian telah selesai.';
         }
 

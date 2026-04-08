@@ -274,6 +274,47 @@ class AppraisalStatusTimelineBuilder
             );
         }
 
+        if ($record->physical_report_printed_at) {
+            $description = 'Laporan fisik selesai dicetak dan masuk antrean pengiriman.';
+
+            if ($record->physicalReportPrintedBy?->name) {
+                $description = 'Laporan fisik selesai dicetak oleh ' . $record->physicalReportPrintedBy->name . ' dan masuk antrean pengiriman.';
+            }
+
+            $append(
+                'physical_report_printed',
+                'Hard Copy Dicetak',
+                $description,
+                $record->physical_report_printed_at,
+                'info'
+            );
+        }
+
+        if ($record->physical_report_shipped_at) {
+            $courier = filled($record->physical_report_courier) ? $record->physical_report_courier : 'kurir';
+            $tracking = filled($record->physical_report_tracking_number)
+                ? ' Nomor resi: ' . $record->physical_report_tracking_number . '.'
+                : '';
+
+            $append(
+                'physical_report_shipped',
+                'Hard Copy Dikirim',
+                'Laporan fisik dikirim melalui ' . $courier . '.' . $tracking,
+                $record->physical_report_shipped_at,
+                'info'
+            );
+        }
+
+        if ($record->physical_report_delivered_at) {
+            $append(
+                'physical_report_delivered',
+                'Hard Copy Diterima',
+                'Laporan fisik ditandai sudah diterima oleh customer.',
+                $record->physical_report_delivered_at,
+                'success'
+            );
+        }
+
         if ($record->market_preview_published_at) {
             $append(
                 'market_preview_published',

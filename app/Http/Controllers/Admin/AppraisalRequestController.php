@@ -12,6 +12,7 @@ use App\Http\Requests\Admin\AppraisalRequestIndexRequest;
 use App\Http\Requests\Admin\UpdateAppraisalRequestBasicRequest;
 use App\Models\AppraisalRequest;
 use App\Models\ReportSigner;
+use App\Services\AppraisalPhysicalReportSummaryBuilder;
 use App\Services\Admin\AppraisalContractNumberService;
 use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
@@ -80,12 +81,14 @@ class AppraisalRequestController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalRequestWorkflowService $workflowService,
         AppraisalRequestRevisionService $revisionService,
-        AppraisalRevisionFileResolver $fileResolver
+        AppraisalRevisionFileResolver $fileResolver,
+        AppraisalPhysicalReportSummaryBuilder $physicalReportSummaryBuilder
     ): Response {
         $appraisalRequest->load([
             'guidelineSet',
-            'user',
+            'user:id,name,email,phone_number,whatsapp_number',
             'cancelledBy:id,name',
+            'physicalReportPrintedBy:id,name',
             'reportReviewerSigner',
             'reportPublicAppraiserSigner',
             'files',
@@ -124,6 +127,8 @@ class AppraisalRequestController extends Controller
                 'contract_status_label' => $appraisalRequest->contract_status?->label() ?? '-',
                 'contract_status_value' => $appraisalRequest->contract_status?->value ?? null,
                 'report_type_label' => $appraisalRequest->report_type?->label() ?? '-',
+                'report_format' => $appraisalRequest->report_format,
+                'physical_copies_count' => (int) ($appraisalRequest->physical_copies_count ?? 0),
                 'requested_at' => $appraisalRequest->requested_at?->toIso8601String(),
                 'verified_at' => $appraisalRequest->verified_at?->toIso8601String(),
                 'client_name' => $appraisalRequest->client_name ?: '-',
@@ -221,7 +226,16 @@ class AppraisalRequestController extends Controller
                 'id' => $appraisalRequest->user?->id,
                 'name' => $appraisalRequest->user?->name ?? '-',
                 'email' => $appraisalRequest->user?->email ?? '-',
+                'phone_number' => $appraisalRequest->user?->phone_number ?? '-',
+                'whatsapp_number' => $appraisalRequest->user?->whatsapp_number ?? '-',
             ],
+            'physicalReport' => array_merge(
+                $physicalReportSummaryBuilder->build($appraisalRequest),
+                [
+                    'update_url' => route('admin.appraisal-requests.actions.physical-report.update', $appraisalRequest),
+                    'workspace' => $workflowService->physicalReportState($appraisalRequest),
+                ]
+            ),
             'availableActions' => $this->buildAvailableActions($appraisalRequest, $workflowService),
             'offerAction' => $this->buildOfferAction($appraisalRequest, $workflowService),
             'approveLatestNegotiationAction' => $this->buildApproveLatestNegotiationAction($appraisalRequest, $workflowService),

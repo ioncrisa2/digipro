@@ -121,6 +121,34 @@ const props = defineProps({
       },
     }),
   },
+  physicalReport: {
+    type: Object,
+    default: () => ({
+      needs_physical_report: false,
+      report_format: 'digital',
+      report_format_label: 'Digital',
+      copies_count: 0,
+      delivery_recipient_name: null,
+      delivery_recipient_phone: null,
+      delivery_address: null,
+      courier: null,
+      tracking_number: null,
+      notes: null,
+      printed_at: null,
+      printed_by_name: null,
+      shipped_at: null,
+      delivered_at: null,
+      state: 'digital_only',
+      state_label: 'Digital Only',
+      state_description: null,
+      update_url: null,
+      workspace: {
+        show: false,
+        ready: false,
+        message: null,
+      },
+    }),
+  },
   approveLatestNegotiationAction: {
     type: Object,
     default: null,
@@ -156,6 +184,7 @@ const {
   offerAction,
   marketPreview,
   reportPreparation,
+  physicalReport,
   approveLatestNegotiationAction,
   paymentVerification,
   revisionWorkspace,
@@ -174,6 +203,12 @@ const finalReportForm = useForm({
 const reportConfigForm = useForm({
   report_reviewer_signer_id: props.reportPreparation?.selected_review_signer_id ? String(props.reportPreparation.selected_review_signer_id) : '',
   report_public_appraiser_signer_id: props.reportPreparation?.selected_public_appraiser_signer_id ? String(props.reportPreparation.selected_public_appraiser_signer_id) : '',
+});
+const physicalReportForm = useForm({
+  action: 'save_details',
+  courier: props.physicalReport?.courier ?? '',
+  tracking_number: props.physicalReport?.tracking_number ?? '',
+  notes: props.physicalReport?.notes ?? '',
 });
 
 const negotiationFilters = reactive({
@@ -312,6 +347,46 @@ const paymentStatusLabel = (status) => {
   }
 };
 
+const physicalReportWorkspace = computed(() => physicalReport.value?.workspace ?? {
+  show: false,
+  ready: false,
+  message: null,
+});
+
+const physicalReportStateTone = computed(() => {
+  switch (physicalReport.value?.state) {
+    case 'delivered':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-900';
+    case 'shipped':
+      return 'border-sky-200 bg-sky-50 text-sky-900';
+    case 'printed':
+    case 'ready_to_print':
+      return 'border-amber-200 bg-amber-50 text-amber-900';
+    default:
+      return 'border-slate-200 bg-slate-50 text-slate-700';
+  }
+});
+
+const canMarkPhysicalPrinted = computed(() => {
+  return Boolean(physicalReportWorkspace.value?.ready && !physicalReport.value?.printed_at);
+});
+
+const canMarkPhysicalShipped = computed(() => {
+  return Boolean(
+    physicalReportWorkspace.value?.ready
+    && physicalReport.value?.printed_at
+    && !physicalReport.value?.shipped_at
+  );
+});
+
+const canMarkPhysicalDelivered = computed(() => {
+  return Boolean(
+    physicalReportWorkspace.value?.ready
+    && physicalReport.value?.shipped_at
+    && !physicalReport.value?.delivered_at
+  );
+});
+
 const isImageFile = (file) => String(file?.mime || '').startsWith('image/');
 
 const openRevisionFilePreview = (file, label) => {
@@ -400,6 +475,22 @@ const submitCancellation = () => {
     preserveScroll: true,
     onSuccess: () => {
       closeCancellationDialog();
+    },
+  });
+};
+
+const submitPhysicalReport = (action) => {
+  if (!physicalReport.value?.update_url || physicalReportForm.processing) {
+    return;
+  }
+
+  physicalReportForm.transform((data) => ({
+    ...data,
+    action,
+  })).post(physicalReport.value.update_url, {
+    preserveScroll: true,
+    onFinish: () => {
+      physicalReportForm.transform((data) => data);
     },
   });
 };
@@ -820,6 +911,12 @@ const submitRevisionItem = () => {
                 <p class="mt-2 text-sm text-slate-900">{{ record.report_type_label }}</p>
               </div>
               <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Format Pengiriman</p>
+                <p class="mt-2 text-sm text-slate-900">
+                  {{ physicalReport.report_format_label || (record.report_format === 'both' ? 'Digital + Hard Copy' : 'Digital') }}
+                </p>
+              </div>
+              <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Guideline</p>
                 <p class="mt-2 text-sm text-slate-900">{{ record.guideline_set }}</p>
               </div>
@@ -830,6 +927,10 @@ const submitRevisionItem = () => {
               <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Tanggal Verifikasi</p>
                 <p class="mt-2 text-sm text-slate-900">{{ formatDateTime(record.verified_at) }}</p>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Jumlah Hard Copy</p>
+                <p class="mt-2 text-sm text-slate-900">{{ record.physical_copies_count ? `${record.physical_copies_count} copy` : '-' }}</p>
               </div>
               <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Klien</p>
@@ -1607,6 +1708,154 @@ const submitRevisionItem = () => {
               <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Email</p>
                 <p class="mt-1">{{ requester.email }}</p>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nomor Telepon</p>
+                <p class="mt-1">{{ requester.phone_number || '-' }}</p>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">WhatsApp</p>
+                <p class="mt-1">{{ requester.whatsapp_number || '-' }}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card v-if="activeTab === 'ringkasan' && physicalReportWorkspace.show">
+            <CardHeader>
+              <CardTitle>Pengiriman Hard Copy</CardTitle>
+              <CardDescription>
+                Workspace manual untuk mencatat cetak, resi, dan status akhir pengiriman laporan fisik.
+              </CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-5">
+              <div
+                class="rounded-2xl border px-4 py-4"
+                :class="physicalReportStateTone"
+              >
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-widest">Status Pengiriman</p>
+                    <p class="text-base font-semibold">{{ physicalReport.state_label }}</p>
+                    <p class="text-sm">
+                      {{ physicalReport.state_description || physicalReportWorkspace.message || 'Pengiriman hard copy sedang dipantau secara manual oleh admin.' }}
+                    </p>
+                  </div>
+                  <Badge variant="outline" class="bg-white/70">
+                    {{ physicalReport.copies_count || 0 }} copy
+                  </Badge>
+                </div>
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-2">
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Penerima</p>
+                  <p class="mt-2 text-sm font-medium text-slate-950">{{ physicalReport.delivery_recipient_name || '-' }}</p>
+                  <p class="mt-1 text-sm text-slate-600">{{ physicalReport.delivery_recipient_phone || '-' }}</p>
+                </div>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Alamat Pengiriman</p>
+                  <p class="mt-2 whitespace-pre-line text-sm text-slate-700">{{ physicalReport.delivery_address || '-' }}</p>
+                </div>
+              </div>
+
+              <div
+                v-if="physicalReportWorkspace.message"
+                class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+              >
+                {{ physicalReportWorkspace.message }}
+              </div>
+
+              <div v-else class="space-y-4">
+                <div class="grid gap-4 md:grid-cols-2">
+                  <div class="space-y-2">
+                    <Label for="physical_report_courier">Kurir</Label>
+                    <Input
+                      id="physical_report_courier"
+                      v-model="physicalReportForm.courier"
+                      placeholder="Contoh: JNE, J&T, SiCepat"
+                    />
+                    <p v-if="physicalReportForm.errors.courier" class="text-xs text-rose-600">
+                      {{ physicalReportForm.errors.courier }}
+                    </p>
+                  </div>
+
+                  <div class="space-y-2">
+                    <Label for="physical_report_tracking_number">Nomor Resi</Label>
+                    <Input
+                      id="physical_report_tracking_number"
+                      v-model="physicalReportForm.tracking_number"
+                      placeholder="Masukkan nomor resi pengiriman"
+                    />
+                    <p v-if="physicalReportForm.errors.tracking_number" class="text-xs text-rose-600">
+                      {{ physicalReportForm.errors.tracking_number }}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <Label for="physical_report_notes">Catatan Pengiriman</Label>
+                  <Textarea
+                    id="physical_report_notes"
+                    v-model="physicalReportForm.notes"
+                    rows="4"
+                    placeholder="Contoh: dikirim melalui pickup sore, paket diasuransikan, atau ada instruksi khusus penerima."
+                  />
+                  <p v-if="physicalReportForm.errors.notes" class="text-xs text-rose-600">
+                    {{ physicalReportForm.errors.notes }}
+                  </p>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-3">
+                  <div class="rounded-2xl border bg-white p-4">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dicetak</p>
+                    <p class="mt-2 text-sm font-medium text-slate-950">{{ formatDateTime(physicalReport.printed_at) }}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ physicalReport.printed_by_name || 'Belum dicatat' }}</p>
+                  </div>
+                  <div class="rounded-2xl border bg-white p-4">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dikirim</p>
+                    <p class="mt-2 text-sm font-medium text-slate-950">{{ formatDateTime(physicalReport.shipped_at) }}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ physicalReport.courier || 'Kurir belum diisi' }}</p>
+                  </div>
+                  <div class="rounded-2xl border bg-white p-4">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Diterima</p>
+                    <p class="mt-2 text-sm font-medium text-slate-950">{{ formatDateTime(physicalReport.delivered_at) }}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ physicalReport.tracking_number || 'Resi belum diisi' }}</p>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    :disabled="physicalReportForm.processing"
+                    @click="submitPhysicalReport('save_details')"
+                  >
+                    Simpan Detail
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    :disabled="!canMarkPhysicalPrinted || physicalReportForm.processing"
+                    @click="submitPhysicalReport('mark_printed')"
+                  >
+                    Tandai Dicetak
+                  </Button>
+                  <Button
+                    type="button"
+                    :disabled="!canMarkPhysicalShipped || physicalReportForm.processing"
+                    @click="submitPhysicalReport('mark_shipped')"
+                  >
+                    Tandai Dikirim
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    :disabled="!canMarkPhysicalDelivered || physicalReportForm.processing"
+                    @click="submitPhysicalReport('mark_delivered')"
+                  >
+                    Tandai Diterima
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -4,6 +4,7 @@ namespace App\Services\Customer\Payloads;
 
 use App\Enums\ReportTypeEnum;
 use App\Models\AppraisalRequest;
+use App\Services\AppraisalPhysicalReportSummaryBuilder;
 use App\Services\AppraisalRequestCancellationService;
 use App\Services\Payments\MidtransSnapService;
 use App\Services\Revisions\AppraisalRequestRevisionSubmissionService;
@@ -16,6 +17,7 @@ class CustomerAppraisalTrackingBuilder
         private readonly AppraisalStatusTimelineBuilder $statusTimelineBuilder,
         private readonly AppraisalPreviewStateBuilder $previewStateBuilder,
         private readonly AppraisalProgressSummaryBuilder $progressSummaryBuilder,
+        private readonly AppraisalPhysicalReportSummaryBuilder $physicalReportSummaryBuilder,
         private readonly MidtransSnapService $midtransSnapService,
         private readonly AppraisalRequestRevisionSubmissionService $revisionSubmissionService,
         private readonly AppraisalRequestCancellationService $cancellationService,
@@ -32,6 +34,7 @@ class CustomerAppraisalTrackingBuilder
             ])
             ->with([
                 'cancelledBy:id,name',
+                'physicalReportPrintedBy:id,name',
                 'latestCancellationRequest' => function ($query): void {
                     $query->select([
                         'appraisal_request_cancellations.id',
@@ -101,6 +104,7 @@ class CustomerAppraisalTrackingBuilder
                     $statusTimeline,
                     $reportPdfUrl
                 ),
+                'physical_report' => $this->physicalReportSummaryBuilder->build($record),
                 'status_timeline' => $statusTimeline,
                 'tracking_page_url' => route('appraisal.tracking.page', ['id' => $record->id]),
                 'tracking_context' => [

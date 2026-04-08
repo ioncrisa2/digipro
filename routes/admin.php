@@ -46,6 +46,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::post('/{appraisalRequest}/revision-items/{revisionItem}/reject', [AppraisalRequestWorkflowController::class, 'rejectRevisionItem'])->name('revision-items.reject');
                 Route::post('/{appraisalRequest}/contract-signed', [AppraisalRequestWorkflowController::class, 'markContractSigned'])->name('actions.contract-signed');
                 Route::post('/{appraisalRequest}/verify-payment', [AppraisalRequestWorkflowController::class, 'verifyPayment'])->name('actions.verify-payment');
+                Route::post('/{appraisalRequest}/physical-report', [AppraisalRequestWorkflowController::class, 'updatePhysicalReport'])->name('actions.physical-report.update');
                 Route::post('/{appraisalRequest}/send-offer', [AppraisalRequestWorkflowController::class, 'sendOffer'])->name('actions.send-offer');
                 Route::post('/{appraisalRequest}/approve-latest-negotiation', [AppraisalRequestWorkflowController::class, 'approveLatestNegotiation'])->name('actions.approve-latest-negotiation');
                 Route::get('/{appraisalRequest}/report-draft', [AppraisalRequestWorkflowController::class, 'downloadReportDraft'])->name('actions.report-draft');

@@ -8,6 +8,7 @@ use App\Enums\ContractStatusEnum;
 use App\Enums\ReportTypeEnum;
 use App\Enums\ValuationObjectiveEnum;
 use App\Models\AppraisalRequest;
+use App\Services\AppraisalPhysicalReportSummaryBuilder;
 use App\Services\AppraisalRequestCancellationService;
 use App\Services\Payments\MidtransSnapService;
 use App\Services\Revisions\AppraisalRequestRevisionSubmissionService;
@@ -23,6 +24,7 @@ class CustomerAppraisalShowBuilder
         private readonly AppraisalStatusTimelineBuilder $statusTimelineBuilder,
         private readonly AppraisalPreviewStateBuilder $previewStateBuilder,
         private readonly AppraisalProgressSummaryBuilder $progressSummaryBuilder,
+        private readonly AppraisalPhysicalReportSummaryBuilder $physicalReportSummaryBuilder,
         private readonly MidtransSnapService $midtransSnapService,
         private readonly AppraisalRequestRevisionSubmissionService $revisionSubmissionService,
         private readonly AppraisalRequestCancellationService $cancellationService,
@@ -40,6 +42,7 @@ class CustomerAppraisalShowBuilder
             ->with([
                 'user:id,name,email,phone_number,whatsapp_number',
                 'cancelledBy:id,name',
+                'physicalReportPrintedBy:id,name',
                 'latestCancellationRequest' => function ($query): void {
                     $query->select([
                         'appraisal_request_cancellations.id',
@@ -231,6 +234,7 @@ class CustomerAppraisalShowBuilder
                 'preview_page_url' => $previewState['page_url'],
                 'appeal_remaining' => $previewState['appeal_remaining'],
                 'latest_preview_version' => $previewState['version'],
+                'physical_report' => $this->physicalReportSummaryBuilder->build($record),
                 'progress_summary' => $this->progressSummaryBuilder->build(
                     $record,
                     $revisionSummary,
