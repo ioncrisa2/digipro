@@ -172,6 +172,7 @@
 @php
     $idr = fn ($value) => 'Rp ' . number_format((int) ($value ?? 0), 0, ',', '.');
     $gateway = is_array($invoice['gateway_details'] ?? null) ? $invoice['gateway_details'] : null;
+    $billing = is_array($invoice['billing_summary'] ?? null) ? $invoice['billing_summary'] : [];
 @endphp
 
 <div class="page">
@@ -232,15 +233,39 @@
         <tbody>
         <tr>
             <td>1</td>
-            <td>Biaya layanan penilaian properti - {{ $invoice['request_number'] ?? '-' }}</td>
-            <td class="amount-col">{{ $idr($invoice['amount'] ?? 0) }}</td>
+            <td>Nilai jasa penilaian properti (DPP) - {{ $invoice['request_number'] ?? '-' }}</td>
+            <td class="amount-col">{{ $idr($billing['nilai_jasa_dpp'] ?? 0) }}</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td>PPN 11%</td>
+            <td class="amount-col">{{ $idr($billing['nilai_ppn'] ?? 0) }}</td>
         </tr>
         <tr class="total-row">
-            <td colspan="2" style="text-align: right;">Total Dibayar</td>
-            <td class="amount-col">{{ $idr($invoice['amount'] ?? 0) }}</td>
+            <td colspan="2" style="text-align: right;">Total Tagihan</td>
+            <td class="amount-col">{{ $idr($billing['total_tagihan'] ?? ($invoice['amount'] ?? 0)) }}</td>
         </tr>
         </tbody>
     </table>
+
+    <div class="section-title">Informasi Pajak</div>
+    <div class="payment-box">
+        <div class="payment-box-title">PPh Dipotong</div>
+        <table class="payment-table">
+            <tr>
+                <td class="payment-label">Jenis PPh</td>
+                <td>: {{ $billing['jenis_pph_dipotong_label'] ?? 'PPh 23' }}</td>
+            </tr>
+            <tr>
+                <td class="payment-label">Nilai PPh Dipotong</td>
+                <td>: {{ $idr($billing['nilai_pph_dipotong'] ?? 0) }}</td>
+            </tr>
+            <tr>
+                <td class="payment-label">Total Transfer Customer</td>
+                <td>: {{ $idr($billing['total_transfer_customer'] ?? ($invoice['amount'] ?? 0)) }}</td>
+            </tr>
+        </table>
+    </div>
 
     <div class="section-title">Informasi Pembayaran</div>
     <div class="payment-box">

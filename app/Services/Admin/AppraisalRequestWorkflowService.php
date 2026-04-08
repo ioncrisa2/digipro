@@ -6,6 +6,7 @@ use App\Enums\AppraisalStatusEnum;
 use App\Enums\ContractStatusEnum;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalOfferNegotiation;
+use App\Services\Finance\AppraisalBillingService;
 use App\Notifications\AppraisalOfferNotification;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -13,7 +14,8 @@ use RuntimeException;
 class AppraisalRequestWorkflowService
 {
     public function __construct(
-        private readonly AppraisalContractNumberService $contractNumberService
+        private readonly AppraisalContractNumberService $contractNumberService,
+        private readonly AppraisalBillingService $billingService,
     ) {
     }
 
@@ -150,17 +152,22 @@ class AppraisalRequestWorkflowService
     public function resolveOfferDefaults(AppraisalRequest $record): array
     {
         $latestCounter = $this->latestCounterRequest($record);
-        $defaultFee = $record->fee_total !== null ? (int) $record->fee_total : null;
+        $defaultDpp = $record->billing_dpp_amount !== null
+            ? (int) $record->billing_dpp_amount
+            : ($record->fee_total !== null
+                ? (int) $this->billingService->deriveFromGross((int) $record->fee_total)['billing_dpp_amount']
+                : null);
 
         if (
             $this->statusValue($record) === AppraisalStatusEnum::WaitingOffer->value
             && $latestCounter?->expected_fee !== null
         ) {
-            $defaultFee = (int) $latestCounter->expected_fee;
+            $defaultDpp = (int) $this->billingService
+                ->deriveFromGross((int) $latestCounter->expected_fee)['billing_dpp_amount'];
         }
 
         return [
-            'fee_total' => $defaultFee,
+            'billing_dpp_amount' => $defaultDpp,
             'contract_sequence' => $record->contract_sequence,
             'offer_validity_days' => $record->offer_validity_days,
         ];
@@ -315,13 +322,18 @@ class AppraisalRequestWorkflowService
         $contractStatusBefore = $this->contractStatusValue($record);
         $actionType = $contractStatusBefore === ContractStatusEnum::Negotiation->value ? 'offer_revised' : 'offer_sent';
         $round = $this->countNegotiationRounds($record);
-        $feeTotal = (int) $data['fee_total'];
+        $billingPayload = $this->billingService->appraisalAttributesFromDpp(
+            (int) $data['billing_dpp_amount'],
+            $record->user
+        );
+        $feeTotal = (int) $billingPayload['billing_total_amount'];
         $contractDate = optional($record->contract_date)->toDateString() ?: now()->toDateString();
 
         DB::transaction(function () use (
             $record,
             $actorId,
             $data,
+            $billingPayload,
             $contractMeta,
             $statusBefore,
             $contractStatusBefore,
@@ -331,7 +343,7 @@ class AppraisalRequestWorkflowService
             $contractDate
         ): void {
             $record->update([
-                'fee_total' => $feeTotal,
+                ...$billingPayload,
                 'fee_has_dp' => false,
                 'fee_dp_percent' => null,
                 'contract_sequence' => $data['contract_sequence'],
@@ -385,6 +397,7 @@ class AppraisalRequestWorkflowService
         }
 
         $approvedFee = (int) $latestCounter->expected_fee;
+        $billingPayload = $this->billingService->deriveFromGross($approvedFee);
         $contractMeta = $this->contractNumberService->deriveMetadata($record->contract_sequence);
         if ($contractMeta['contract_number'] === null) {
             throw new RuntimeException('No. Penawaran wajib diisi terlebih dahulu sebelum harapan fee user bisa disetujui.');
@@ -402,6 +415,7 @@ class AppraisalRequestWorkflowService
             $latestCounter,
             $approvedFee,
             $offeredFeeBefore,
+            $billingPayload,
             $contractMeta,
             $statusBefore,
             $contractStatusBefore,
@@ -409,6 +423,7 @@ class AppraisalRequestWorkflowService
             $contractDate
         ): void {
             $record->update([
+                ...$billingPayload,
                 'fee_total' => $approvedFee,
                 'contract_office_code' => $contractMeta['contract_office_code'],
                 'contract_month' => $contractMeta['contract_month'],

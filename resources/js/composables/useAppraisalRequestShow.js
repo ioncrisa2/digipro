@@ -242,6 +242,7 @@ export function useAppraisalRequestShow(props) {
 
   const progressSummary = computed(() => req.value?.progress_summary ?? null);
   const physicalReport = computed(() => req.value?.physical_report ?? null);
+  const billingSummary = computed(() => req.value?.billing_summary ?? null);
   const recentStatusEvents = computed(() => {
     const events = req.value?.recent_status_events;
     return Array.isArray(events) ? events : [];
@@ -272,6 +273,7 @@ export function useAppraisalRequestShow(props) {
     documentWorkspace,
     progressSummary,
     physicalReport,
+    billingSummary,
     recentStatusEvents,
     trackingPageUrl,
     cancellationRequest,

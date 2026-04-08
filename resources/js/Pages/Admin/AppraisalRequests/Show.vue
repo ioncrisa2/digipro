@@ -193,7 +193,7 @@ const {
 const activeTab = ref('ringkasan');
 
 const offerForm = useForm({
-  fee_total: offerAction.value?.defaults?.fee_total ?? '',
+  billing_dpp_amount: offerAction.value?.defaults?.billing_dpp_amount ?? '',
   contract_sequence: offerAction.value?.defaults?.contract_sequence ?? '',
   offer_validity_days: offerAction.value?.defaults?.offer_validity_days ?? '',
 });
@@ -505,6 +505,12 @@ const offerContractNumberPreview = computed(() => {
 
   return `${raw.padStart(5, '0')}/AGR/DP/${month}/${year}`;
 });
+
+const offerDppValue = computed(() => Number(offerForm.billing_dpp_amount || 0));
+const offerVatValue = computed(() => Math.round(offerDppValue.value * 0.11));
+const offerGrossValue = computed(() => offerDppValue.value + offerVatValue.value);
+const offerPphValue = computed(() => Math.round(offerDppValue.value * 0.02));
+const offerNetValue = computed(() => Math.max(0, offerGrossValue.value - offerPphValue.value));
 
 const submitOffer = () => {
   if (!offerAction.value?.url) {
@@ -966,11 +972,15 @@ const submitRevisionItem = () => {
               </div>
               <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Fee</p>
-                <p class="mt-2 text-sm text-slate-900">{{ formatCurrency(record.fee_total) }}</p>
+                <p class="mt-2 text-sm text-slate-900">{{ formatCurrency(record.ringkasan_tagihan?.nilai_jasa_dpp ?? record.billing_dpp_amount ?? 0) }}</p>
               </div>
               <div>
-                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Skema Pembayaran</p>
-                <p class="mt-2 text-sm text-slate-900">Pelunasan penuh via payment gateway</p>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">PPN 11%</p>
+                <p class="mt-2 text-sm text-slate-900">{{ formatCurrency(record.ringkasan_tagihan?.nilai_ppn ?? 0) }}</p>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Tagihan</p>
+                <p class="mt-2 text-sm text-slate-900">{{ formatCurrency(record.ringkasan_tagihan?.total_tagihan ?? record.fee_total) }}</p>
               </div>
               <div>
                 <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Harapan Fee Terakhir</p>
@@ -1887,9 +1897,9 @@ const submitRevisionItem = () => {
                 </div>
                 <div class="rounded-2xl border bg-slate-50 p-4">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Penugasan</p>
-                  <p class="mt-3 text-sm font-semibold text-slate-950">{{ formatCurrency(record.fee_total) }}</p>
+                  <p class="mt-3 text-sm font-semibold text-slate-950">{{ formatCurrency(record.ringkasan_tagihan?.total_tagihan ?? record.fee_total) }}</p>
                   <p class="mt-2 text-xs text-slate-500">
-                    Pelunasan penuh via payment gateway
+                    Nilai Jasa: {{ formatCurrency(record.ringkasan_tagihan?.nilai_jasa_dpp ?? record.billing_dpp_amount ?? 0) }} · PPN 11%: {{ formatCurrency(record.ringkasan_tagihan?.nilai_ppn ?? 0) }}
                   </p>
                 </div>
                 <div class="rounded-2xl border bg-slate-50 p-4">
@@ -2222,9 +2232,9 @@ const submitRevisionItem = () => {
                 <form class="space-y-5" @submit.prevent="submitOffer">
                   <div class="grid gap-5 xl:grid-cols-2">
                     <div class="space-y-2">
-                      <Label for="offer_fee_total">Total Fee (Rp)</Label>
-                      <Input id="offer_fee_total" v-model="offerForm.fee_total" type="number" min="1" placeholder="15000000" />
-                      <p v-if="offerForm.errors.fee_total" class="text-xs text-red-500">{{ offerForm.errors.fee_total }}</p>
+                      <Label for="offer_fee_total">Nilai Jasa (DPP)</Label>
+                      <Input id="offer_fee_total" v-model="offerForm.billing_dpp_amount" type="number" min="1" placeholder="15000000" />
+                      <p v-if="offerForm.errors.billing_dpp_amount" class="text-xs text-red-500">{{ offerForm.errors.billing_dpp_amount }}</p>
                     </div>
 
                     <div class="space-y-2">
@@ -2235,7 +2245,26 @@ const submitRevisionItem = () => {
                   </div>
 
                   <div class="rounded-2xl border bg-slate-50 p-4 text-sm text-slate-700">
-                    Sistem pembayaran memakai pelunasan penuh melalui payment gateway. Penawaran yang dikirim ke user tidak lagi memakai skema DP.
+                    Sistem pembayaran memakai pelunasan penuh melalui payment gateway. Admin hanya menginput Nilai Jasa (DPP), lalu sistem menghitung PPN 11%, PPh 23 Dipotong, dan Total Transfer Customer.
+                  </div>
+
+                  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div class="rounded-2xl border bg-white p-4">
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">PPN 11%</p>
+                      <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(offerVatValue) }}</p>
+                    </div>
+                    <div class="rounded-2xl border bg-white p-4">
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Tagihan</p>
+                      <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(offerGrossValue) }}</p>
+                    </div>
+                    <div class="rounded-2xl border bg-white p-4">
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">PPh 23 Dipotong</p>
+                      <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(offerPphValue) }}</p>
+                    </div>
+                    <div class="rounded-2xl border bg-white p-4">
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Transfer Customer</p>
+                      <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(offerNetValue) }}</p>
+                    </div>
                   </div>
 
                   <div class="grid gap-5 xl:grid-cols-2">

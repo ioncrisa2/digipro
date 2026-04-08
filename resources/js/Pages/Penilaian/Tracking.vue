@@ -17,6 +17,7 @@ const props = defineProps({
 const req = computed(() => props.request ?? {});
 const progressSummary = computed(() => req.value?.progress_summary ?? null);
 const physicalReport = computed(() => req.value?.physical_report ?? null);
+const billingSummary = computed(() => req.value?.billing_summary ?? null);
 const trackingContext = computed(() => req.value?.tracking_context ?? {});
 const cancellationRequest = computed(() => req.value?.cancellation_request ?? null);
 const showPhysicalReport = computed(() => Boolean(physicalReport.value?.needs_physical_report));
@@ -24,6 +25,18 @@ const subtitle = computed(() => {
     const parts = [req.value?.report_type_label, `${req.value?.assets_count ?? 0} aset`].filter(Boolean);
     return parts.join(" | ");
 });
+
+const formatIDR = (value) => {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) {
+        return "-";
+    }
+
+    return new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+    }).format(amount);
+};
 
 const goBack = () => {
     if (trackingContext.value?.back_url) {
@@ -72,6 +85,44 @@ const goBack = () => {
                 </CardHeader>
                 <CardContent>
                     <AppraisalProgressMilestone v-if="progressSummary" :summary="progressSummary" />
+                </CardContent>
+            </Card>
+
+            <Card v-if="billingSummary">
+                <CardHeader class="pb-3">
+                    <CardTitle class="text-base">Ringkasan Tagihan & Pajak</CardTitle>
+                    <CardDescription>
+                        Status dokumen finance dan breakdown pembayaran yang terkait dengan pekerjaan ini.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                        <div class="rounded-xl border bg-slate-50/70 p-3"><div class="text-xs text-slate-500">Nilai Jasa</div><div class="mt-1 font-semibold text-slate-950">{{ formatIDR(billingSummary.nilai_jasa_dpp) }}</div></div>
+                        <div class="rounded-xl border bg-slate-50/70 p-3"><div class="text-xs text-slate-500">PPN 11%</div><div class="mt-1 font-semibold text-slate-950">{{ formatIDR(billingSummary.nilai_ppn) }}</div></div>
+                        <div class="rounded-xl border bg-slate-50/70 p-3"><div class="text-xs text-slate-500">Total Tagihan</div><div class="mt-1 font-semibold text-slate-950">{{ formatIDR(billingSummary.total_tagihan) }}</div></div>
+                        <div class="rounded-xl border bg-slate-50/70 p-3"><div class="text-xs text-slate-500">PPh 23 Dipotong</div><div class="mt-1 font-semibold text-slate-950">{{ formatIDR(billingSummary.nilai_pph_dipotong) }}</div></div>
+                        <div class="rounded-xl border bg-slate-50/70 p-3"><div class="text-xs text-slate-500">Total yang Ditransfer</div><div class="mt-1 font-semibold text-slate-950">{{ formatIDR(billingSummary.total_transfer_customer) }}</div></div>
+                    </div>
+
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <div class="rounded-xl border p-3">
+                            <div class="text-xs text-slate-500">Nomor Dokumen</div>
+                            <div class="mt-2 space-y-1 text-sm text-slate-950">
+                                <div>Invoice: {{ billingSummary.nomor_invoice || "-" }}</div>
+                                <div>Faktur Pajak: {{ billingSummary.nomor_faktur_pajak || "-" }}</div>
+                                <div>Bukti Potong: {{ billingSummary.nomor_bukti_potong || "-" }}</div>
+                            </div>
+                        </div>
+                        <div class="rounded-xl border p-3">
+                            <div class="text-xs text-slate-500">Status Dokumen Keuangan</div>
+                            <div class="mt-2 font-medium text-slate-950">{{ billingSummary.status_dokumen_keuangan_label || "-" }}</div>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <Button v-if="billingSummary.dokumen_invoice_url" variant="outline" as-child><a :href="billingSummary.dokumen_invoice_url" target="_blank" rel="noreferrer">Buka Invoice</a></Button>
+                                <Button v-if="billingSummary.dokumen_faktur_pajak_url" variant="outline" as-child><a :href="billingSummary.dokumen_faktur_pajak_url" target="_blank" rel="noreferrer">Buka Faktur Pajak</a></Button>
+                                <Button v-if="billingSummary.dokumen_bukti_potong_url" variant="outline" as-child><a :href="billingSummary.dokumen_bukti_potong_url" target="_blank" rel="noreferrer">Buka Bukti Potong</a></Button>
+                            </div>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
 

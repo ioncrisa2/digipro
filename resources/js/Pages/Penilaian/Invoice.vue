@@ -45,6 +45,7 @@ const invoicePdfUrl = computed(() => {
 });
 
 const gatewayDetails = computed(() => props.payment?.gateway_details ?? null);
+const billingSummary = computed(() => props.payment?.billing_summary ?? props.request?.billing_summary ?? {});
 
 const formatIDR = (value) => {
     const n = Number(value);
@@ -161,8 +162,16 @@ const downloadInvoicePdf = () => {
                 </CardHeader>
                 <CardContent class="space-y-3">
                     <div class="rounded-xl border p-4">
-                        <div class="text-xs text-muted-foreground">Total Dibayar</div>
-                        <div class="mt-1 text-2xl font-semibold">{{ formatIDR(payment.amount ?? request.fee_total) }}</div>
+                        <div class="text-xs text-muted-foreground">Total Tagihan</div>
+                        <div class="mt-1 text-2xl font-semibold">{{ formatIDR(billingSummary.total_tagihan ?? payment.amount ?? request.fee_total) }}</div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                        <div class="rounded-xl border p-3"><div class="text-xs text-muted-foreground">Nilai Jasa</div><div class="font-semibold">{{ formatIDR(billingSummary.nilai_jasa_dpp) }}</div></div>
+                        <div class="rounded-xl border p-3"><div class="text-xs text-muted-foreground">PPN 11%</div><div class="font-semibold">{{ formatIDR(billingSummary.nilai_ppn) }}</div></div>
+                        <div class="rounded-xl border p-3"><div class="text-xs text-muted-foreground">Total Tagihan</div><div class="font-semibold">{{ formatIDR(billingSummary.total_tagihan ?? payment.amount ?? request.fee_total) }}</div></div>
+                        <div class="rounded-xl border p-3"><div class="text-xs text-muted-foreground">PPh 23 Dipotong</div><div class="font-semibold">{{ formatIDR(billingSummary.nilai_pph_dipotong) }}</div></div>
+                        <div class="rounded-xl border p-3"><div class="text-xs text-muted-foreground">Total yang Ditransfer</div><div class="font-semibold">{{ formatIDR(billingSummary.total_transfer_customer) }}</div></div>
                     </div>
 
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-3">

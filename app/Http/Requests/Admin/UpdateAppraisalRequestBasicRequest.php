@@ -24,7 +24,7 @@ class UpdateAppraisalRequestBasicRequest extends FormRequest
             'contract_status' => ['nullable', Rule::enum(ContractStatusEnum::class)],
             'valuation_duration_days' => ['nullable', 'integer', 'min:1'],
             'offer_validity_days' => ['nullable', 'integer', 'min:1'],
-            'fee_total' => ['nullable', 'integer', 'min:1'],
+            'billing_dpp_amount' => ['nullable', 'integer', 'min:1'],
             'user_request_note' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
         ];
@@ -41,7 +41,7 @@ class UpdateAppraisalRequestBasicRequest extends FormRequest
             'contract_status' => $normalize($this->input('contract_status')),
             'valuation_duration_days' => $normalize($this->input('valuation_duration_days')),
             'offer_validity_days' => $normalize($this->input('offer_validity_days')),
-            'fee_total' => $normalize($this->input('fee_total')),
+            'billing_dpp_amount' => $normalize($this->input('billing_dpp_amount')),
         ]);
     }
 }

@@ -37,6 +37,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'billing_village_id',
         'billing_postal_code',
         'billing_address_detail',
+        'billing_npwp',
+        'billing_nik',
+        'billing_email',
         'password',
         'avatar_url'
     ];

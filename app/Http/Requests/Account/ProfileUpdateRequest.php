@@ -34,6 +34,9 @@ class ProfileUpdateRequest extends FormRequest
             'billing_village_id' => ['nullable', 'string', 'size:10', 'exists:villages,id'],
             'billing_postal_code' => ['nullable', 'string', 'max:10'],
             'billing_address_detail' => ['nullable', 'string'],
+            'billing_npwp' => ['nullable', 'string', 'max:40'],
+            'billing_nik' => ['nullable', 'string', 'max:40'],
+            'billing_email' => ['nullable', 'email', 'max:255'],
         ];
     }
 

@@ -42,6 +42,7 @@ const {
     documentWorkspace,
     progressSummary,
     physicalReport,
+    billingSummary,
     recentStatusEvents,
     trackingPageUrl,
     cancellationRequest,
@@ -227,6 +228,84 @@ const submitCancellationRequest = () => {
                 </CardHeader>
                 <CardContent>
                     <AppraisalPhysicalDeliveryStatus :summary="physicalReport" />
+                </CardContent>
+            </Card>
+
+            <Card v-if="billingSummary" class="border-slate-200">
+                <CardHeader class="pb-3">
+                    <CardTitle class="text-base">Ringkasan Tagihan & Pajak</CardTitle>
+                    <CardDescription>
+                        Breakdown tagihan jasa, PPN, PPh dipotong, dan dokumen keuangan yang diterbitkan admin finance.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                        <div class="rounded-xl border bg-slate-50/60 p-3">
+                            <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Nilai Jasa</div>
+                            <div class="mt-2 text-base font-semibold text-slate-950">{{ formatIDR(billingSummary.nilai_jasa_dpp) }}</div>
+                        </div>
+                        <div class="rounded-xl border bg-slate-50/60 p-3">
+                            <div class="text-xs uppercase tracking-[0.18em] text-slate-500">PPN 11%</div>
+                            <div class="mt-2 text-base font-semibold text-slate-950">{{ formatIDR(billingSummary.nilai_ppn) }}</div>
+                        </div>
+                        <div class="rounded-xl border bg-slate-50/60 p-3">
+                            <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Total Tagihan</div>
+                            <div class="mt-2 text-base font-semibold text-slate-950">{{ formatIDR(billingSummary.total_tagihan) }}</div>
+                        </div>
+                        <div class="rounded-xl border bg-slate-50/60 p-3">
+                            <div class="text-xs uppercase tracking-[0.18em] text-slate-500">PPh 23 Dipotong</div>
+                            <div class="mt-2 text-base font-semibold text-slate-950">{{ formatIDR(billingSummary.nilai_pph_dipotong) }}</div>
+                        </div>
+                        <div class="rounded-xl border bg-slate-50/60 p-3">
+                            <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Total yang Ditransfer</div>
+                            <div class="mt-2 text-base font-semibold text-slate-950">{{ formatIDR(billingSummary.total_transfer_customer) }}</div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)]">
+                        <div class="rounded-2xl border p-4">
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <div>
+                                    <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Nomor Invoice</div>
+                                    <div class="mt-1 text-sm font-medium text-slate-950">{{ billingSummary.nomor_invoice || "-" }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Tanggal Invoice</div>
+                                    <div class="mt-1 text-sm font-medium text-slate-950">{{ billingSummary.tanggal_invoice || "-" }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Nomor Faktur Pajak</div>
+                                    <div class="mt-1 text-sm font-medium text-slate-950">{{ billingSummary.nomor_faktur_pajak || "-" }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Nomor Bukti Potong</div>
+                                    <div class="mt-1 text-sm font-medium text-slate-950">{{ billingSummary.nomor_bukti_potong || "-" }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border p-4">
+                            <div class="space-y-3">
+                                <div>
+                                    <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Dokumen Finance</div>
+                                    <div class="mt-1 text-sm text-slate-600">
+                                        Invoice tagihan, faktur pajak, dan bukti potong akan muncul di sini setelah admin finance melengkapinya.
+                                    </div>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <Button v-if="billingSummary.dokumen_invoice_url" variant="outline" as-child>
+                                        <a :href="billingSummary.dokumen_invoice_url" target="_blank" rel="noreferrer">Buka Invoice</a>
+                                    </Button>
+                                    <Button v-if="billingSummary.dokumen_faktur_pajak_url" variant="outline" as-child>
+                                        <a :href="billingSummary.dokumen_faktur_pajak_url" target="_blank" rel="noreferrer">Buka Faktur Pajak</a>
+                                    </Button>
+                                    <Button v-if="billingSummary.dokumen_bukti_potong_url" variant="outline" as-child>
+                                        <a :href="billingSummary.dokumen_bukti_potong_url" target="_blank" rel="noreferrer">Buka Bukti Potong</a>
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -509,7 +588,7 @@ const submitCancellationRequest = () => {
                                 </div>
                                 <div>
                                     <div class="text-xs text-muted-foreground">Fee</div>
-                                    <div class="font-medium">{{ req.fee_total != null ? formatIDR(req.fee_total) : "-" }}</div>
+                                    <div class="font-medium">{{ billingSummary?.total_tagihan != null ? formatIDR(billingSummary.total_tagihan) : (req.fee_total != null ? formatIDR(req.fee_total) : "-") }}</div>
                                 </div>
                                 <div>
                                     <div class="text-xs text-muted-foreground">Tidak Dijaminkan</div>

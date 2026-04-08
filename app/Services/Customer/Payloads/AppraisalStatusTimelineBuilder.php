@@ -264,6 +264,48 @@ class AppraisalStatusTimelineBuilder
             }
         }
 
+        if ($record->billing_invoice_date) {
+            $invoiceNumber = filled($record->billing_invoice_number)
+                ? ' Nomor invoice: ' . $record->billing_invoice_number . '.'
+                : '';
+
+            $append(
+                'billing_invoice_issued',
+                'Invoice Tagihan Terbit',
+                'Admin finance menerbitkan invoice tagihan untuk pekerjaan ini.' . $invoiceNumber,
+                $record->billing_invoice_date,
+                'info'
+            );
+        }
+
+        if ($record->tax_invoice_date) {
+            $taxInvoiceNumber = filled($record->tax_invoice_number)
+                ? ' Nomor faktur: ' . $record->tax_invoice_number . '.'
+                : '';
+
+            $append(
+                'tax_invoice_recorded',
+                'Faktur Pajak Terinput',
+                'Admin finance mencatat faktur pajak untuk transaksi ini.' . $taxInvoiceNumber,
+                $record->tax_invoice_date,
+                'info'
+            );
+        }
+
+        if ($record->withholding_receipt_date) {
+            $receiptNumber = filled($record->withholding_receipt_number)
+                ? ' Nomor bukti potong: ' . $record->withholding_receipt_number . '.'
+                : '';
+
+            $append(
+                'withholding_receipt_recorded',
+                'Bukti Potong Terinput',
+                'Admin finance mencatat bukti potong PPh untuk transaksi ini.' . $receiptNumber,
+                $record->withholding_receipt_date,
+                'info'
+            );
+        }
+
         if ($record->report_generated_at) {
             $append(
                 'report_ready',

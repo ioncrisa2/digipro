@@ -44,10 +44,17 @@ const form = useForm({
   contract_status: props.record.contract_status ?? '',
   valuation_duration_days: props.record.valuation_duration_days ?? '',
   offer_validity_days: props.record.offer_validity_days ?? '',
-  fee_total: props.record.fee_total ?? '',
+  billing_dpp_amount: props.record.billing_dpp_amount ?? '',
   user_request_note: props.record.user_request_note ?? '',
   notes: props.record.notes ?? '',
 });
+
+const formatIDR = (value) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(Number(value || 0));
+const billingDpp = computed(() => Number(form.billing_dpp_amount || 0));
+const billingVat = computed(() => Math.round(billingDpp.value * 0.11));
+const billingGross = computed(() => billingDpp.value + billingVat.value);
+const billingPph = computed(() => Math.round(billingDpp.value * 0.02));
+const billingNet = computed(() => Math.max(0, billingGross.value - billingPph.value));
 
 const contractNumberPreview = computed(() => {
   const raw = String(form.contract_sequence ?? '').replace(/\D+/g, '');
@@ -78,7 +85,7 @@ const submit = () => {
           <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Edit Request</p>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{{ record.request_number }}</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Perbarui informasi dasar, kontrak, dan fee permohonan penilaian dari workspace admin.
+            Perbarui informasi dasar, kontrak, dan nilai jasa permohonan penilaian dari workspace admin.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -210,21 +217,39 @@ const submit = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Fee Penilaian</CardTitle>
-            <CardDescription>Bagian ini hanya menyimpan total fee pelunasan penuh via payment gateway.</CardDescription>
+            <CardTitle>Ringkasan Tagihan</CardTitle>
+            <CardDescription>Input utama admin adalah Nilai Jasa (DPP). Sistem menghitung PPN 11%, PPh 23 Dipotong, dan Total Transfer Customer secara otomatis.</CardDescription>
           </CardHeader>
           <CardContent class="space-y-6">
-            <div class="grid gap-6 md:grid-cols-2">
+            <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
               <div class="space-y-2">
-                <Label for="fee_total">Total Fee (Rp)</Label>
-                <Input id="fee_total" v-model="form.fee_total" type="number" min="1" placeholder="15000000" />
-                <p v-if="form.errors.fee_total" class="text-xs text-red-500">{{ form.errors.fee_total }}</p>
+                <Label for="billing_dpp_amount">Nilai Jasa (DPP)</Label>
+                <Input id="billing_dpp_amount" v-model="form.billing_dpp_amount" type="number" min="1" placeholder="15000000" />
+                <p v-if="form.errors.billing_dpp_amount" class="text-xs text-red-500">{{ form.errors.billing_dpp_amount }}</p>
               </div>
-              <div class="space-y-2">
-                <Label>Skema Pembayaran</Label>
-                <div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900">
-                  Pelunasan penuh via payment gateway
-                </div>
+              <div class="space-y-2"><Label>PPN 11%</Label><div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900">{{ formatIDR(billingVat) }}</div></div>
+              <div class="space-y-2"><Label>Total Tagihan</Label><div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900">{{ formatIDR(billingGross) }}</div></div>
+              <div class="space-y-2"><Label>PPh 23 Dipotong</Label><div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900">{{ formatIDR(billingPph) }}</div></div>
+              <div class="space-y-2"><Label>Total Transfer Customer</Label><div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900">{{ formatIDR(billingNet) }}</div></div>
+            </div>
+            <div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              Nilai Jasa (DPP) adalah nilai jasa sebelum pajak. Total Tagihan dihitung dari DPP + PPN, lalu Total Transfer Customer dikurangi PPh 23 Dipotong.
+            </div>
+            <div class="rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900">
+              Pelunasan penuh via payment gateway
+            </div>
+            <div v-if="record.ringkasan_tagihan" class="grid gap-4 md:grid-cols-3">
+              <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Nomor Invoice Saat Ini</p>
+                <p class="mt-2 font-medium text-slate-950">{{ record.ringkasan_tagihan.nomor_invoice || '-' }}</p>
+              </div>
+              <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Status Dokumen</p>
+                <p class="mt-2 font-medium text-slate-950">{{ record.ringkasan_tagihan.status_dokumen_keuangan_label || '-' }}</p>
+              </div>
+              <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Nama Tagihan</p>
+                <p class="mt-2 font-medium text-slate-950">{{ record.ringkasan_tagihan.nama_tagihan || '-' }}</p>
               </div>
             </div>
           </CardContent>

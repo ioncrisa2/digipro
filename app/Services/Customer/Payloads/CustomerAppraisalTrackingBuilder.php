@@ -6,6 +6,7 @@ use App\Enums\ReportTypeEnum;
 use App\Models\AppraisalRequest;
 use App\Services\AppraisalPhysicalReportSummaryBuilder;
 use App\Services\AppraisalRequestCancellationService;
+use App\Services\Finance\AppraisalBillingService;
 use App\Services\Payments\MidtransSnapService;
 use App\Services\Revisions\AppraisalRequestRevisionSubmissionService;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +22,7 @@ class CustomerAppraisalTrackingBuilder
         private readonly MidtransSnapService $midtransSnapService,
         private readonly AppraisalRequestRevisionSubmissionService $revisionSubmissionService,
         private readonly AppraisalRequestCancellationService $cancellationService,
+        private readonly AppraisalBillingService $billingService,
     ) {
     }
 
@@ -60,6 +62,7 @@ class CustomerAppraisalTrackingBuilder
         $previewState = $this->previewStateBuilder->build($record);
         $revisionSummary = $this->revisionSubmissionService->buildSummary($record);
         $latestPayment = $record->payments->sortByDesc('id')->first();
+        $billingSummary = $this->billingService->summary($record, $latestPayment);
         $reportPdfUrl = null;
         $latestCancellationRequest = $record->latestCancellationRequest;
 
@@ -117,6 +120,7 @@ class CustomerAppraisalTrackingBuilder
                     'status_label' => $this->midtransSnapService->paymentStatusLabel($latestPayment),
                     'paid_at' => optional($latestPayment?->paid_at)->toDateTimeString(),
                 ],
+                'billing_summary' => $billingSummary,
                 'preview_state' => [
                     'has_preview' => (bool) ($previewState['has_preview'] ?? false),
                     'status' => $previewState['status'] ?? null,

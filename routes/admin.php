@@ -58,10 +58,16 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
             ->prefix('keuangan')
             ->name('finance.')
             ->group(function (): void {
+                Route::get('/tagihan', [FinanceController::class, 'billingsIndex'])->name('billings.index');
+                Route::get('/tagihan/{appraisalRequest}', [FinanceController::class, 'billingsShow'])->name('billings.show');
+                Route::get('/tagihan/{appraisalRequest}/edit', [FinanceController::class, 'billingsEdit'])->name('billings.edit');
+                Route::put('/tagihan/{appraisalRequest}', [FinanceController::class, 'billingsUpdate'])->name('billings.update');
                 Route::get('/pembayaran', [FinanceController::class, 'paymentsIndex'])->name('payments.index');
                 Route::get('/pembayaran/{payment}', [FinanceController::class, 'paymentsShow'])->name('payments.show');
                 Route::get('/pembayaran/{payment}/edit', [FinanceController::class, 'paymentsEdit'])->name('payments.edit');
                 Route::put('/pembayaran/{payment}', [FinanceController::class, 'paymentsUpdate'])->name('payments.update');
+                Route::get('/faktur-pajak', [FinanceController::class, 'taxInvoicesIndex'])->name('tax-invoices.index');
+                Route::get('/bukti-potong', [FinanceController::class, 'withholdingReceiptsIndex'])->name('withholding-receipts.index');
             });
 
         Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_CONTENT)

@@ -3,6 +3,7 @@
 namespace App\Services\Customer\Payloads;
 
 use App\Models\AppraisalRequest;
+use App\Services\Finance\AppraisalBillingService;
 use App\Services\Revisions\AppraisalRevisionFileResolver;
 use Illuminate\Support\Facades\Storage;
 
@@ -11,6 +12,7 @@ class AppraisalDocumentCatalogBuilder
     public function __construct(
         private readonly AppraisalPayloadFormatter $formatter,
         private readonly AppraisalRevisionFileResolver $fileResolver,
+        private readonly AppraisalBillingService $billingService,
     ) {
     }
 
@@ -177,28 +179,74 @@ class AppraisalDocumentCatalogBuilder
 
     private function buildBillingDocumentEntries(AppraisalRequest $record, mixed $latestPayment): array
     {
-        if (! $latestPayment || $latestPayment->status !== 'paid') {
-            return [];
+        $entries = [];
+
+        if ($latestPayment && $latestPayment->status === 'paid') {
+            $invoiceNumber = $this->billingService->invoiceNumber($record, $latestPayment);
+
+            $entries[] = [
+                'id' => 'invoice-' . $record->id,
+                'type' => 'invoice_pdf',
+                'label' => 'Invoice Tagihan',
+                'original_name' => $invoiceNumber . '.pdf',
+                'mime' => 'application/pdf',
+                'size' => 0,
+                'created_at' => optional($latestPayment->paid_at)->toDateTimeString(),
+                'url' => route('appraisal.invoice.pdf', ['id' => $record->id]),
+                'path' => null,
+                'asset_id' => null,
+                'asset_type' => null,
+            ];
         }
 
-        $invoiceNumber = data_get($latestPayment->metadata, 'invoice_number');
-
-        if (! filled($invoiceNumber)) {
-            $invoiceNumber = 'INV-' . now()->format('Y') . '-' . str_pad((string) $latestPayment->id, 5, '0', STR_PAD_LEFT);
+        if (filled($record->tax_invoice_file_path) && Storage::disk('public')->exists($record->tax_invoice_file_path)) {
+            $entries[] = [
+                'id' => 'tax-invoice-' . $record->id,
+                'type' => 'tax_invoice_pdf',
+                'label' => 'Faktur Pajak',
+                'original_name' => basename((string) $record->tax_invoice_file_path),
+                'mime' => 'application/pdf',
+                'size' => 0,
+                'created_at' => optional($record->tax_invoice_date)->toDateString(),
+                'url' => Storage::disk('public')->url($record->tax_invoice_file_path),
+                'path' => $record->tax_invoice_file_path,
+                'asset_id' => null,
+                'asset_type' => null,
+            ];
         }
 
-        return [[
-            'id' => 'invoice-' . $record->id,
-            'type' => 'invoice_pdf',
-            'label' => 'Invoice Pembayaran',
-            'original_name' => $invoiceNumber . '.pdf',
-            'mime' => 'application/pdf',
-            'size' => 0,
-            'created_at' => optional($latestPayment->paid_at)->toDateTimeString(),
-            'url' => route('appraisal.invoice.pdf', ['id' => $record->id]),
-            'path' => null,
-            'asset_id' => null,
-            'asset_type' => null,
-        ]];
+        if (filled($record->withholding_receipt_file_path) && Storage::disk('public')->exists($record->withholding_receipt_file_path)) {
+            $entries[] = [
+                'id' => 'withholding-' . $record->id,
+                'type' => 'withholding_receipt_pdf',
+                'label' => 'Bukti Potong PPh 23',
+                'original_name' => basename((string) $record->withholding_receipt_file_path),
+                'mime' => 'application/pdf',
+                'size' => 0,
+                'created_at' => optional($record->withholding_receipt_date)->toDateString(),
+                'url' => Storage::disk('public')->url($record->withholding_receipt_file_path),
+                'path' => $record->withholding_receipt_file_path,
+                'asset_id' => null,
+                'asset_type' => null,
+            ];
+        }
+
+        if (filled($record->billing_invoice_file_path) && Storage::disk('public')->exists($record->billing_invoice_file_path)) {
+            $entries[] = [
+                'id' => 'billing-upload-' . $record->id,
+                'type' => 'billing_invoice_uploaded_pdf',
+                'label' => 'Invoice Tagihan (Upload Admin)',
+                'original_name' => basename((string) $record->billing_invoice_file_path),
+                'mime' => 'application/pdf',
+                'size' => 0,
+                'created_at' => optional($record->billing_invoice_date)->toDateString(),
+                'url' => Storage::disk('public')->url($record->billing_invoice_file_path),
+                'path' => $record->billing_invoice_file_path,
+                'asset_id' => null,
+                'asset_type' => null,
+            ];
+        }
+
+        return $entries;
     }
 }

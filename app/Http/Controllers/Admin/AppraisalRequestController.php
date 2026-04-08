@@ -16,6 +16,7 @@ use App\Services\AppraisalPhysicalReportSummaryBuilder;
 use App\Services\Admin\AppraisalContractNumberService;
 use App\Services\Admin\AppraisalRequestRevisionService;
 use App\Services\Admin\AppraisalRequestWorkflowService;
+use App\Services\Finance\AppraisalBillingService;
 use App\Services\Revisions\AppraisalRevisionFileResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -82,7 +83,8 @@ class AppraisalRequestController extends Controller
         AppraisalRequestWorkflowService $workflowService,
         AppraisalRequestRevisionService $revisionService,
         AppraisalRevisionFileResolver $fileResolver,
-        AppraisalPhysicalReportSummaryBuilder $physicalReportSummaryBuilder
+        AppraisalPhysicalReportSummaryBuilder $physicalReportSummaryBuilder,
+        AppraisalBillingService $billingService,
     ): Response {
         $appraisalRequest->load([
             'guidelineSet',
@@ -140,6 +142,7 @@ class AppraisalRequestController extends Controller
                 'valuation_duration_days' => $appraisalRequest->valuation_duration_days,
                 'offer_validity_days' => $appraisalRequest->offer_validity_days,
                 'fee_total' => (int) ($appraisalRequest->fee_total ?? 0),
+                'billing_dpp_amount' => (int) ($appraisalRequest->billing_dpp_amount ?? 0),
                 'latest_expected_fee' => $latestCounterRequest?->expected_fee,
                 'latest_negotiation_reason' => $latestCounterRequest?->reason,
                 'notes' => $appraisalRequest->notes,
@@ -148,6 +151,8 @@ class AppraisalRequestController extends Controller
                 'cancelled_at' => $appraisalRequest->cancelled_at?->toIso8601String(),
                 'cancelled_by_name' => $appraisalRequest->cancelledBy?->name,
                 'cancellation_reason' => $appraisalRequest->cancellation_reason,
+                'ringkasan_tagihan' => $billingService->summary($appraisalRequest),
+                'tagihan_admin_url' => route('admin.finance.billings.show', $appraisalRequest),
             ],
             'marketPreview' => [
                 'version' => (int) ($appraisalRequest->market_preview_version ?? 0),
@@ -291,6 +296,8 @@ class AppraisalRequestController extends Controller
 
     public function appraisalRequestsEdit(AppraisalRequest $appraisalRequest): Response
     {
+        $billingService = app(AppraisalBillingService::class);
+
         return inertia('Admin/AppraisalRequests/Edit', [
             'record' => [
                 'id' => $appraisalRequest->id,
@@ -304,8 +311,11 @@ class AppraisalRequestController extends Controller
                 'valuation_duration_days' => $appraisalRequest->valuation_duration_days,
                 'offer_validity_days' => $appraisalRequest->offer_validity_days,
                 'fee_total' => $appraisalRequest->fee_total,
+                'billing_dpp_amount' => $appraisalRequest->billing_dpp_amount
+                    ?? $billingService->deriveFromGross((int) ($appraisalRequest->fee_total ?? 0))['billing_dpp_amount'],
                 'user_request_note' => $appraisalRequest->user_request_note,
                 'notes' => $appraisalRequest->notes,
+                'ringkasan_tagihan' => $billingService->summary($appraisalRequest),
             ],
             'contractStatusOptions' => array_map(
                 fn (ContractStatusEnum $status) => [
@@ -327,7 +337,8 @@ class AppraisalRequestController extends Controller
     public function appraisalRequestsUpdate(
         UpdateAppraisalRequestBasicRequest $request,
         AppraisalRequest $appraisalRequest,
-        AppraisalContractNumberService $contractNumberService
+        AppraisalContractNumberService $contractNumberService,
+        AppraisalBillingService $billingService
     ): RedirectResponse {
         $validated = $request->validated();
         $contractMeta = $contractNumberService->deriveMetadata($validated['contract_sequence'] ?? null);
@@ -340,7 +351,16 @@ class AppraisalRequestController extends Controller
             $contractDate = now()->toDateString();
         }
 
+        $billingAttributes = [];
+        if (array_key_exists('billing_dpp_amount', $validated) && $validated['billing_dpp_amount'] !== null) {
+            $billingAttributes = $billingService->appraisalAttributesFromDpp(
+                (int) $validated['billing_dpp_amount'],
+                $appraisalRequest->user
+            );
+        }
+
         $appraisalRequest->update([
+            ...$billingAttributes,
             'client_name' => $this->blankToNull($validated['client_name'] ?? null),
             'report_type' => $this->blankToNull($validated['report_type'] ?? null),
             'contract_sequence' => $this->blankToNull($validated['contract_sequence'] ?? null),
@@ -352,7 +372,6 @@ class AppraisalRequestController extends Controller
             'contract_status' => $contractStatus,
             'valuation_duration_days' => $this->blankToNull($validated['valuation_duration_days'] ?? null),
             'offer_validity_days' => $this->blankToNull($validated['offer_validity_days'] ?? null),
-            'fee_total' => $this->blankToNull($validated['fee_total'] ?? null),
             'fee_has_dp' => false,
             'fee_dp_percent' => null,
             'user_request_note' => $this->blankToNull($validated['user_request_note'] ?? null),

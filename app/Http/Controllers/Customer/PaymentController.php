@@ -11,6 +11,7 @@ use App\Models\AppraisalRequest;
 use App\Models\Payment;
 use App\Notifications\AppraisalPaymentStatusNotification;
 use App\Services\Admin\AdminNotificationService;
+use App\Services\Finance\AppraisalBillingService;
 use App\Services\Reports\AppraisalFinalDocumentService;
 use App\Services\Payments\MidtransSnapService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -48,14 +49,15 @@ class PaymentController extends Controller
         $payments = $records->map(function (AppraisalRequest $record) {
             $payment = $record->payments->sortByDesc('id')->first();
             $gatewayDetails = $this->resolveGatewayDetails($payment);
-            $invoiceNumber = $this->resolveInvoiceNumber($record, $payment);
+            $billingSummary = $this->billingService()->summary($record, $payment);
+            $invoiceNumber = $billingSummary['nomor_invoice'];
 
             return [
                 'id' => $record->id,
                 'invoice_number' => $invoiceNumber,
                 'request_number' => $record->request_number ?? ('REQ-' . $record->id),
                 'client' => $record->client_name ?: ($record->user?->name ?? '-'),
-                'amount' => $this->formatIDR((int) ($payment?->amount ?? $record->fee_total ?? 0)),
+                'amount' => $this->formatIDR((int) $billingSummary['total_tagihan']),
                 'status' => $this->midtrans()->paymentStatusLabel($payment),
                 'is_paid' => $payment?->status === 'paid',
                 'invoice_pdf_url' => route('appraisal.invoice.pdf', ['id' => $record->id]),
@@ -72,6 +74,7 @@ class PaymentController extends Controller
                     'type' => 'invoice',
                     'size' => '-',
                 ]],
+                'billing_summary' => $billingSummary,
             ];
         })->values()->all();
 
@@ -132,7 +135,8 @@ class PaymentController extends Controller
                 'status' => $status,
                 'status_label' => $record->status?->label() ?? $status,
                 'fee_total' => (int) ($record->fee_total ?? 0),
-                'invoice_number' => $this->resolveInvoiceNumber($record, $payment),
+                'invoice_number' => $this->billingService()->invoiceNumber($record, $payment),
+                'billing_summary' => $this->billingService()->summary($record, $payment),
             ],
             'payment' => $this->buildPaymentPayload($record, $payment, $activeCheckout),
             'midtrans' => [
@@ -190,9 +194,11 @@ class PaymentController extends Controller
         }
 
         $payment = DB::transaction(function () use ($record): Payment {
+            $billingSummary = $this->billingService()->summary($record);
+
             $payment = Payment::create([
                 'appraisal_request_id' => $record->id,
-                'amount' => (int) ($record->fee_total ?? 0),
+                'amount' => (int) $billingSummary['total_tagihan'],
                 'method' => 'gateway',
                 'gateway' => 'midtrans',
                 'status' => 'pending',
@@ -337,10 +343,11 @@ class PaymentController extends Controller
                 'status_label' => $record->status?->label() ?? (string) $record->status,
                 'fee_total' => (int) ($record->fee_total ?? 0),
                 'client_name' => $record->client_name ?: ($request->user()->name ?? '-'),
+                'billing_summary' => $this->billingService()->summary($record, $payment),
             ],
             'payment' => [
                 'id' => $payment->id,
-                'invoice_number' => $this->resolveInvoiceNumber($record, $payment),
+                'invoice_number' => $this->billingService()->invoiceNumber($record, $payment),
                 'status' => $payment->status,
                 'status_label' => $this->midtrans()->paymentStatusLabel($payment),
                 'amount' => (int) ($payment->amount ?? 0),
@@ -350,6 +357,7 @@ class PaymentController extends Controller
                 'external_payment_id' => $payment->external_payment_id,
                 'gateway_details' => $gatewayDetails,
                 'metadata' => $payment->metadata,
+                'billing_summary' => $this->billingService()->summary($record, $payment),
             ],
         ]);
     }
@@ -372,7 +380,8 @@ class PaymentController extends Controller
         }
 
         $gatewayDetails = $this->resolveGatewayDetails($payment);
-        $invoiceNumber = $this->resolveInvoiceNumber($record, $payment);
+        $billingSummary = $this->billingService()->summary($record, $payment);
+        $invoiceNumber = $billingSummary['nomor_invoice'];
         $invoice = [
             'invoice_number' => $invoiceNumber,
             'request_number' => $record->request_number ?? ('REQ-' . $record->id),
@@ -386,6 +395,7 @@ class PaymentController extends Controller
             'gateway_details' => $gatewayDetails,
             'company_name' => config('app.name', 'DigiPro'),
             'external_payment_id' => $payment->external_payment_id,
+            'billing_summary' => $billingSummary,
         ];
 
         $safeInvoiceNumber = preg_replace('/[^A-Za-z0-9\-_.]/', '-', (string) $invoiceNumber);
@@ -427,11 +437,12 @@ class PaymentController extends Controller
             'amount' => (int) ($payment?->amount ?? $record->fee_total ?? 0),
             'method' => $this->resolvePaymentMethodLabel($payment),
             'paid_at' => optional($payment?->paid_at)->toDateTimeString(),
-            'invoice_number' => $this->resolveInvoiceNumber($record, $payment),
+            'invoice_number' => $this->billingService()->invoiceNumber($record, $payment),
             'external_payment_id' => $payment?->external_payment_id,
             'checkout' => $checkout,
             'gateway_details' => $gatewayDetails,
             'metadata' => $metadata,
+            'billing_summary' => $this->billingService()->summary($record, $payment),
         ];
     }
 
@@ -512,12 +523,7 @@ class PaymentController extends Controller
 
     private function resolveInvoiceNumber(AppraisalRequest $record, ?Payment $payment): string
     {
-        $invoice = data_get($payment?->metadata, 'invoice_number');
-        if (filled($invoice)) {
-            return (string) $invoice;
-        }
-
-        return $this->buildInvoiceNumber($record, $payment);
+        return $this->billingService()->invoiceNumber($record, $payment);
     }
 
     private function buildInvoiceNumber(AppraisalRequest $record, ?Payment $payment = null): string
@@ -734,6 +740,11 @@ class PaymentController extends Controller
     private function midtrans(): MidtransSnapService
     {
         return app(MidtransSnapService::class);
+    }
+
+    private function billingService(): AppraisalBillingService
+    {
+        return app(AppraisalBillingService::class);
     }
 
     private function notifyAdminsPaymentConfirmed(Payment $payment): void

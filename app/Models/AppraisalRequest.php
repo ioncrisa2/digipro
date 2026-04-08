@@ -7,7 +7,10 @@ use App\Models\GuidelineSet;
 use App\Enums\ReportTypeEnum;
 use App\Enums\ContractStatusEnum;
 use App\Enums\AppraisalStatusEnum;
+use App\Enums\TaxIdentityTypeEnum;
+use App\Enums\WithholdingTaxTypeEnum;
 use App\Enums\ValuationObjectiveEnum;
+use App\Enums\FinanceDocumentStatusEnum;
 use App\Traits\HasRequestNumber;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -53,6 +56,29 @@ class AppraisalRequest extends Model
         'report_type',
         'valuation_duration_days',
         'fee_total',
+        'billing_dpp_amount',
+        'billing_vat_rate_percent',
+        'billing_vat_amount',
+        'billing_total_amount',
+        'billing_withholding_tax_type',
+        'billing_withholding_tax_rate_percent',
+        'billing_withholding_tax_amount',
+        'billing_net_amount',
+        'finance_billing_name',
+        'finance_billing_address',
+        'finance_tax_identity_type',
+        'finance_tax_identity_number',
+        'finance_billing_email',
+        'billing_invoice_number',
+        'billing_invoice_date',
+        'billing_invoice_file_path',
+        'tax_invoice_number',
+        'tax_invoice_date',
+        'tax_invoice_file_path',
+        'withholding_receipt_number',
+        'withholding_receipt_date',
+        'withholding_receipt_file_path',
+        'finance_document_status',
         'fee_has_dp',
         'fee_dp_percent',
         'offer_validity_days',
@@ -100,6 +126,19 @@ class AppraisalRequest extends Model
         'contract_date'                 => 'date',
         'fee_has_dp'                    => 'boolean',
         'fee_total'                     => 'integer',
+        'billing_dpp_amount'            => 'integer',
+        'billing_vat_rate_percent'      => 'float',
+        'billing_vat_amount'            => 'integer',
+        'billing_total_amount'          => 'integer',
+        'billing_withholding_tax_type'  => WithholdingTaxTypeEnum::class,
+        'billing_withholding_tax_rate_percent' => 'float',
+        'billing_withholding_tax_amount' => 'integer',
+        'billing_net_amount'            => 'integer',
+        'finance_tax_identity_type'     => TaxIdentityTypeEnum::class,
+        'finance_document_status'       => FinanceDocumentStatusEnum::class,
+        'billing_invoice_date'          => 'date',
+        'tax_invoice_date'              => 'date',
+        'withholding_receipt_date'      => 'date',
         'valuation_duration_days'       => 'integer',
         'offer_validity_days'           => 'integer',
         'purpose'                       => PurposeEnum::class,

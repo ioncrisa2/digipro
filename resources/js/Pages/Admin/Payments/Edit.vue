@@ -35,6 +35,14 @@ const props = defineProps({
   },
 });
 
+const billingSummary = props.record.ringkasan_tagihan ?? null;
+
+const formatIDR = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return '-';
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount);
+};
+
 const form = useForm({
   amount: props.record.amount ?? '',
   status: props.record.status ?? 'pending',
@@ -108,6 +116,35 @@ const submit = () => {
             <div>
               <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Klien</p>
               <p class="mt-2 text-sm text-slate-900">{{ record.client_name }}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card v-if="billingSummary">
+          <CardHeader>
+            <CardTitle>Ringkasan Tagihan</CardTitle>
+            <CardDescription>Nominal pembayaran mengikuti nilai jasa, PPN, dan potongan PPh yang tercatat di modul tagihan.</CardDescription>
+          </CardHeader>
+          <CardContent class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div class="rounded-2xl border bg-slate-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Jasa</p>
+              <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatIDR(billingSummary.nilai_jasa_dpp) }}</p>
+            </div>
+            <div class="rounded-2xl border bg-slate-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">PPN 11%</p>
+              <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatIDR(billingSummary.nilai_ppn) }}</p>
+            </div>
+            <div class="rounded-2xl border bg-slate-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Tagihan</p>
+              <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatIDR(billingSummary.total_tagihan) }}</p>
+            </div>
+            <div class="rounded-2xl border bg-slate-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">PPh 23 Dipotong</p>
+              <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatIDR(billingSummary.nilai_pph_dipotong) }}</p>
+            </div>
+            <div class="rounded-2xl border bg-slate-50 p-4">
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Transfer Customer</p>
+              <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatIDR(billingSummary.total_transfer_customer) }}</p>
             </div>
           </CardContent>
         </Card>

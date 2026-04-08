@@ -28,6 +28,8 @@ const props = defineProps({
   },
 });
 
+const billingSummary = props.record.ringkasan_tagihan ?? null;
+
 const statusTone = (status) => {
   switch (status) {
     case 'paid':
@@ -119,6 +121,29 @@ const statusTone = (status) => {
             </TabsList>
 
             <TabsContent value="summary" class="space-y-6">
+              <div v-if="billingSummary" class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Nilai Jasa</p>
+                  <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(billingSummary.nilai_jasa_dpp) }}</p>
+                </div>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">PPN 11%</p>
+                  <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(billingSummary.nilai_ppn) }}</p>
+                </div>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Tagihan</p>
+                  <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(billingSummary.total_tagihan) }}</p>
+                </div>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">PPh 23 Dipotong</p>
+                  <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(billingSummary.nilai_pph_dipotong) }}</p>
+                </div>
+                <div class="rounded-2xl border bg-slate-50 p-4">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Transfer Customer</p>
+                  <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(billingSummary.total_transfer_customer) }}</p>
+                </div>
+              </div>
+
               <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <div class="rounded-2xl border bg-slate-50 p-4">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Invoice</p>

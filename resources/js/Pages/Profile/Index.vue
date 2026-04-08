@@ -98,6 +98,9 @@ const profileForm = useForm({
   billing_village_id: user.value.billing_village_id || "",
   billing_postal_code: user.value.billing_postal_code || "",
   billing_address_detail: user.value.billing_address_detail || "",
+  billing_npwp: user.value.billing_npwp || "",
+  billing_nik: user.value.billing_nik || "",
+  billing_email: user.value.billing_email || "",
 });
 
 const provinceOptions = ref(profileLocationOptions.value.provinceOptions || []);
@@ -164,6 +167,9 @@ const cancelProfileEdit = () => {
   profileForm.billing_village_id = user.value.billing_village_id || "";
   profileForm.billing_postal_code = user.value.billing_postal_code || "";
   profileForm.billing_address_detail = user.value.billing_address_detail || "";
+  profileForm.billing_npwp = user.value.billing_npwp || "";
+  profileForm.billing_nik = user.value.billing_nik || "";
+  profileForm.billing_email = user.value.billing_email || "";
   provinceOptions.value = profileLocationOptions.value.provinceOptions || [];
   regencyOptions.value = profileLocationOptions.value.regencyOptions || [];
   districtOptions.value = profileLocationOptions.value.districtOptions || [];
@@ -902,6 +908,56 @@ watch(activeTab, (val) => {
                         <Textarea id="billing_address_detail" v-model="profileForm.billing_address_detail" rows="4" />
                         <p v-if="profileForm.errors.billing_address_detail" class="mt-1 text-xs text-red-500">
                           {{ profileForm.errors.billing_address_detail }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div class="space-y-2">
+                        <Label for="billing_npwp">NPWP Billing</Label>
+                        <p class="text-xs text-slate-500">
+                          Gunakan NPWP lawan transaksi bila customer membutuhkan faktur pajak.
+                        </p>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ user.billing_npwp || "-" }}
+                        </div>
+                        <div v-else>
+                          <Input id="billing_npwp" v-model="profileForm.billing_npwp" placeholder="00.000.000.0-000.000" />
+                          <p v-if="profileForm.errors.billing_npwp" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.billing_npwp }}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div class="space-y-2">
+                        <Label for="billing_nik">NIK Billing</Label>
+                        <p class="text-xs text-slate-500">
+                          Isi NIK bila billing tidak memakai NPWP sebagai identitas pajak.
+                        </p>
+                        <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                          {{ user.billing_nik || "-" }}
+                        </div>
+                        <div v-else>
+                          <Input id="billing_nik" v-model="profileForm.billing_nik" inputmode="numeric" placeholder="3201xxxxxxxxxxxx" />
+                          <p v-if="profileForm.errors.billing_nik" class="mt-1 text-xs text-red-500">
+                            {{ profileForm.errors.billing_nik }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="space-y-2">
+                      <Label for="billing_email">Email Billing</Label>
+                      <p class="text-xs text-slate-500">
+                        Email ini dipakai untuk pengiriman invoice, faktur pajak, atau dokumen tagihan bila diperlukan.
+                      </p>
+                      <div v-if="!profileEditing" class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900">
+                        {{ user.billing_email || "-" }}
+                      </div>
+                      <div v-else>
+                        <Input id="billing_email" v-model="profileForm.billing_email" type="email" placeholder="billing@contoh.id" />
+                        <p v-if="profileForm.errors.billing_email" class="mt-1 text-xs text-red-500">
+                          {{ profileForm.errors.billing_email }}
                         </p>
                       </div>
                     </div>

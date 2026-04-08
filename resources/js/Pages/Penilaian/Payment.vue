@@ -68,6 +68,7 @@ const paymentStatusVariant = computed(() => {
 
 const checkout = computed(() => paymentState.value?.checkout ?? {});
 const gatewayDetails = computed(() => paymentState.value?.gateway_details ?? {});
+const billingSummary = computed(() => paymentState.value?.billing_summary ?? props.request?.billing_summary ?? {});
 
 const canPayNow = computed(() => {
     return Boolean(
@@ -228,7 +229,7 @@ const startCheckout = async ({ forceNewAttempt = false } = {}) => {
                     </div>
                     <div class="rounded-xl border p-3">
                         <div class="text-xs text-muted-foreground">Total Tagihan</div>
-                        <div class="font-semibold">{{ formatIDR(paymentState.amount ?? request.fee_total) }}</div>
+                        <div class="font-semibold">{{ formatIDR(billingSummary.total_tagihan ?? paymentState.amount ?? request.fee_total) }}</div>
                     </div>
                     <div class="rounded-xl border p-3">
                         <div class="text-xs text-muted-foreground">Status Pembayaran</div>
@@ -247,6 +248,14 @@ const startCheckout = async ({ forceNewAttempt = false } = {}) => {
                     <CardDescription>VA, QRIS, dan e-wallet ditampilkan sesuai channel yang aktif</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                        <div class="rounded-xl border p-3"><div class="text-xs text-muted-foreground">Nilai Jasa</div><div class="font-semibold">{{ formatIDR(billingSummary.nilai_jasa_dpp) }}</div></div>
+                        <div class="rounded-xl border p-3"><div class="text-xs text-muted-foreground">PPN 11%</div><div class="font-semibold">{{ formatIDR(billingSummary.nilai_ppn) }}</div></div>
+                        <div class="rounded-xl border p-3"><div class="text-xs text-muted-foreground">Total Tagihan</div><div class="font-semibold">{{ formatIDR(billingSummary.total_tagihan ?? paymentState.amount ?? request.fee_total) }}</div></div>
+                        <div class="rounded-xl border p-3"><div class="text-xs text-muted-foreground">PPh 23 Dipotong</div><div class="font-semibold">{{ formatIDR(billingSummary.nilai_pph_dipotong) }}</div></div>
+                        <div class="rounded-xl border p-3"><div class="text-xs text-muted-foreground">Total yang Ditransfer</div><div class="font-semibold">{{ formatIDR(billingSummary.total_transfer_customer) }}</div></div>
+                    </div>
+
                     <div
                         v-if="!midtrans?.configured"
                         class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
@@ -285,6 +294,9 @@ const startCheckout = async ({ forceNewAttempt = false } = {}) => {
                         </div>
                         <p class="mt-1 text-xs text-muted-foreground">
                             Setelah transaksi sukses di Midtrans, DigiPro akan menyinkronkan status pembayaran dan mengaktifkan invoice secara otomatis.
+                        </p>
+                        <p class="mt-2 text-xs text-muted-foreground">
+                            Nilai transfer customer mengikuti pola tagihan: Nilai Jasa + PPN 11% - PPh 23 Dipotong.
                         </p>
                     </div>
 

@@ -10,6 +10,7 @@ use App\Enums\ValuationObjectiveEnum;
 use App\Models\AppraisalRequest;
 use App\Services\AppraisalPhysicalReportSummaryBuilder;
 use App\Services\AppraisalRequestCancellationService;
+use App\Services\Finance\AppraisalBillingService;
 use App\Services\Payments\MidtransSnapService;
 use App\Services\Revisions\AppraisalRequestRevisionSubmissionService;
 use App\Support\SupportContact;
@@ -28,6 +29,7 @@ class CustomerAppraisalShowBuilder
         private readonly MidtransSnapService $midtransSnapService,
         private readonly AppraisalRequestRevisionSubmissionService $revisionSubmissionService,
         private readonly AppraisalRequestCancellationService $cancellationService,
+        private readonly AppraisalBillingService $billingService,
     ) {
     }
 
@@ -171,6 +173,7 @@ class CustomerAppraisalShowBuilder
             ->all();
         $paymentStatus = $latestPayment?->status;
         $paymentStatusLabel = $this->midtransSnapService->paymentStatusLabel($latestPayment);
+        $billingSummary = $this->billingService->summary($record, $latestPayment);
         $invoiceNumber = data_get($latestPayment?->metadata, 'invoice_number');
         $latestCancellationRequest = $record->latestCancellationRequest;
         $cancellationBlockers = $this->cancellationService->customerBlockers($record, $record->user);
@@ -280,6 +283,7 @@ class CustomerAppraisalShowBuilder
                     'invoice_number' => $invoiceNumber,
                     'paid_at' => optional($latestPayment?->paid_at)->toDateTimeString(),
                 ],
+                'billing_summary' => $billingSummary,
             ],
         ];
     }
