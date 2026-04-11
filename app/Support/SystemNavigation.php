@@ -19,6 +19,7 @@ class SystemNavigation
     public const MANAGE_ADMIN_ACCESS_CONTROL = 'manage_admin_access_control';
     public const MANAGE_ADMIN_CONTENT = 'manage_admin_content';
     public const MANAGE_ADMIN_COMMUNICATIONS = 'manage_admin_communications';
+    public const MANAGE_ADMIN_BACKUPS = 'manage_admin_backups';
 
     public static function reviewerSectionPermissions(): array
     {

@@ -89,6 +89,7 @@ class HandleInertiaRequests extends Middleware
                 'status' => fn() => $request->session()->get('status'),
                 'success' => fn() => $request->session()->get('success'),
                 'error' => fn() => $request->session()->get('error'),
+                'backup_restore_summary' => fn() => $request->session()->get('backup_restore_summary'),
             ],
 
             //notification count

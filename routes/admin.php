@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AccessControlController;
+use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\AppraisalRequestController;
 use App\Http\Controllers\Admin\AppraisalRequestCancellationController;
 use App\Http\Controllers\Admin\AppraisalRequestWorkflowController;
@@ -302,5 +303,14 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::post('/contact-messages/{contactMessage}/done', [CommunicationController::class, 'contactMessagesMarkDone'])->name('contact-messages.done');
                 Route::post('/contact-messages/{contactMessage}/archive', [CommunicationController::class, 'contactMessagesArchive'])->name('contact-messages.archive');
                 Route::delete('/contact-messages/{contactMessage}', [CommunicationController::class, 'contactMessagesDestroy'])->name('contact-messages.destroy');
+            });
+
+        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_BACKUPS)
+            ->prefix('backup')
+            ->name('backups.')
+            ->group(function (): void {
+                Route::get('/', [BackupController::class, 'index'])->name('index');
+                Route::get('/{appraisalRequest}/download', [BackupController::class, 'download'])->name('download');
+                Route::post('/restore', [BackupController::class, 'restore'])->name('restore');
             });
     });

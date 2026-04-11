@@ -111,6 +111,14 @@ class SystemMenuManagementRegistry
                 'permission' => SystemNavigation::MANAGE_ADMIN_COMMUNICATIONS,
                 'items' => ['Contact Messages'],
             ],
+            [
+                'key' => 'backups',
+                'surface' => 'admin',
+                'label' => 'Backup',
+                'description' => 'Backup dan restore appraisal per request untuk pemulihan data terkontrol.',
+                'permission' => SystemNavigation::MANAGE_ADMIN_BACKUPS,
+                'items' => ['Backup Request'],
+            ],
         ];
     }
 }

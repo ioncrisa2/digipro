@@ -490,6 +490,16 @@ class SystemSectionNavigationRegistry
                     ],
                 ],
             ],
+            [
+                'key' => 'admin.backups',
+                'label' => 'Backup',
+                'icon' => 'ArchiveRestore',
+                'surface' => 'admin',
+                'routeName' => 'admin.backups.index',
+                'activePatterns' => ['admin.backups.*'],
+                'pathPrefixes' => ['/admin/backup'],
+                'requiredPermission' => SystemNavigation::MANAGE_ADMIN_BACKUPS,
+            ],
         ];
     }
 }

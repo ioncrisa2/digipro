@@ -33,6 +33,7 @@ class SystemPermissionRegistry
         return [
             ...self::reviewerSectionPermissions(),
             ...self::adminSectionPermissions(),
+            SystemNavigation::MANAGE_ADMIN_BACKUPS,
         ];
     }
 
@@ -86,6 +87,10 @@ class SystemPermissionRegistry
             SystemNavigation::MANAGE_ADMIN_COMMUNICATIONS => [
                 'title' => 'Admin Workspace',
                 'label' => 'Manage Admin Communications',
+            ],
+            SystemNavigation::MANAGE_ADMIN_BACKUPS => [
+                'title' => 'Admin Workspace',
+                'label' => 'Manage Admin Backups',
             ],
         ];
     }

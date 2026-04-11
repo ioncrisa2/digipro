@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import {
+  ArchiveRestore,
   BookMarked,
   BookOpen,
   BookText,
@@ -67,6 +68,7 @@ const iconMap = {
   BookMarked,
   BookOpen,
   BookText,
+  ArchiveRestore,
   Building2,
   ClipboardCheck,
   ClipboardList,
