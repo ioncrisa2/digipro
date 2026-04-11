@@ -181,7 +181,7 @@
     <table class="header-table">
         <tr>
             <td class="header-left">
-                <h1 class="company">{{ $invoice['company_name'] ?? 'DigiPro' }}</h1>
+                <h1 class="company">{{ $invoice['company_name'] ?? 'DigiPro by KJPP HJAR' }}</h1>
                 <p class="invoice-title">Invoice Pembayaran</p>
                 <div class="subline">Dokumen resmi bukti transaksi layanan penilaian properti</div>
             </td>
@@ -297,7 +297,7 @@
     </div>
 
     <div class="footer">
-        Invoice ini diterbitkan otomatis oleh sistem {{ $invoice['company_name'] ?? 'DigiPro' }}.
+        Invoice ini diterbitkan otomatis oleh sistem {{ $invoice['company_name'] ?? 'DigiPro by KJPP HJAR' }}.
         Simpan dokumen ini sebagai arsip transaksi.
         <div class="signature">Generated at {{ now()->format('Y-m-d H:i:s') }}</div>
     </div>

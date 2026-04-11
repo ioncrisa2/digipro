@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>{{ $doc['title'] ?? 'Disclaimer DigiPro' }}</title>
+    <title>{{ $doc['title'] ?? 'Disclaimer DigiPro by KJPP HJAR' }}</title>
     <style>
         body {
             font-family: DejaVu Sans, sans-serif;
@@ -59,8 +59,8 @@
     </style>
 </head>
 <body>
-    <h1>{{ $doc['title'] ?? 'DISCLAIMER & PERSETUJUAN DIGIPRO' }}</h1>
-    <div class="muted">{{ $doc['document_title'] ?? 'Dokumen consent DigiPro' }}</div>
+    <h1>{{ $doc['title'] ?? 'DISCLAIMER & PERSETUJUAN DIGIPRO BY KJPP HJAR' }}</h1>
+    <div class="muted">{{ $doc['document_title'] ?? 'Dokumen consent DigiPro by KJPP HJAR' }}</div>
 
     <table class="meta">
         <tr>
@@ -109,7 +109,7 @@
     </div>
 
     <div class="footer">
-        Dokumen ini dibuat otomatis oleh sistem DigiPro berdasarkan snapshot consent yang terkait dengan request ini.
+        Dokumen ini dibuat otomatis oleh sistem DigiPro by KJPP HJAR berdasarkan snapshot consent yang terkait dengan request ini.
     </div>
 </body>
 </html>

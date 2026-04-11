@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Landing;
 
 use App\Http\Controllers\Controller;
+use App\Models\Article;
 use App\Models\Faq;
 use App\Models\Feature;
 use App\Models\LandingMediaSetting;
@@ -41,6 +42,25 @@ class HomeController extends Controller
             ->values()
             ->all();
 
+        $recentArticles = Article::query()
+            ->with(['category:id,name,slug'])
+            ->published()
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->limit(8)
+            ->get()
+            ->map(fn (Article $article) => [
+                'title' => $article->title,
+                'slug' => $article->slug,
+                'excerpt' => $article->excerpt,
+                'cover_image_path' => $article->cover_image_path,
+                'published_at' => $article->published_at?->toDateString(),
+                'category' => $article->category?->name,
+                'category_slug' => $article->category?->slug,
+            ])
+            ->values()
+            ->all();
+
         $testimonials = Testimonial::query()
             ->active()
             ->orderBy('sort_order')
@@ -73,6 +93,7 @@ class HomeController extends Controller
         return inertia('Landing/LandingPage', [
             'features' => $features,
             'faqs' => $faqs,
+            'recentArticles' => $recentArticles,
             'testimonials' => $testimonials,
             'heroBackgroundUrl' => filled($heroMedia?->file_path) ? Storage::disk('public')->url($heroMedia->file_path) : null,
             'platformPreviewImages' => $platformPreviewImages,

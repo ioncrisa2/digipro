@@ -14,6 +14,7 @@ use App\Services\Revisions\AppraisalRequestRevisionSubmissionService;
 use App\Support\SupportContact;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use App\Models\User;
 
 /**
  * Builds dashboard stats and recent appraisal requests for the user.
@@ -219,12 +220,7 @@ class DashboardController extends Controller
             'recentRequests' => $recentRequests,
             'featuredRequest' => $featuredRequest,
             'actionCenter' => $actionCenter,
-            'profileCompletionAlert' => blank($user->phone_number) ? [
-                'type' => 'warning',
-                'message' => 'Nomor telepon belum diatur. Mohon lengkapi profil terlebih dahulu.',
-                'action_label' => 'Lengkapi Profil',
-                'action_url' => route('profile.edit'),
-            ] : null,
+            'profileCompletionAlert' => $this->buildProfileCompletionAlert($user),
             'supportContact' => SupportContact::payload(),
         ]);
     }
@@ -269,5 +265,34 @@ class DashboardController extends Controller
             'tone' => $tone,
             'url' => $url,
         ];
+    }
+
+    private function buildProfileCompletionAlert(?User $user): ?array
+    {
+        if (! $user) {
+            return null;
+        }
+
+        if ($this->hasReadyBillingProfile($user)) {
+            return null;
+        }
+
+        return [
+            'type' => 'warning',
+            'message' => 'Lengkapi profil billing terlebih dahulu sebelum membuat permohonan penilaian baru.',
+            'action_label' => 'Lengkapi Profil',
+            'action_url' => route('profile.edit'),
+        ];
+    }
+
+    private function hasReadyBillingProfile(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return filled($user->phone_number)
+            && filled($user->billing_recipient_name)
+            && filled($user->billing_address_detail);
     }
 }

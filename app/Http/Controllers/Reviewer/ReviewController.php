@@ -29,7 +29,7 @@ class ReviewController extends Controller
     {
         $filters = $request->filters();
 
-        $reviews = AppraisalRequest::query()
+        $baseQuery = AppraisalRequest::query()
             ->with('user:id,name')
             ->withCount('assets')
             ->whereIn('status', $this->workspace->reviewerStatuses())
@@ -42,16 +42,29 @@ class ReviewController extends Controller
                         ->orWhereHas('user', fn (Builder $userQuery): Builder => $userQuery->where('name', 'like', "%{$q}%"));
                 });
             })
-            ->when($filters['status'] !== '' && $filters['status'] !== 'all', fn (Builder $query): Builder => $query->where('status', $filters['status']))
+            ->when($filters['status'] !== '' && $filters['status'] !== 'all', fn (Builder $query): Builder => $query->where('status', $filters['status']));
+
+        $reviews = (clone $baseQuery)
             ->latest('requested_at')
-            ->paginate(12)
+            ->paginate($filters['per_page'])
             ->withQueryString()
             ->through(fn (AppraisalRequest $record): array => $this->workspace->serializeReviewListItem($record));
+
+        $summaryBase = AppraisalRequest::query()->whereIn('status', $this->workspace->reviewerStatuses());
 
         return Inertia::render('Reviewer/Reviews/Index', [
             'filters' => $filters,
             'statusOptions' => $this->workspace->reviewStatusOptions(),
-            'reviews' => $reviews,
+            'summary' => [
+                'total' => (clone $summaryBase)->count(),
+                'siap_review' => (clone $summaryBase)->where('status', AppraisalStatusEnum::ContractSigned)->count(),
+                'sedang_review' => (clone $summaryBase)->where('status', AppraisalStatusEnum::ValuationOnProgress)->count(),
+                'siap_preview' => (clone $summaryBase)->where('status', AppraisalStatusEnum::ValuationCompleted)->count(),
+                'total_aset' => AppraisalAsset::query()
+                    ->whereHas('request', fn (Builder $query): Builder => $query->whereIn('status', $this->workspace->reviewerStatuses()))
+                    ->count(),
+            ],
+            'records' => $this->paginatedRecordsPayload($reviews),
         ]);
     }
 

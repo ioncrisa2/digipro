@@ -11,12 +11,9 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    /**
-     * Create a new notification instance.
-     */
-    public function __construct()
-    {
-        //
+    public function __construct(
+        protected string $token,
+    ) {
     }
 
     /**
@@ -32,15 +29,15 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
     /**
      * Get the mail representation of the notification.
      */
-    public function toMail($notifiable): MailMessage
+    public function toMail(object $notifiable): MailMessage
     {
-       $url = url(route('password.reset', [
+        $url = url(route('password.reset', [
             'token' => $this->token,
             'email' => $notifiable->getEmailForPasswordReset(),
         ], false));
 
         return (new MailMessage)
-            ->subject('Atur Ulang Password Akun DIGIPRO')
+            ->subject('Atur Ulang Password Akun DigiPro by KJPP HJAR')
             ->markdown('emails.auth.reset-password', [
                 'url'   => $url,
                 'user'  => $notifiable,

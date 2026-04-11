@@ -10,7 +10,6 @@ defineProps({
   <section id="process" class="scroll-mt-24 bg-white/70 px-6 py-24">
     <div class="mx-auto max-w-7xl space-y-14">
       <div class="max-w-3xl space-y-4">
-        <div class="text-sm font-medium uppercase tracking-[0.28em] text-slate-500">Workflow</div>
         <h2 class="text-3xl font-semibold tracking-tight text-slate-900 md:text-5xl">Alur kerja dibuat lurus, ringkas, dan langsung terbaca dalam satu sapuan.</h2>
         <p class="text-base leading-7 text-slate-600 md:text-lg">
           Setiap langkah sekarang ditampilkan menyamping dengan arah panah yang tegas, sehingga user bisa langsung membaca progres dari permohonan sampai laporan siap.

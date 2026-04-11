@@ -207,7 +207,7 @@ const startCheckout = async ({ forceNewAttempt = false } = {}) => {
                         <Badge :variant="paymentStatusVariant">{{ paymentState.status_label ?? "Menunggu Pembayaran" }}</Badge>
                     </div>
                     <p class="text-sm text-muted-foreground">
-                        Pembayaran utama DigiPro diproses melalui Midtrans Snap.
+                        Pembayaran utama DigiPro by KJPP HJAR diproses melalui Midtrans Snap.
                     </p>
                 </div>
 
@@ -293,7 +293,7 @@ const startCheckout = async ({ forceNewAttempt = false } = {}) => {
                             Status pembayaran akan difinalkan otomatis lewat webhook Midtrans.
                         </div>
                         <p class="mt-1 text-xs text-muted-foreground">
-                            Setelah transaksi sukses di Midtrans, DigiPro akan menyinkronkan status pembayaran dan mengaktifkan invoice secara otomatis.
+                            Setelah transaksi sukses di Midtrans, DigiPro by KJPP HJAR akan menyinkronkan status pembayaran dan mengaktifkan invoice secara otomatis.
                         </p>
                         <p class="mt-2 text-xs text-muted-foreground">
                             Nilai transfer customer mengikuti pola tagihan: Nilai Jasa + PPN 11% - PPh 23 Dipotong.

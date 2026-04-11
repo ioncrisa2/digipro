@@ -1,35 +1,25 @@
 @component('mail::message')
-{{-- Header custom --}}
-<div style="text-align:center; margin-bottom:24px;">
-    <div style="
-        display:inline-flex;
-        align-items:center;
-        gap:8px;
-        padding:8px 14px;
-        border-radius:999px;
-        background:#020617;
-        color:#e5e7eb;
-        font-size:12px;
-        text-transform:uppercase;
-        letter-spacing:0.08em;
-    ">
-        <span style="font-weight:700;">DIGI<span style="color:#38bdf8;">PRO</span></span>
-        <span style="opacity:.7;">Password Reset</span>
-    </div>
-</div>
+# Atur Ulang Password DigiPro by KJPP HJAR
 
-# Halo, {{ $user->name ?? 'Pengguna DIGIPRO' }}
+Halo, {{ $user->name ?? 'Pengguna DigiPro by KJPP HJAR' }}.
 
-Kami menerima permintaan untuk mengatur ulang password akun Anda.
+Kami menerima permintaan untuk mengatur ulang password akun DigiPro by KJPP HJAR Anda.
+
+Silakan buka tautan berikut untuk melanjutkan proses reset password:
+
+@component('mail::panel')
+<a href="{{ $url }}" style="word-break: break-all; color: #0f766e; text-decoration: none;">{{ $url }}</a>
+@endcomponent
+
+Jika email client Anda mendukung tombol aksi, Anda juga bisa menggunakan tombol berikut:
 
 @component('mail::button', ['url' => $url])
 Atur Ulang Password
 @endcomponent
 
-Jika Anda tidak merasa meminta pengaturan ulang password, abaikan email ini.
-Password Anda saat ini akan tetap aman.
+Jika Anda tidak meminta reset password, abaikan email ini. Password Anda saat ini tetap aman dan tidak berubah.
 
-Terima kasih,<br>
-**Tim DIGIPRO**
-<small style="color:#6b7280;">KJPP Henricus Judi Adrianto & Rekan</small>
+Salam,<br>
+**Tim DigiPro by KJPP HJAR**  
+KJPP Henricus Judi Adrianto & Rekan
 @endcomponent

@@ -159,7 +159,7 @@ const canSubmit = computed(() => {
             <button type="button" @click="termsOpen = true" class="text-slate-900 font-semibold hover:underline">
               Syarat dan Ketentuan
             </button>
-            yang berlaku di DigiPro.
+            yang berlaku di DigiPro by KJPP HJAR.
           </label>
         </div>
         <p v-if="register.form.errors.terms" class="text-[10px] text-red-500 font-medium ml-7">

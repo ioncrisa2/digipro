@@ -29,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
 
         VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
             return (new MailMessage)
-                ->subject('Verifikasi Email Akun DigiPro')
+                ->subject('Verifikasi Email Akun DigiPro by KJPP HJAR')
                 ->line('Klik tombol di bawah untuk mengaktifkan akun Anda.')
                 ->action('Verifikasi Email', $url)
                 ->line('Jika Anda tidak merasa mendaftar, abaikan email ini.');

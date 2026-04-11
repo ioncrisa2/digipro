@@ -50,8 +50,6 @@ const authUser = computed(() => page.props.auth?.user || {});
 const consentSubmitting = ref(false);
 const sertifikatOnHandConfirmed = ref(false);
 const certificateNotEncumberedConfirmed = ref(false);
-const needsHardCopy = ref(true);
-const physicalCopiesCount = ref(1);
 
 const assets = ref([]);
 const submitting = ref(false);
@@ -293,16 +291,6 @@ const hardCopyProfileReady = computed(() => {
   )
 })
 
-const hardCopySummary = computed(() => {
-  const user = authUser.value || {}
-
-  return {
-    recipient: user.billing_recipient_name || '-',
-    phone: user.phone_number || user.whatsapp_number || '-',
-    address: user.billing_address_detail || '-',
-  }
-})
-
 const openProfilePage = () => {
   router.visit(route('profile.edit'))
 }
@@ -360,8 +348,7 @@ const isAssetComplete = (asset) => {
 const canSubmit = computed(() => {
   return assets.value.length > 0 &&
     assets.value.every(isAssetComplete) &&
-    (!needsHardCopy.value || Number(physicalCopiesCount.value || 0) >= 1) &&
-    (!needsHardCopy.value || hardCopyProfileReady.value) &&
+    hardCopyProfileReady.value &&
     !submitting.value
 })
 
@@ -446,13 +433,8 @@ async function handleSubmit() {
       return
     }
 
-    if (needsHardCopy.value && !hardCopyProfileReady.value) {
-      notify('warning', 'Lengkapi profil billing dan nomor telepon terlebih dahulu sebelum meminta pengiriman hard copy.')
-      return
-    }
-
-    if (needsHardCopy.value && Number(physicalCopiesCount.value || 0) < 1) {
-      notify('warning', 'Jumlah hard copy minimal 1 jika Anda memilih pengiriman laporan fisik.')
+    if (!hardCopyProfileReady.value) {
+      notify('warning', 'Lengkapi profil billing dan nomor telepon terlebih dahulu sebelum mengirim permohonan.')
       return
     }
 
@@ -534,8 +516,6 @@ async function handleSubmit() {
 
     formData.append('sertifikat_on_hand_confirmed', sertifikatOnHandConfirmed.value ? '1' : '0');
     formData.append('certificate_not_encumbered_confirmed', certificateNotEncumberedConfirmed.value ? '1' : '0');
-    formData.append('report_format', 'both');
-    formData.append('physical_copies_count', String(Math.max(1, Number(physicalCopiesCount.value || 1))));
 
     router.post(route('appraisal.store'), formData, {
         forceFormData: true,
@@ -587,78 +567,30 @@ async function handleSubmit() {
                 <AppraisalCreateHeader />
 
                 <div class="space-y-6 mb-8">
-                    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                        <div class="border-b border-slate-100 px-5 py-4">
-                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Delivery Preference</p>
-                            <h2 class="mt-2 text-lg font-semibold text-slate-950">Pengiriman Hard Copy Wajib</h2>
-                            <p class="mt-1 text-sm text-slate-600">
-                                Setiap permohonan akan diproses dengan laporan digital dan hard copy. Admin akan memakai data billing di profil Anda sebagai alamat pengiriman fisik.
-                            </p>
-                        </div>
-
-                        <div class="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
-                            <div class="space-y-4">
-                                <div class="rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 text-white">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Format Tetap</p>
-                                    <p class="mt-2 text-base font-semibold">Digital + Hard Copy</p>
-                                    <p class="mt-1 text-sm text-slate-300">
-                                        Laporan digital tetap tersedia untuk unduh, sementara hard copy dikirim ke alamat billing yang sudah Anda atur.
-                                    </p>
-                                </div>
-
-                                <div class="grid gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 sm:grid-cols-[minmax(0,160px)_1fr]">
-                                    <div class="space-y-2">
-                                        <label for="physical_copies_count" class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">
-                                            Jumlah Hard Copy
-                                        </label>
-                                        <input
-                                            id="physical_copies_count"
-                                            v-model="physicalCopiesCount"
-                                            type="number"
-                                            min="1"
-                                            max="20"
-                                            class="h-10 w-full rounded-xl border border-amber-200 bg-white px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-amber-400"
-                                        />
-                                    </div>
-
-                                    <div class="space-y-2">
-                                        <p class="text-sm font-medium text-amber-900">Alamat kirim diambil dari profil billing Anda.</p>
-                                        <p class="text-sm text-amber-800">
-                                            Pastikan nama penerima, nomor telepon, dan alamat billing sudah benar karena akan dipakai untuk pengiriman laporan fisik.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                <div class="space-y-2">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Snapshot Tujuan Kirim</p>
-                                    <p class="text-sm font-medium text-slate-950">{{ hardCopySummary.recipient }}</p>
-                                    <p class="text-sm text-slate-600">{{ hardCopySummary.phone }}</p>
-                                    <p class="text-sm text-slate-600">{{ hardCopySummary.address }}</p>
-                                </div>
-
-                                <div
-                                    v-if="!hardCopyProfileReady"
-                                    class="mt-4 space-y-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3"
-                                >
-                                    <p class="text-sm font-medium text-rose-900">
-                                        Profil billing belum lengkap untuk pengiriman hard copy.
-                                    </p>
+                    <div
+                        v-if="!hardCopyProfileReady"
+                        class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3"
+                    >
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div class="flex items-start gap-3">
+                                <AlertTriangle class="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+                                <div class="space-y-1">
+                                    <p class="text-sm font-semibold text-rose-900">Profil billing perlu segera dilengkapi</p>
                                     <p class="text-sm text-rose-800">
-                                        Lengkapi nama penerima laporan, nomor telepon, dan alamat detail billing terlebih dahulu.
+                                        Pengiriman permohonan membutuhkan nama penerima laporan, nomor telepon, dan alamat detail billing pada profil Anda.
                                     </p>
-                                    <button
-                                        type="button"
-                                        class="inline-flex items-center rounded-xl border border-rose-300 bg-white px-3 py-2 text-sm font-medium text-rose-900 transition hover:bg-rose-100"
-                                        @click="openProfilePage"
-                                    >
-                                        Lengkapi Profil
-                                    </button>
                                 </div>
                             </div>
+
+                            <button
+                                type="button"
+                                class="inline-flex items-center rounded-xl border border-rose-300 bg-white px-3 py-2 text-sm font-medium text-rose-900 transition hover:bg-rose-100"
+                                @click="openProfilePage"
+                            >
+                                Lengkapi Profil
+                            </button>
                         </div>
-                    </section>
+                    </div>
 
                     <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                         <div class="flex items-start gap-3">

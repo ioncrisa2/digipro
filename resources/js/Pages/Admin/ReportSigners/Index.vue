@@ -70,7 +70,7 @@ const columns = [
         <div>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Penandatangan Report</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Master profil reviewer dan penilai publik yang dipilih admin untuk blok otorisasi report DigiPro.
+            Master profil reviewer dan penilai publik yang dipilih admin untuk blok otorisasi report DigiPro by KJPP HJAR.
           </p>
         </div>
         <Button as-child>

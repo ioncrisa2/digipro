@@ -2,10 +2,13 @@
 import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import ReviewerLayout from '@/layouts/ReviewerLayout.vue';
-import PaginationBar from '@/components/reviewer/PaginationBar.vue';
-import { formatArea, formatCurrency, formatPercent } from '@/utils/reviewer';
+import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -13,224 +16,191 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Search, Database } from 'lucide-vue-next';
+import { formatArea, formatCurrency, formatPercent } from '@/utils/reviewer';
 
 const props = defineProps({
-  filters: Object,
-  comparables: Object,
+  filters: { type: Object, default: () => ({ q: '', asset_id: '', is_selected: 'all', per_page: 15 }) },
+  summary: { type: Object, default: () => ({}) },
+  records: { type: Object, required: true },
 });
 
 const form = reactive({
-  q: props.filters?.q ?? '',
-  asset_id: props.filters?.asset_id ?? '',
-  is_selected: props.filters?.is_selected ?? 'all',
+  q: props.filters.q ?? '',
+  asset_id: props.filters.asset_id ?? '',
+  is_selected: props.filters.is_selected ?? 'all',
 });
 
-const groupedComparables = computed(() => {
-  const groups = new Map();
+const activeFilterCount = computed(() => {
+  let count = 0;
 
-  (props.comparables?.data || []).forEach((item) => {
-    const key = String(item.appraisal_asset_id ?? 'unknown');
+  if (form.asset_id) count += 1;
+  if (form.is_selected !== 'all') count += 1;
 
-    if (!groups.has(key)) {
-      groups.set(key, {
-        assetId: item.appraisal_asset_id,
-        requestNumber: item.request_number,
-        assetAddress: item.asset_address,
-        assetDetailUrl: item.asset_detail_url,
-        items: [],
-      });
-    }
-
-    groups.get(key).items.push(item);
-  });
-
-  return Array.from(groups.values()).map((group) => ({
-    ...group,
-    selectedCount: group.items.filter((item) => item.is_selected).length,
-  }));
+  return count;
 });
 
-const defaultExpandedGroups = computed(() => {
-  const firstGroup = groupedComparables.value[0];
-
-  return firstGroup ? [String(firstGroup.assetId)] : [];
-});
-
-const submit = () => {
-  router.get(route('reviewer.comparables.index'), form, {
-    preserveState: true,
-    preserveScroll: true,
-  });
+const applyFilters = () => {
+  router.get(
+    route('reviewer.comparables.index'),
+    {
+      q: form.q || undefined,
+      asset_id: form.asset_id || undefined,
+      is_selected: form.is_selected === 'all' ? undefined : form.is_selected,
+    },
+    {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+    },
+  );
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.asset_id = '';
+  form.is_selected = 'all';
+  applyFilters();
+};
+
+const summaryCards = [
+  { key: 'total', label: 'Total Comparable' },
+  { key: 'dipakai', label: 'Dipakai' },
+  { key: 'perlu_penyesuaian', label: 'Perlu Penyesuaian' },
+  { key: 'diperbarui_hari_ini', label: 'Diperbarui Hari Ini' },
+];
+
+const columns = [
+  { key: 'asset', label: 'Aset', cellClass: 'min-w-[220px]' },
+  { key: 'external', label: 'Comparable', cellClass: 'min-w-[170px]' },
+  { key: 'selected', label: 'Dipakai', cellClass: 'w-[110px]' },
+  { key: 'shape', label: 'LT / LB', cellClass: 'min-w-[120px]' },
+  { key: 'adjustment', label: 'Penyesuaian', cellClass: 'min-w-[180px]' },
+  { key: 'value', label: 'Nilai', cellClass: 'min-w-[180px]' },
+  { key: 'actions', label: 'Aksi', cellClass: 'min-w-[180px]' },
+];
 </script>
 
 <template>
-  <Head title="Reviewer Comparables" />
+  <Head title="Reviewer - Comparable" />
 
-  <ReviewerLayout title="Comparables">
+  <ReviewerLayout title="Comparable">
     <div class="space-y-6">
-      <Card>
-        <CardHeader class="pb-4">
-          <CardTitle>Filter Comparable</CardTitle>
-          <CardDescription>Telusuri pembanding berdasarkan ext id, aset, dan status pemakaian.</CardDescription>
+      <section>
+        <h1 class="text-3xl font-semibold tracking-tight text-slate-950">Database Comparable</h1>
+        <p class="mt-2 text-sm text-slate-600">
+          Telusuri pembanding yang sudah dipakai reviewer, baca konteks asetnya, dan masuk ke penyesuaian tanpa pindah-pindah layar.
+        </p>
+      </section>
+
+      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card v-for="card in summaryCards" :key="card.key" class="border-slate-200/80 shadow-sm">
+          <CardContent class="p-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ card.label }}</p>
+            <p class="mt-3 text-4xl font-semibold text-slate-950">{{ summary[card.key] ?? 0 }}</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card class="border-slate-200/80 shadow-sm">
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar Comparable</CardTitle>
+          </div>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari ext id, peruntukan, atau alamat aset"
+            filter-title="Filter comparable"
+            filter-description="Saring pembanding berdasarkan aset dan status pemakaian."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; applyFilters(); }"
+            @apply-filters="applyFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="grid gap-4">
+              <div class="space-y-2">
+                <Label for="reviewer_comparable_asset_filter">ID Aset</Label>
+                <Input
+                  id="reviewer_comparable_asset_filter"
+                  v-model="form.asset_id"
+                  type="number"
+                  min="1"
+                  placeholder="Masukkan ID aset"
+                />
+              </div>
+
+              <div class="space-y-2">
+                <Label for="reviewer_comparable_status_filter">Status Pemakaian</Label>
+                <Select v-model="form.is_selected">
+                  <SelectTrigger id="reviewer_comparable_status_filter">
+                    <SelectValue placeholder="Semua comparable" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Comparable</SelectItem>
+                    <SelectItem value="1">Dipakai</SelectItem>
+                    <SelectItem value="0">Tidak Dipakai</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
-          <div class="grid gap-4 lg:grid-cols-[1fr_220px_220px_auto] lg:items-end">
-            <div class="grid gap-2">
-              <label class="text-sm font-medium">Cari</label>
-              <Input v-model="form.q" type="text" placeholder="Cari ext id, peruntukan, alamat" />
-            </div>
-            <div class="grid gap-2">
-              <label class="text-sm font-medium">Asset ID</label>
-              <Input v-model="form.asset_id" type="number" min="1" placeholder="Filter asset id" />
-            </div>
-            <div class="grid gap-2">
-              <label class="text-sm font-medium">Dipakai</label>
-              <Select v-model="form.is_selected">
-                <SelectTrigger>
-                  <SelectValue placeholder="Semua" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua</SelectItem>
-                  <SelectItem value="1">Dipakai</SelectItem>
-                  <SelectItem value="0">Tidak dipakai</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button @click="submit">
-              <Search class="mr-2 h-4 w-4" />
-              Terapkan
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          <AdminDataTable
+            :columns="columns"
+            :rows="records.data"
+            :meta="records.meta"
+            :default-per-page="filters.per_page ?? 15"
+            empty-text="Belum ada comparable yang cocok dengan filter saat ini."
+          >
+            <template #cell-asset="{ row }">
+              <div class="space-y-1">
+                <Button variant="link" class="h-auto px-0 text-left font-medium" as-child>
+                  <Link :href="row.asset_detail_url">{{ row.asset_address }}</Link>
+                </Button>
+                <div class="text-xs text-slate-500">{{ row.request_number }} • Asset {{ row.appraisal_asset_id }}</div>
+              </div>
+            </template>
 
-      <Card>
-        <CardHeader class="pb-4">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <CardTitle>Daftar Comparable</CardTitle>
-              <CardDescription>Pembanding ditampilkan per aset agar reviewer bisa membaca konteksnya lebih cepat.</CardDescription>
-            </div>
-            <Database class="h-4 w-4 text-muted-foreground" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div v-if="groupedComparables.length" class="space-y-3">
-            <Accordion type="multiple" :default-value="defaultExpandedGroups" class="space-y-3">
-              <AccordionItem
-                v-for="group in groupedComparables"
-                :key="`group-${group.assetId}`"
-                :value="String(group.assetId)"
-                class="overflow-hidden rounded-xl border bg-card px-0"
-              >
-                <AccordionTrigger class="px-5 py-4 hover:no-underline">
-                  <div class="flex w-full flex-col gap-3 text-left md:flex-row md:items-center md:justify-between">
-                    <div class="min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" class="font-mono">Asset {{ group.assetId }}</Badge>
-                        <Badge variant="secondary">{{ group.requestNumber }}</Badge>
-                      </div>
-                      <p class="mt-2 truncate text-sm font-semibold text-foreground">
-                        {{ group.assetAddress }}
-                      </p>
-                    </div>
+            <template #cell-external="{ row }">
+              <div class="space-y-1">
+                <Button variant="link" class="h-auto px-0 font-medium" as-child>
+                  <Link :href="row.detail_url">{{ row.external_id }}</Link>
+                </Button>
+                <div class="text-xs text-slate-500">{{ row.raw_peruntukan || '-' }}</div>
+              </div>
+            </template>
 
-                    <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground md:justify-end">
-                      <Badge variant="outline">{{ group.items.length }} comparable</Badge>
-                      <Badge variant="outline">{{ group.selectedCount }} dipakai</Badge>
-                    </div>
-                  </div>
-                </AccordionTrigger>
+            <template #cell-selected="{ row }">
+              <Badge :variant="row.is_selected ? 'default' : 'outline'">
+                {{ row.is_selected ? 'Dipakai' : 'Tidak' }}
+              </Badge>
+            </template>
 
-                <AccordionContent class="px-5 pb-5 pt-0">
-                  <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3">
-                    <div>
-                      <p class="text-sm font-medium text-foreground">Comparable terasosiasi dengan aset {{ group.assetId }}</p>
-                      <p class="text-xs text-muted-foreground">Expand grup untuk melihat seluruh data pembanding yang terkait dengan aset ini.</p>
-                    </div>
-                    <Button v-if="group.assetDetailUrl" variant="outline" size="sm" as-child>
-                      <Link :href="group.assetDetailUrl">Buka Aset</Link>
-                    </Button>
-                  </div>
+            <template #cell-shape="{ row }">
+              {{ formatArea(row.raw_land_area) }} / {{ formatArea(row.raw_building_area) }}
+            </template>
 
-                  <div class="overflow-x-auto rounded-xl border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Ext ID</TableHead>
-                          <TableHead>Dipakai</TableHead>
-                          <TableHead>Score</TableHead>
-                          <TableHead>LT / LB</TableHead>
-                          <TableHead>Adj</TableHead>
-                          <TableHead>Nilai</TableHead>
-                          <TableHead>Aksi</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <TableRow v-for="item in group.items" :key="item.id">
-                          <TableCell class="font-medium">{{ item.external_id }}</TableCell>
-                          <TableCell>
-                            <Badge :variant="item.is_selected ? 'default' : 'outline'">
-                              {{ item.is_selected ? 'Dipakai' : 'Tidak' }}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{{ item.score ?? '-' }}</TableCell>
-                          <TableCell>{{ formatArea(item.raw_land_area) }} / {{ formatArea(item.raw_building_area) }}</TableCell>
-                          <TableCell>{{ formatPercent(item.total_adjustment_percent ?? 0) }}</TableCell>
-                          <TableCell>
-                            <p>{{ formatCurrency(item.adjusted_unit_value) }}</p>
-                            <p class="mt-1 text-xs text-muted-foreground">Indikasi {{ formatCurrency(item.indication_value) }}</p>
-                          </TableCell>
-                          <TableCell>
-                            <div class="flex flex-wrap gap-2">
-                              <Button variant="link" class="h-auto px-0" as-child>
-                                <Link :href="item.detail_url">Detail</Link>
-                              </Button>
-                              <Button variant="link" class="h-auto px-0" as-child>
-                                <Link :href="item.adjustment_url">Adjust Harga Tanah</Link>
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </div>
+            <template #cell-adjustment="{ row }">
+              <div>{{ formatPercent(row.total_adjustment_percent ?? 0) }}</div>
+              <div class="mt-1 text-xs text-slate-500">{{ row.land_adjustments_count }} faktor</div>
+            </template>
 
-          <div v-else class="rounded-xl border border-dashed px-6 py-12 text-center text-muted-foreground">
-            Belum ada comparable yang sesuai filter.
-          </div>
+            <template #cell-value="{ row }">
+              <div>{{ formatCurrency(row.adjusted_unit_value) }}</div>
+              <div class="mt-1 text-xs text-slate-500">Indikasi {{ formatCurrency(row.indication_value) }}</div>
+            </template>
 
-          <div class="mt-4 border-t pt-4">
-            <PaginationBar :links="comparables.links || []" />
-          </div>
+            <template #cell-actions="{ row }">
+              <div class="flex flex-wrap gap-3">
+                <Button variant="link" class="h-auto px-0" as-child>
+                  <Link :href="row.detail_url">Detail</Link>
+                </Button>
+                <Button variant="link" class="h-auto px-0" as-child>
+                  <Link :href="row.adjustment_url">Adjust Harga Tanah</Link>
+                </Button>
+              </div>
+            </template>
+          </AdminDataTable>
         </CardContent>
       </Card>
     </div>

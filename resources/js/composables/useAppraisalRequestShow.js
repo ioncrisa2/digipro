@@ -42,11 +42,11 @@ export function useAppraisalRequestShow(props) {
   function docTypeLabel(type) {
     const t = String(type || "").trim();
     const map = {
-      agreement_pdf: "Agreement DigiPro",
+      agreement_pdf: "Agreement DigiPro by KJPP HJAR",
       npwp: "NPWP",
       representative: "Surat Kuasa / Perwakilan",
-      representative_letter_pdf: "Surat Representatif DigiPro",
-      disclaimer_pdf: "Disclaimer DigiPro",
+      representative_letter_pdf: "Surat Representatif DigiPro by KJPP HJAR",
+      disclaimer_pdf: "Disclaimer DigiPro by KJPP HJAR",
       permission: "Surat Izin Aset",
       contract_signed_pdf: "PDF Kontrak Ditandatangani",
       doc_pbb: "PBB",

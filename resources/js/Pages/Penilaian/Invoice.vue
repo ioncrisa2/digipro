@@ -206,7 +206,7 @@ const downloadInvoicePdf = () => {
             <Card>
                 <CardHeader class="pb-3">
                     <CardTitle class="text-base">Keterangan</CardTitle>
-                    <CardDescription>Ringkasan transaksi yang tercatat di DigiPro</CardDescription>
+                    <CardDescription>Ringkasan transaksi yang tercatat di DigiPro by KJPP HJAR</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-3">
                     <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
@@ -215,7 +215,7 @@ const downloadInvoicePdf = () => {
                             Pembayaran terverifikasi otomatis
                         </div>
                         <p class="mt-1 text-xs text-emerald-800">
-                            Status pembayaran telah diterima DigiPro dari Midtrans dan proses penilaian sudah berjalan.
+                            Status pembayaran telah diterima DigiPro by KJPP HJAR dari Midtrans dan proses penilaian sudah berjalan.
                         </p>
                     </div>
                 </CardContent>

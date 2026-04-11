@@ -45,7 +45,7 @@ const submit = () => {
             {{ isEditMode ? 'Edit Penandatangan Report' : 'Tambah Penandatangan Report' }}
           </h1>
           <p class="mt-2 text-sm text-slate-600">
-            Master profil ini dipakai admin saat menentukan reviewer dan penilai publik untuk report DigiPro.
+            Master profil ini dipakai admin saat menentukan reviewer dan penilai publik untuk report DigiPro by KJPP HJAR.
           </p>
         </div>
         <Button variant="outline" as-child><Link :href="indexUrl">Kembali ke daftar</Link></Button>

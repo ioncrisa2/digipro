@@ -9,6 +9,7 @@ class ReviewIndexRequest extends ReviewerFormRequest
         return [
             'q' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', 'string', 'max:50'],
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
         ];
     }
 
@@ -17,6 +18,7 @@ class ReviewIndexRequest extends ReviewerFormRequest
         return [
             'q' => trim((string) $this->string('q')->toString()),
             'status' => (string) $this->string('status', 'all'),
+            'per_page' => $this->perPage(12),
         ];
     }
 }

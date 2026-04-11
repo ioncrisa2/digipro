@@ -393,7 +393,7 @@ class PaymentController extends Controller
             'status_label' => 'LUNAS',
             'payment_status' => $payment->status,
             'gateway_details' => $gatewayDetails,
-            'company_name' => config('app.name', 'DigiPro'),
+            'company_name' => config('app.name', 'DigiPro by KJPP HJAR'),
             'external_payment_id' => $payment->external_payment_id,
             'billing_summary' => $billingSummary,
         ];

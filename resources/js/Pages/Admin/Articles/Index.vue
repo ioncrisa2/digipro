@@ -135,7 +135,7 @@ const columns = [
         <div>
           <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">CMS Artikel</h1>
           <p class="mt-2 text-sm text-slate-600">
-            Workspace editorial untuk menulis, menjadwalkan, dan mempublikasikan artikel DigiPro.
+            Workspace editorial untuk menulis, menjadwalkan, dan mempublikasikan artikel DigiPro by KJPP HJAR.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">

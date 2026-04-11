@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import { ArrowRight, Menu, Search } from 'lucide-vue-next'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
@@ -69,18 +70,11 @@ onBeforeUnmount(() => {
     "
   >
     <div class="mx-auto flex h-20 w-full max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
-      <Link href="/" class="group flex items-center gap-3">
-        <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-bold text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)] transition-transform duration-300 group-hover:scale-[1.03]">
-          DP
-        </div>
-        <div class="leading-tight">
-          <div class="text-[11px] font-semibold uppercase tracking-[0.28em] text-emerald-700">
-            DigiPro Journal
-          </div>
-          <div class="font-['Space_Grotesk'] text-lg font-semibold tracking-tight text-slate-950">
-            Artikel & Insight
-          </div>
-        </div>
+      <Link href="/" class="group flex items-center">
+        <BrandLockup
+          wrapper-class="border border-black/5 bg-white/95 shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+          logo-class="w-[180px] sm:w-[208px]"
+        />
       </Link>
 
       <div class="hidden flex-1 items-center justify-center lg:flex">
@@ -135,7 +129,7 @@ onBeforeUnmount(() => {
           as-child
         >
           <Link href="/">
-            Open DigiPro
+            Buka DigiPro by KJPP HJAR
             <ArrowRight class="ml-2 h-4 w-4" />
           </Link>
         </Button>
@@ -151,8 +145,11 @@ onBeforeUnmount(() => {
 
           <SheetContent side="right" class="w-[22rem] border-l-white/60 bg-[#f7f4ed]">
             <SheetHeader>
-              <SheetTitle class="text-left font-['Space_Grotesk'] text-2xl font-semibold tracking-tight text-slate-950">
-                DigiPro Journal
+              <SheetTitle class="text-left">
+                <BrandLockup
+                  wrapper-class="border border-black/5 bg-white"
+                  logo-class="w-[204px]"
+                />
               </SheetTitle>
             </SheetHeader>
 
@@ -223,7 +220,7 @@ onBeforeUnmount(() => {
 
               <Button class="w-full rounded-full bg-slate-950 text-white hover:bg-slate-800" as-child>
                 <Link href="/">
-                  Open DigiPro
+                  Buka DigiPro by KJPP HJAR
                   <ArrowRight class="ml-2 h-4 w-4" />
                 </Link>
               </Button>

@@ -10,6 +10,7 @@ import LandingFeaturesSection from '@/components/landing/LandingFeaturesSection.
 import LandingWorkflowSection from '@/components/landing/LandingWorkflowSection.vue'
 import LandingTestimonialsSection from '@/components/landing/LandingTestimonialsSection.vue'
 import LandingFaqSection from '@/components/landing/LandingFaqSection.vue'
+import LandingRecentArticlesSection from '@/components/landing/LandingRecentArticlesSection.vue'
 import LandingFinalCtaSection from '@/components/landing/LandingFinalCtaSection.vue'
 import {
   buildLandingFeatureCards,
@@ -25,6 +26,7 @@ import { ArrowUp } from 'lucide-vue-next'
 const props = defineProps({
   features: { type: Array, default: () => [] },
   faqs: { type: Array, default: () => [] },
+  recentArticles: { type: Array, default: () => [] },
   testimonials: { type: Array, default: () => [] },
   heroBackgroundUrl: { type: String, default: '' },
   platformPreviewImages: { type: Array, default: () => [] },
@@ -106,6 +108,8 @@ onBeforeUnmount(() => {
     <LandingFeaturesSection :feature-cards="featureCards" />
 
     <LandingWorkflowSection :process-steps="processSteps" />
+
+    <LandingRecentArticlesSection :articles="props.recentArticles" />
 
     <LandingTestimonialsSection
       :testimonials="props.testimonials"

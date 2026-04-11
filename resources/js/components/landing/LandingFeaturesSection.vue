@@ -17,7 +17,6 @@ const iconMap = {
   <section id="features" class="scroll-mt-24 px-6 py-24">
     <div class="mx-auto max-w-7xl space-y-14">
       <div class="max-w-3xl space-y-4">
-        <div class="text-sm font-medium uppercase tracking-[0.28em] text-slate-500">Core Features</div>
         <h2 class="text-3xl font-semibold tracking-tight md:text-5xl">Fitur tetap ada, tapi sekarang setiap narasi punya visual pendukung.</h2>
         <p class="text-base leading-7 text-slate-600 md:text-lg">
           Struktur ini sudah siap untuk dipasangi upload image per fitur. Sementara itu saya pakai placeholder agar section ini tidak lagi hanya berupa blok kata-kata.

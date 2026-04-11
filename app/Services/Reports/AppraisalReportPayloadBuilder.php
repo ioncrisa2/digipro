@@ -118,7 +118,7 @@ class AppraisalReportPayloadBuilder
 
         return [
             'title' => 'LAPORAN KAJIAN PASAR PROPERTI DALAM BENTUK RANGE',
-            'subtitle' => 'Estimasi rentang harga properti berbasis data, dokumen, foto, dan kajian pasar digital DigiPro',
+            'subtitle' => 'Estimasi rentang harga properti berbasis data, dokumen, foto, dan kajian pasar digital DigiPro by KJPP HJAR',
             'request_number' => $record->request_number ?? ('REQ-' . $record->id),
             'client_name' => $record->client_name ?: ($record->user?->name ?? '-'),
             'prepared_for' => $record->client_name ?: ($record->user?->name ?? '-'),
@@ -140,7 +140,7 @@ class AppraisalReportPayloadBuilder
             'summary' => $summary,
             'cover_range_text' => $this->rangeText($summary['estimated_value_low'], $summary['estimated_value_high']),
             'scope_points' => [
-                'Kajian dilakukan terhadap data objek, foto, dokumen legalitas, dan informasi digital yang tersedia di sistem DigiPro.',
+                'Kajian dilakukan terhadap data objek, foto, dokumen legalitas, dan informasi digital yang tersedia di sistem DigiPro by KJPP HJAR.',
                 'Pendekatan kajian menggunakan data pembanding pasar yang relevan untuk menghasilkan estimasi bawah dan estimasi atas.',
                 'Laporan ini disusun untuk tujuan kajian pasar dalam bentuk range dan bukan opini nilai tunggal penilaian formal.',
             ],
@@ -151,7 +151,7 @@ class AppraisalReportPayloadBuilder
             ],
             'statement_points' => [
                 'Laporan disusun secara independen berdasarkan data yang tersedia pada saat kajian dilakukan.',
-                'Tidak terdapat konflik kepentingan terhadap objek properti yang dikaji dalam lingkup layanan DigiPro ini.',
+                'Tidak terdapat konflik kepentingan terhadap objek properti yang dikaji dalam lingkup layanan DigiPro by KJPP HJAR ini.',
                 'Rentang hasil kajian ditampilkan pada level request dan per aset untuk membantu pengguna memahami posisi estimasi pasar saat ini.',
             ],
             'methodology_points' => [

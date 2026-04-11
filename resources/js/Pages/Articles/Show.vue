@@ -10,7 +10,7 @@ const page = usePage()
 const article = computed(() => page.props.article)
 const relatedArticles = computed(() => page.props.relatedArticles ?? [])
 
-const metaTitle = computed(() => article.value?.meta_title || article.value?.title || 'Artikel DigiPro')
+const metaTitle = computed(() => article.value?.meta_title || article.value?.title || 'Artikel DigiPro by KJPP HJAR')
 const metaDescription = computed(() => article.value?.meta_description || article.value?.excerpt || '')
 
 const slugify = (value) =>

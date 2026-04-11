@@ -29,7 +29,7 @@ onBeforeUnmount(() => {
       <div class="p-3 bg-slate-900 text-white rounded-2xl mb-2 shadow-lg shadow-slate-200">
         <LogIn class="w-6 h-6" />
       </div>
-      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Masuk ke DigiPro</h1>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Masuk ke DigiPro by KJPP HJAR</h1>
       <p class="text-sm text-slate-500 max-w-[300px]">
         Gunakan email terdaftar untuk mengakses dashboard appraisal Anda.
       </p>

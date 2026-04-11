@@ -19,7 +19,7 @@ const meta = computed(() => {
   const doc = policyDocument.value
   return {
     title: doc?.title || 'Kebijakan Privasi',
-    company: doc?.company || 'DigiPro',
+    company: doc?.company || 'DigiPro by KJPP HJAR',
     version: doc?.version || '-',
     effectiveSince: formatMonthYear(doc?.effective_since),
   }

@@ -102,8 +102,8 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(AppraisalRequestCancellation::class);
     }
 
-    // public function sendPasswordResetNotification($token): void
-    // {
-    //     $this->notify(new ResetPasswordNotification($token));
-    // }
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
+    }
 }

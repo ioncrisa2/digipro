@@ -4,7 +4,7 @@ import BlogNavbar from '@/layouts/BlogNavbar.vue'
 import BlogFooter from '@/layouts/BlogFooter.vue'
 
 defineProps({
-  title: { type: String, default: 'Artikel DigiPro' },
+  title: { type: String, default: 'Artikel DigiPro by KJPP HJAR' },
   description: { type: String, default: '' },
 })
 </script>

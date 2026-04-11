@@ -10,7 +10,7 @@ class SupportContact
     public static function defaults(): array
     {
         return [
-            'name' => (string) config('support.name', 'Tim Support DigiPro'),
+            'name' => (string) config('support.name', 'Tim Support DigiPro by KJPP HJAR'),
             'phone' => (string) config('support.phone', ''),
             'whatsapp' => (string) config('support.whatsapp', ''),
             'email' => (string) config('support.email', ''),

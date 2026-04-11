@@ -64,7 +64,7 @@ class AppraisalFinalDocumentService
         $requestNumber = $this->safeRequestNumber($record);
         $pdfBinary = Pdf::loadView('pdfs.appraisal-contract-offer', [
             'doc' => array_merge($doc, [
-                'title' => 'AGREEMENT LAYANAN DIGIPRO',
+                'title' => 'AGREEMENT LAYANAN DIGIPRO BY KJPP HJAR',
                 'subtitle' => '(Dokumen agreement final customer)',
             ]),
         ])->setPaper('a4', 'portrait')->output();
@@ -84,13 +84,13 @@ class AppraisalFinalDocumentService
     {
         $consentDocument = $this->resolveConsentDocument($record);
         $payload = [
-            'title' => 'DISCLAIMER & PERSETUJUAN DIGIPRO',
+            'title' => 'DISCLAIMER & PERSETUJUAN DIGIPRO BY KJPP HJAR',
             'request_number' => $record->request_number ?? ('REQ-' . $record->id),
             'client_name' => $record->client_name ?: ($record->user?->name ?? '-'),
             'accepted_at' => optional($record->consent_accepted_at)->toDateTimeString() ?: '-',
             'version' => $record->consent_version ?: '-',
             'hash' => $record->consent_hash ?: '-',
-            'document_title' => $consentDocument?->title ?? 'Dokumen Consent DigiPro',
+            'document_title' => $consentDocument?->title ?? 'Dokumen Consent DigiPro by KJPP HJAR',
             'sections' => is_array($consentDocument?->sections) ? $consentDocument->sections : [],
             'checkbox_label' => $consentDocument?->checkbox_label
                 ?? 'Saya telah membaca, memahami, dan menyetujui dokumen ini.',

@@ -46,7 +46,7 @@ const submitSearch = () => {
 </script>
 
 <template>
-  <BlogPageLayout title="Artikel DigiPro" description="Insight, panduan, dan pembacaan pasar properti dari DigiPro.">
+  <BlogPageLayout title="Artikel DigiPro by KJPP HJAR" description="Insight, panduan, dan pembacaan pasar properti dari DigiPro by KJPP HJAR.">
     <section class="relative overflow-hidden border-b border-black/5">
       <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(15,23,42,0.95)_0%,rgba(15,23,42,0.82)_38%,rgba(6,78,59,0.68)_100%)]" />
       <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.26),transparent_28%)]" />
@@ -55,13 +55,13 @@ const submitSearch = () => {
         <div class="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div class="max-w-3xl space-y-6">
             <p class="text-xs font-semibold uppercase tracking-[0.32em] text-emerald-200">
-              DigiPro Journal
+              DigiPro by KJPP HJAR
             </p>
             <h1 class="font-['Space_Grotesk'] text-4xl font-semibold leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
               Perspektif properti yang lebih tajam, operasional, dan bisa dipakai.
             </h1>
             <p class="max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
-              Kumpulan artikel DigiPro untuk membahas valuasi, data pasar, regulasi, dan keputusan praktis di sekitar proses penilaian properti.
+              Kumpulan artikel DigiPro by KJPP HJAR untuk membahas valuasi, data pasar, regulasi, dan keputusan praktis di sekitar proses penilaian properti.
             </p>
 
             <div class="flex flex-col gap-3 sm:flex-row">
@@ -75,7 +75,7 @@ const submitSearch = () => {
                 href="/"
                 class="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
               >
-                Open DigiPro
+                Buka DigiPro by KJPP HJAR
               </Link>
             </div>
           </div>
@@ -97,7 +97,7 @@ const submitSearch = () => {
                 Valuasi, pasar, dan regulasi
               </p>
               <p class="mt-2 text-sm leading-6 text-slate-200">
-                Disusun agar relevan untuk pengguna DigiPro, bukan sekadar artikel umum properti.
+                Disusun agar relevan untuk pengguna DigiPro by KJPP HJAR, bukan sekadar artikel umum properti.
               </p>
             </div>
           </div>
@@ -125,7 +125,7 @@ const submitSearch = () => {
               <ArticleCover
                 :cover-path="featuredArticle.cover_image_path"
                 :alt="featuredArticle.title"
-                fallback-text="DigiPro Feature"
+                fallback-text="DigiPro by KJPP HJAR"
                 wrapper-class="aspect-[4/3] overflow-hidden bg-[#d9ddd6] lg:aspect-auto lg:min-h-[28rem]"
                 image-class="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]"
                 fallback-class="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#0f172a,#065f46)] text-sm font-semibold uppercase tracking-[0.24em] text-white/80"
@@ -182,7 +182,7 @@ const submitSearch = () => {
                 <ArticleCover
                   :cover-path="article.cover_image_path"
                   :alt="article.title"
-                  fallback-text="DigiPro"
+                  fallback-text="DigiPro by KJPP HJAR"
                   wrapper-class="aspect-[4/3] overflow-hidden rounded-[1.5rem] bg-[#e5e7eb]"
                   image-class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                   fallback-class="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#0f172a,#1f2937)] text-xs font-semibold uppercase tracking-[0.24em] text-white/75"

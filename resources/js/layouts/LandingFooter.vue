@@ -1,5 +1,6 @@
 ﻿<script setup>
 import { Link } from '@inertiajs/vue3'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
 import NotificationCenter from '@/components/ui/notification/NotificationCenter.vue'
 </script>
 
@@ -9,11 +10,14 @@ import NotificationCenter from '@/components/ui/notification/NotificationCenter.
     <footer class="bg-slate-900 text-slate-100 py-8 px-6">
       <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         <div>
-          <div class="text-xl font-semibold">DigiPro</div>
+          <BrandLockup
+            wrapper-class="shadow-[0_18px_40px_rgba(15,23,42,0.22)]"
+            logo-class="w-[220px] sm:w-[248px]"
+          />
           <p class="text-base text-slate-300 mt-2">
-            Platform penilaian properti digital untuk institusi keuangan, developer, dan pemilik aset.
+            Produk digital resmi untuk proses penilaian properti oleh KJPP Henricus Judi Adrianto & Rekan.
           </p>
-          <p class="text-sm text-slate-500 mt-4">(c) 2026 DigiPro. All rights reserved.</p>
+          <p class="text-sm text-slate-500 mt-4">(c) 2026 DigiPro by KJPP HJAR. All rights reserved.</p>
         </div>
 
         <div>

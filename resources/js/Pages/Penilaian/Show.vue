@@ -398,7 +398,7 @@ const submitCancellationRequest = () => {
                             <div class="space-y-2">
                                 <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Support Contact</p>
                                 <div class="text-sm font-medium text-slate-950">
-                                    {{ supportContact?.name || "Tim Admin DigiPro" }}
+                                    {{ supportContact?.name || "Tim Admin DigiPro by KJPP HJAR" }}
                                 </div>
                                 <div class="flex items-center gap-2 text-sm text-slate-600">
                                     <PhoneCall class="h-4 w-4" />
@@ -442,7 +442,7 @@ const submitCancellationRequest = () => {
                             <div class="space-y-2">
                                 <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Butuh Bantuan</p>
                                 <div class="text-sm font-medium text-slate-950">
-                                    {{ supportContact?.name || "Tim Admin DigiPro" }}
+                                    {{ supportContact?.name || "Tim Admin DigiPro by KJPP HJAR" }}
                                 </div>
                                 <div class="flex items-center gap-2 text-sm text-slate-600">
                                     <PhoneCall class="h-4 w-4" />

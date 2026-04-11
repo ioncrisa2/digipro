@@ -15,12 +15,12 @@ const emit = defineEmits(['previous', 'next', 'go'])
   <section id="showcase" class="scroll-mt-24 bg-[#111827] px-6 py-24 text-white">
     <div class="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
       <div class="space-y-6">
-        <div class="text-sm font-medium uppercase tracking-[0.28em] text-cyan-300/80">Platform Preview</div>
         <h2 class="max-w-lg text-3xl font-semibold tracking-tight md:text-5xl">
-          Tetap pertahankan narasi, tapi sekarang setiap slide punya visual yang lebih kuat.
+          Lihat bagaimana proses penilaian berjalan lebih rapi, cepat, dan mudah dipantau.
         </h2>
         <p class="max-w-xl text-base leading-7 text-slate-300 md:text-lg">
-          Section ini dipindahkan ke surface gelap agar image lebih menonjol. Visual SVG lama diganti dengan image placeholder yang nanti bisa Anda replace satu per satu.
+          DigiPro by KJPP HJAR membantu permohonan, Verifikasi Dokumen, Appraisal Review, hingga laporan akhir
+          berjalan dalam satu alur digital yang lebih terstruktur.
         </p>
 
         <div class="flex items-center gap-3">
@@ -57,7 +57,7 @@ const emit = defineEmits(['previous', 'next', 'go'])
             <div class="relative min-h-[520px]">
               <div class="absolute bottom-4 left-1/2 w-[calc(100%-2rem)] -translate-x-1/2 rounded-[1.5rem] border border-white/12 bg-slate-950/72 p-6 text-center shadow-[0_24px_70px_rgba(0,0,0,0.3)] backdrop-blur md:bottom-6 md:right-6 md:left-auto md:w-[min(420px,42%)] md:translate-x-0 md:text-left">
                 <div class="space-y-4">
-                  <div class="text-xs font-medium uppercase tracking-[0.24em] text-cyan-300/80">Highlight</div>
+                  <div class="text-xs font-medium uppercase tracking-[0.24em] text-cyan-300/80">Preview Platform</div>
                   <h3 class="text-2xl font-semibold text-white md:text-3xl">{{ currentSlide.title }}</h3>
                   <p class="text-sm leading-7 text-slate-200 md:text-base">{{ currentSlide.description }}</p>
                 </div>

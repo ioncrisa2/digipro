@@ -57,7 +57,7 @@
 <body>
     <section class="cover">
         <div class="cover-inner">
-            <div class="eyebrow">DigiPro Property Market Study</div>
+            <div class="eyebrow">DigiPro by KJPP HJAR Property Market Study</div>
             <div class="title">{{ $report['title'] ?? '-' }}</div>
             <div class="subtitle">{{ $report['subtitle'] ?? '-' }}</div>
 
@@ -65,7 +65,7 @@
                 <div class="metric-label">Kesimpulan Range</div>
                 <div class="metric-value">{{ $report['cover_range_text'] ?? '-' }}</div>
                 <div class="small-note">
-                    Dokumen ini merangkum estimasi bawah dan estimasi atas properti berdasarkan kajian pasar yang dilakukan DigiPro.
+                    Dokumen ini merangkum estimasi bawah dan estimasi atas properti berdasarkan kajian pasar yang dilakukan DigiPro by KJPP HJAR.
                 </div>
             </div>
 
@@ -106,7 +106,7 @@
         <div class="section-title">Surat Pengantar / Executive Summary</div>
         <p class="lead">
             Laporan ini disusun untuk memberikan gambaran estimasi rentang harga properti berdasarkan data objek, dokumen legalitas, foto, dan kajian pasar yang relevan pada tanggal penilaian.
-            Output DigiPro disajikan dalam bentuk range agar pengguna memperoleh batas bawah dan batas atas estimasi pasar, bukan opini nilai tunggal.
+            Output DigiPro by KJPP HJAR disajikan dalam bentuk range agar pengguna memperoleh batas bawah dan batas atas estimasi pasar, bukan opini nilai tunggal.
         </p>
 
         <div class="section">
@@ -155,7 +155,7 @@
     <section class="page-break">
         <div class="section-title">Uraian Pasar dan Metode Kajian</div>
         <p class="lead">
-            DigiPro menggunakan pendekatan kajian pasar dengan melihat karakteristik objek, kecocokan peruntukan, kualitas legalitas, serta data pembanding pasar yang tersedia pada sistem.
+            DigiPro by KJPP HJAR menggunakan pendekatan kajian pasar dengan melihat karakteristik objek, kecocokan peruntukan, kualitas legalitas, serta data pembanding pasar yang tersedia pada sistem.
             Rentang hasil kajian merangkum posisi estimasi bawah dan estimasi atas yang dinilai paling merepresentasikan kondisi pasar pada tanggal penilaian.
         </p>
 
@@ -359,7 +359,7 @@
         <div class="section">
             <div class="section-title">Penutup dan Otorisasi</div>
             <p class="lead">
-                Draft ini disiapkan sebagai dasar finalisasi laporan DigiPro. Identitas reviewer dan penilai publik yang tampil di bawah mengikuti profil signer yang dipilih admin pada request ini.
+                Draft ini disiapkan sebagai dasar finalisasi laporan DigiPro by KJPP HJAR. Identitas reviewer dan penilai publik yang tampil di bawah mengikuti profil signer yang dipilih admin pada request ini.
             </p>
 
             <table class="signatures">

@@ -28,7 +28,7 @@ defineProps({
         </div>
 
         <div class="space-y-4">
-          <div class="text-sm font-medium uppercase tracking-[0.32em] text-white/60">DigiPro Valuation Platform</div>
+          <div class="text-sm font-medium uppercase tracking-[0.32em] text-white/60">DigiPro by KJPP HJAR</div>
           <h1 class="max-w-4xl text-4xl font-semibold leading-[0.95] tracking-tight md:text-6xl">
             Penilaian properti yang terasa lebih cepat, lebih rapi, dan lebih mudah dipahami.
           </h1>

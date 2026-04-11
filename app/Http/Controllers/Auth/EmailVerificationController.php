@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Support\SystemNavigation;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,8 +15,12 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
  */
 class EmailVerificationController extends Controller
 {
-    public function notice(Request $request): Response
+    public function notice(Request $request): Response|RedirectResponse
     {
+        if ($request->user()?->hasVerifiedEmail()) {
+            return redirect()->to($this->resolveVerifiedRedirect($request));
+        }
+
         return Inertia::render('Auth/VerifyEmail');
     }
 
@@ -29,15 +34,38 @@ class EmailVerificationController extends Controller
     public function success(Request $request): Response
     {
         return Inertia::render('Auth/VerifySuccess', [
-            'redirectTo' => route('dashboard'),
+            'redirectTo' => $this->resolveVerifiedRedirect($request),
             'countdownSeconds' => 5,
         ]);
     }
 
     public function send(Request $request): RedirectResponse
     {
+        if ($request->user()?->hasVerifiedEmail()) {
+            return redirect()->to($this->resolveVerifiedRedirect($request));
+        }
+
         $request->user()->sendEmailVerificationNotification();
 
         return back()->with('status', 'verification-link-sent');
+    }
+
+    private function resolveVerifiedRedirect(Request $request): string
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return route('login');
+        }
+
+        if ($user->isReviewer()) {
+            return route(SystemNavigation::firstAccessibleRouteName($user, 'reviewer') ?? 'reviewer.dashboard');
+        }
+
+        if ($user->hasAdminNavigationAccess()) {
+            return route('admin.dashboard');
+        }
+
+        return route('dashboard');
     }
 }

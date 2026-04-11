@@ -55,7 +55,7 @@ const baseSections = computed(() => {
     {
       key: "system",
       title: "Dokumen Sistem",
-      description: "Dokumen yang dihasilkan workflow DigiPro selama proses penilaian berjalan.",
+      description: "Dokumen yang dihasilkan workflow DigiPro by KJPP HJAR selama proses penilaian berjalan.",
       icon: FileArchive,
       items: normalizeItems(workspace.systemDocuments, "system", "system", "Dokumen Sistem"),
     },

@@ -69,7 +69,7 @@ const groupedSections = computed(() => [
   {
     key: "system",
     title: "Dokumen Sistem",
-    description: "Dokumen yang disiapkan oleh workflow DigiPro selama proses permohonan berjalan.",
+    description: "Dokumen yang disiapkan oleh workflow DigiPro by KJPP HJAR selama proses permohonan berjalan.",
     items: props.report.system_documents || [],
     empty: "Belum ada dokumen sistem yang siap diakses untuk request ini.",
     icon: FileArchive,

@@ -8,7 +8,7 @@ const year = new Date().getFullYear();
   <footer class="border-t border-slate-200 bg-white px-4 py-4 text-xs text-slate-500 lg:px-6">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        DIGIPRO (c) {{ year }}. All rights reserved.
+        DIGIPRO BY KJPP HJAR (c) {{ year }}. All rights reserved.
       </div>
       <div class="flex flex-wrap items-center gap-4">
         <Link href="/terms" class="hover:text-slate-700">Syarat & Ketentuan</Link>

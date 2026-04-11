@@ -1,4 +1,4 @@
-# DIGIPRO
+# DigiPro by KJPP HJAR
 
 Platform penilaian properti end-to-end untuk KJPP dan institusi finansial. Portal pelanggan (Inertia + Vue) menangani permohonan hingga pembayaran, sementara back-office Filament memudahkan tim internal mengelola appraisal, konten, dan master data. Panel reviewer terpisah mendukung proses valuasi.
 
@@ -26,7 +26,7 @@ Platform penilaian properti end-to-end untuk KJPP dan institusi finansial. Porta
 - Akses internet sekali untuk sinkronisasi data wilayah
 
 ## Setup Lokal (Windows/Unix)
-1) Salin env: `cp .env.example .env` (Windows: `copy .env.example .env`) lalu set `APP_NAME=DIGIPRO`, `APP_URL`, kredensial DB & mail.
+1) Salin env: `cp .env.example .env` (Windows: `copy .env.example .env`) lalu set `APP_NAME="DigiPro by KJPP HJAR"`, `APP_URL`, kredensial DB & mail.
 2) Pasang dependensi PHP: `composer install`
 3) Generate key: `php artisan key:generate`
 4) Migrasi & seeder dasar: `php artisan migrate --seed`

@@ -43,8 +43,8 @@ class CustomerAppraisalCreateBuilder
             'needsConsent' => $needsConsent,
             'consentData' => $consentData,
             'representativeLetterNotice' => [
-                'title' => 'Surat Representatif DigiPro',
-                'description' => 'Setelah request dilanjutkan dan kontrak ditandatangani, DigiPro akan menyiapkan surat representatif berdasarkan data permohonan dan dokumen yang Anda kirim.',
+                'title' => 'Surat Representatif DigiPro by KJPP HJAR',
+                'description' => 'Setelah request dilanjutkan dan kontrak ditandatangani, DigiPro by KJPP HJAR akan menyiapkan surat representatif berdasarkan data permohonan dan dokumen yang Anda kirim.',
             ],
             'valuationObjective' => [
                 'value' => ValuationObjectiveEnum::KajianNilaiPasarRange->value,

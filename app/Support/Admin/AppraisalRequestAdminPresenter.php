@@ -341,12 +341,12 @@ class AppraisalRequestAdminPresenter
     private function requestFileTypeLabel(?string $type): string
     {
         return match ((string) $type) {
-            'agreement_pdf' => 'Agreement DigiPro',
+            'agreement_pdf' => 'Agreement DigiPro by KJPP HJAR',
             'contract_signed_pdf' => 'PDF Kontrak Ditandatangani',
-            'disclaimer_pdf' => 'Disclaimer DigiPro',
+            'disclaimer_pdf' => 'Disclaimer DigiPro by KJPP HJAR',
             'npwp' => 'NPWP',
             'representative' => 'Surat Kuasa',
-            'representative_letter_pdf' => 'Surat Representatif DigiPro',
+            'representative_letter_pdf' => 'Surat Representatif DigiPro by KJPP HJAR',
             'permission' => 'Surat Izin',
             'other_request_document' => 'Lampiran Request',
             default => Str::headline((string) $type),

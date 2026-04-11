@@ -35,6 +35,8 @@ class StoreAppraisalRequest extends CustomerFormRequest
 
         $this->merge([
             'assets' => $assets,
+            'report_format' => 'both',
+            'physical_copies_count' => 1,
         ]);
     }
 
@@ -44,7 +46,7 @@ class StoreAppraisalRequest extends CustomerFormRequest
             'sertifikat_on_hand_confirmed' => ['accepted'],
             'certificate_not_encumbered_confirmed' => ['accepted'],
             'report_format' => ['required', 'in:both'],
-            'physical_copies_count' => ['required', 'integer', 'min:1', 'max:20'],
+            'physical_copies_count' => ['required', 'integer', 'min:1', 'max:1'],
             'assets' => ['required', 'array', 'min:1'],
             'assets.*.type' => ['required', 'string'],
 
@@ -149,10 +151,10 @@ class StoreAppraisalRequest extends CustomerFormRequest
                 );
             }
 
-            if ($physicalCopiesCount < 1) {
+            if ($physicalCopiesCount !== 1) {
                 $v->errors()->add(
                     'physical_copies_count',
-                    'Jumlah hard copy minimal 1 untuk setiap permohonan.'
+                    'Saat ini setiap permohonan otomatis diproses dengan 1 hard copy.'
                 );
             }
 
@@ -244,8 +246,8 @@ class StoreAppraisalRequest extends CustomerFormRequest
             'report_format.in' => 'Format laporan untuk permohonan ini harus digital dan hard copy.',
             'physical_copies_count.integer' => 'Jumlah hard copy harus berupa angka bulat.',
             'physical_copies_count.required' => 'Jumlah hard copy wajib diisi.',
-            'physical_copies_count.min' => 'Jumlah hard copy minimal 1.',
-            'physical_copies_count.max' => 'Jumlah hard copy terlalu besar untuk satu permohonan.',
+            'physical_copies_count.min' => 'Setiap permohonan otomatis diproses dengan 1 hard copy.',
+            'physical_copies_count.max' => 'Setiap permohonan otomatis diproses dengan 1 hard copy.',
 
             'assets.*.land_area.required' => 'Luas tanah wajib diisi.',
             'assets.*.land_area.numeric' => 'Luas tanah harus berupa angka.',

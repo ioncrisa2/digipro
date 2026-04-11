@@ -45,11 +45,11 @@ class CustomerRepresentativeLetterBuilder
             'client_name' => $record->client_name ?: ($record->user?->name ?? '-'),
             'asset_summaries' => $assetSummaries,
             'statement_items' => [
-                'Seluruh data, pernyataan, foto, dan dokumen yang saya unggah ke DigiPro adalah benar, lengkap, dan sesuai kondisi objek yang sebenarnya pada saat permohonan dibuat.',
-                'Saya menyatakan dokumen kepemilikan utama tersedia/on hand dan tidak sedang dijaminkan pada saat permohonan diajukan melalui platform DigiPro.',
-                'Saya memahami bahwa hasil layanan dan dokumen turunannya disusun berdasarkan informasi yang saya berikan melalui proses digital DigiPro. Jika di kemudian hari terdapat ketidaksesuaian atau informasi yang tidak benar dari pihak saya, maka tanggung jawab atas akibat yang timbul berada pada pihak saya.',
-                'Saya memberikan pembebasan tanggung jawab kepada DigiPro dan tim operasionalnya atas kerugian, tuntutan, atau sengketa yang timbul akibat data atau dokumen yang saya sampaikan tidak benar, tidak lengkap, atau berubah tanpa pemberitahuan.',
-                'Saya memahami bahwa surat ini dan dokumen yang dihasilkan DigiPro digunakan hanya dalam konteks proses permohonan penilaian digital sesuai ketentuan layanan yang berlaku di platform.',
+                'Seluruh data, pernyataan, foto, dan dokumen yang saya unggah ke DigiPro by KJPP HJAR adalah benar, lengkap, dan sesuai kondisi objek yang sebenarnya pada saat permohonan dibuat.',
+                'Saya menyatakan dokumen kepemilikan utama tersedia/on hand dan tidak sedang dijaminkan pada saat permohonan diajukan melalui platform DigiPro by KJPP HJAR.',
+                'Saya memahami bahwa hasil layanan dan dokumen turunannya disusun berdasarkan informasi yang saya berikan melalui proses digital DigiPro by KJPP HJAR. Jika di kemudian hari terdapat ketidaksesuaian atau informasi yang tidak benar dari pihak saya, maka tanggung jawab atas akibat yang timbul berada pada pihak saya.',
+                'Saya memberikan pembebasan tanggung jawab kepada DigiPro by KJPP HJAR dan tim operasionalnya atas kerugian, tuntutan, atau sengketa yang timbul akibat data atau dokumen yang saya sampaikan tidak benar, tidak lengkap, atau berubah tanpa pemberitahuan.',
+                'Saya memahami bahwa surat ini dan dokumen yang dihasilkan DigiPro by KJPP HJAR digunakan hanya dalam konteks proses permohonan penilaian digital sesuai ketentuan layanan yang berlaku di platform.',
             ],
             'signature' => [
                 'signed_at' => $signatureMeta['signed_at'] ?? '-',

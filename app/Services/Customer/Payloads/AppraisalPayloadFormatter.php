@@ -67,18 +67,18 @@ class AppraisalPayloadFormatter
     public function contractDocumentTypeLabel(?string $type): string
     {
         return match ((string) $type) {
-            'agreement_pdf' => 'Agreement DigiPro',
+            'agreement_pdf' => 'Agreement DigiPro by KJPP HJAR',
             'contract_pdf' => 'Kontrak',
             'contract_signed_pdf' => 'PDF Kontrak Ditandatangani',
             'doc_certs' => 'Sertifikat',
             'doc_pbb' => 'PBB',
             'doc_imb' => 'IMB/PBG',
-            'disclaimer_pdf' => 'Disclaimer DigiPro',
+            'disclaimer_pdf' => 'Disclaimer DigiPro by KJPP HJAR',
             'doc_old_report' => 'Laporan Lama',
             'invoice_pdf' => 'Invoice Pembayaran',
             'npwp' => 'NPWP',
             'representative' => 'Surat Kuasa',
-            'representative_letter_pdf' => 'Surat Representatif DigiPro',
+            'representative_letter_pdf' => 'Surat Representatif DigiPro by KJPP HJAR',
             'permission' => 'Surat Izin',
             default => $this->headlineOrDash((string) $type),
         };

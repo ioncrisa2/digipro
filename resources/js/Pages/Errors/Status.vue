@@ -49,7 +49,7 @@ const statuses = {
   },
   503: {
     eyebrow: "Layanan Sementara Tidak Tersedia",
-    title: "DigiPro sedang menyiapkan sistem.",
+    title: "DigiPro by KJPP HJAR sedang menyiapkan sistem.",
     description:
       "Layanan sedang dalam proses pemeliharaan atau penyesuaian sementara. Silakan coba lagi beberapa saat lagi.",
     tone: "stone",
@@ -129,7 +129,7 @@ const goBack = () => {
 </script>
 
 <template>
-  <Head :title="`${statusLabel} • DigiPro`" />
+  <Head :title="`${statusLabel} • DigiPro by KJPP HJAR`" />
 
   <div
     class="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.12),_transparent_30%),linear-gradient(180deg,#f7f6f2_0%,#efece5_100%)] text-slate-900"
@@ -144,7 +144,7 @@ const goBack = () => {
           <div class="space-y-4">
             <div class="inline-flex items-center gap-3 rounded-full border border-white/70 bg-white/70 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-600 shadow-sm backdrop-blur">
               <span class="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-              DigiPro System Response
+              DigiPro by KJPP HJAR System Response
             </div>
 
             <div class="space-y-3">
@@ -204,7 +204,7 @@ const goBack = () => {
                     Catatan
                   </p>
                   <p class="mt-2 leading-6">
-                    Jika kendala ini terus muncul, laporkan status code <span class="font-semibold text-slate-900">{{ statusLabel }}</span> ke tim internal DigiPro.
+                    Jika kendala ini terus muncul, laporkan status code <span class="font-semibold text-slate-900">{{ statusLabel }}</span> ke tim internal DigiPro by KJPP HJAR.
                   </p>
                 </div>
               </div>

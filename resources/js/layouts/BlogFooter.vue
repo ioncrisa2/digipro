@@ -1,6 +1,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3'
 import { ArrowRight } from 'lucide-vue-next'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
 import NotificationCenter from '@/components/ui/notification/NotificationCenter.vue'
 
 const currentYear = new Date().getFullYear()
@@ -12,7 +13,7 @@ const footerLinks = {
     { label: 'Kebijakan Privasi', href: '/policy' },
   ],
   platform: [
-    { label: 'Open DigiPro', href: '/' },
+    { label: 'Buka DigiPro by KJPP HJAR', href: '/' },
     { label: 'Syarat & Ketentuan', href: '/terms' },
   ],
 }
@@ -26,22 +27,19 @@ const footerLinks = {
       <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div class="grid gap-10 lg:grid-cols-[1.4fr_0.8fr_0.8fr]">
           <div class="max-w-xl space-y-5">
-            <div class="inline-flex items-center gap-3">
-              <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-bold text-white">
-                DP
-              </div>
-              <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-emerald-700">
-                  DigiPro Journal
-                </p>
-                <h3 class="font-['Space_Grotesk'] text-2xl font-semibold tracking-tight text-slate-950">
-                  Insight properti, regulasi, dan pembacaan pasar.
-                </h3>
-              </div>
+            <div class="inline-flex items-center">
+              <BrandLockup
+                wrapper-class="border border-black/5 bg-white shadow-sm"
+                logo-class="w-[220px] sm:w-[248px]"
+              />
             </div>
 
+            <h3 class="font-['Space_Grotesk'] text-2xl font-semibold tracking-tight text-slate-950">
+              Insight properti, regulasi, dan pembacaan pasar.
+            </h3>
+
             <p class="max-w-lg text-sm leading-7 text-slate-600">
-              Kanal editorial DigiPro untuk membahas valuasi properti, konteks pasar, dan hal-hal operasional yang
+              Kanal editorial DigiPro by KJPP HJAR untuk membahas valuasi properti, konteks pasar, dan hal-hal operasional yang
               relevan untuk pengguna platform.
             </p>
 
@@ -49,7 +47,7 @@ const footerLinks = {
               href="/"
               class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
             >
-              Masuk ke DigiPro
+              Masuk ke DigiPro by KJPP HJAR
               <ArrowRight class="h-4 w-4" />
             </Link>
           </div>
@@ -88,7 +86,7 @@ const footerLinks = {
         </div>
 
         <div class="mt-12 flex flex-col gap-3 border-t border-black/5 pt-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {{ currentYear }} DigiPro. Semua hak dilindungi.</p>
+          <p>© {{ currentYear }} DigiPro by KJPP HJAR. Semua hak dilindungi.</p>
           <p>Editorial surface untuk insight valuasi properti digital.</p>
         </div>
       </div>

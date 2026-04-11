@@ -37,12 +37,8 @@ class AppraisalRequestService
 
         $submitter = $this->submitterResolver->resolve($request);
 
-        $format = in_array(($validated['report_format'] ?? 'both'), ['digital', 'physical', 'both'], true)
-            ? (string) $validated['report_format']
-            : 'both';
-        $copies = $format === 'digital'
-            ? 0
-            : max(1, (int) ($validated['physical_copies_count'] ?? 1));
+        $format = 'both';
+        $copies = 1;
         $reportType = in_array(($validated['report_type'] ?? 'terinci'), ['terinci', 'singkat'], true)
             ? (string) $validated['report_type']
             : 'terinci';
@@ -62,7 +58,7 @@ class AppraisalRequestService
 
         $deliverySnapshot = $this->reportDeliverySnapshotResolver->resolve(
             $submitter,
-            in_array($format, ['physical', 'both'], true)
+            true
         );
 
         $appraisalRequest = DB::transaction(function () use ($request, $validated, $format, $copies, $reportType, $purpose, $clientName, $submitter, $guidelineSetId, $consentSnapshot, $deliverySnapshot) {

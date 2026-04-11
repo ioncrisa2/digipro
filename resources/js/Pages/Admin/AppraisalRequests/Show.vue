@@ -2067,7 +2067,7 @@ const submitRevisionItem = () => {
           <Card v-if="activeTab === 'laporan' && (record.status_value === 'report_preparation' || reportPreparation.draft_available)">
             <CardHeader>
               <CardTitle>Persiapan Laporan Final</CardTitle>
-              <CardDescription>Atur signer report, download draft DigiPro, lalu upload PDF final yang sudah diproses di luar sistem.</CardDescription>
+              <CardDescription>Atur signer report, download draft DigiPro by KJPP HJAR, lalu upload PDF final yang sudah diproses di luar sistem.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-4">
               <div class="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900">

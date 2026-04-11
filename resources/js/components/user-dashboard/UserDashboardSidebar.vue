@@ -87,7 +87,7 @@ watch(
         <span class="text-sm font-semibold">DG</span>
       </div>
       <div v-if="!sidebarCollapsed" class="flex flex-col leading-tight">
-        <span class="font-semibold text-sm tracking-tight">DIGIPRO</span>
+        <span class="font-semibold text-sm tracking-tight">DIGIPRO BY KJPP HJAR</span>
         <span class="text-[11px] text-slate-400">{{ portalLabel }}</span>
       </div>
       <button
@@ -199,7 +199,7 @@ watch(
     </div>
 
     <div v-if="!sidebarCollapsed" class="px-4 py-3 border-t border-slate-800 text-[11px] text-slate-500">
-      DIGIPRO (c) {{ year }}
+      DIGIPRO BY KJPP HJAR (c) {{ year }}
     </div>
   </aside>
 </template>

@@ -28,6 +28,11 @@ const profileCompletionAlert = computed(() => page.props.profileCompletionAlert 
 const userName = computed(() => page.props.auth?.user?.name ?? "Pengguna");
 
 const newRequest = () => {
+  if (profileCompletionAlert.value?.action_url) {
+    router.visit(profileCompletionAlert.value.action_url);
+    return;
+  }
+
   try {
     router.visit(route("appraisal.create"));
   } catch (_) {

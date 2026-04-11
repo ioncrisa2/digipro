@@ -59,6 +59,12 @@ class AppraisalController extends Controller
      */
     public function create(AppraisalCreatePageRequest $request, AppraisalService $appraisalService)
     {
+        if (! $this->hasReadyBillingProfile($request->user())) {
+            return redirect()
+                ->route('profile.edit')
+                ->with('error', 'Lengkapi profil billing terlebih dahulu sebelum membuat permohonan penilaian.');
+        }
+
         $provinceId = $request->provinceId();
         $regencyId = $request->regencyId();
         $districtId = $request->districtId();
@@ -610,6 +616,17 @@ class AppraisalController extends Controller
             AppraisalStatusEnum::ReportReady->value,
             AppraisalStatusEnum::Completed->value,
         ], true);
+    }
+
+    private function hasReadyBillingProfile(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return filled($user->phone_number)
+            && filled($user->billing_recipient_name)
+            && filled($user->billing_address_detail);
     }
 
     /**

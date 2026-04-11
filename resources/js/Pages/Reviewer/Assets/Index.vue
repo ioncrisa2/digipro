@@ -1,13 +1,14 @@
-﻿<script setup>
-import { reactive } from 'vue';
+<script setup>
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import ReviewerLayout from '@/layouts/ReviewerLayout.vue';
+import AdminDataTable from '@/components/admin/AdminDataTable.vue';
+import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import StatusBadge from '@/components/reviewer/StatusBadge.vue';
-import PaginationBar from '@/components/reviewer/PaginationBar.vue';
-import { formatArea, formatCurrency } from '@/utils/reviewer';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -15,140 +16,185 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Search, SlidersHorizontal } from 'lucide-vue-next';
+import { formatArea, formatCurrency } from '@/utils/reviewer';
 
 const props = defineProps({
-  filters: Object,
-  statusOptions: Array,
-  assets: Object,
+  filters: { type: Object, default: () => ({ q: '', status: 'all', needs_adjustment: false, per_page: 12 }) },
+  statusOptions: { type: Array, default: () => [] },
+  summary: { type: Object, default: () => ({}) },
+  records: { type: Object, required: true },
 });
 
 const form = reactive({
-  q: props.filters?.q ?? '',
-  status: props.filters?.status ?? 'all',
-  needs_adjustment: Boolean(props.filters?.needs_adjustment),
+  q: props.filters.q ?? '',
+  status: props.filters.status ?? 'all',
+  needs_adjustment: Boolean(props.filters.needs_adjustment),
 });
 
-const submit = () => {
-  router.get(route('reviewer.assets.index'), form, {
-    preserveState: true,
-    preserveScroll: true,
-  });
+const activeFilterCount = computed(() => {
+  let count = 0;
+
+  if (form.status !== 'all') count += 1;
+  if (form.needs_adjustment) count += 1;
+
+  return count;
+});
+
+const applyFilters = () => {
+  router.get(
+    route('reviewer.assets.index'),
+    {
+      q: form.q || undefined,
+      status: form.status === 'all' ? undefined : form.status,
+      needs_adjustment: form.needs_adjustment ? 1 : undefined,
+    },
+    {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+    },
+  );
 };
+
+const resetFilters = () => {
+  form.q = '';
+  form.status = 'all';
+  form.needs_adjustment = false;
+  applyFilters();
+};
+
+const summaryCards = [
+  { key: 'total', label: 'Total Aset' },
+  { key: 'butuh_penyesuaian', label: 'Butuh Penyesuaian' },
+  { key: 'sudah_punya_range', label: 'Sudah Ada Range' },
+  { key: 'siap_nilai_final', label: 'Sudah Nilai Final' },
+];
+
+const columns = [
+  { key: 'request', label: 'Permohonan', cellClass: 'min-w-[170px]' },
+  { key: 'address', label: 'Alamat Aset', cellClass: 'min-w-[240px]' },
+  { key: 'asset_type', label: 'Jenis', cellClass: 'min-w-[120px]' },
+  { key: 'area', label: 'LT / LB', cellClass: 'min-w-[120px]' },
+  { key: 'comparables', label: 'Pembanding', cellClass: 'min-w-[150px]' },
+  { key: 'range', label: 'Range Pasar', cellClass: 'min-w-[180px]' },
+  { key: 'actions', label: 'Aksi', cellClass: 'min-w-[220px]' },
+];
 </script>
 
 <template>
-  <Head title="Reviewer Assets" />
+  <Head title="Reviewer - Aset" />
 
-  <ReviewerLayout title="Assets">
+  <ReviewerLayout title="Aset Reviewer">
     <div class="space-y-6">
-      <Card>
-        <CardHeader class="pb-4">
-          <CardTitle>Filter Aset Reviewer</CardTitle>
-          <CardDescription>Filter alamat, status request, dan aset yang masih perlu adjustment.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div class="grid gap-4 lg:grid-cols-[1fr_220px_auto_auto] lg:items-end">
-            <div class="grid gap-2">
-              <label class="text-sm font-medium">Cari</label>
-              <Input v-model="form.q" type="text" placeholder="Cari alamat atau nomor request" />
-            </div>
-            <div class="grid gap-2">
-              <label class="text-sm font-medium">Status</label>
-              <Select v-model="form.status">
-                <SelectTrigger>
-                  <SelectValue placeholder="Semua status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <label class="flex h-10 items-center gap-2 rounded-md border px-3 text-sm">
-              <Checkbox :model-value="form.needs_adjustment" @update:modelValue="(value) => form.needs_adjustment = Boolean(value)" />
-              <span>Hanya butuh adjustment</span>
-            </label>
-            <Button @click="submit">
-              <Search class="mr-2 h-4 w-4" />
-              Terapkan
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <section>
+        <h1 class="text-3xl font-semibold tracking-tight text-slate-950">Aset Reviewer</h1>
+        <p class="mt-2 text-sm text-slate-600">
+          Baca konteks aset, pantau kebutuhan penyesuaian, dan buka jalur kerja ke harga tanah maupun BTB bangunan.
+        </p>
+      </section>
 
-      <Card>
-        <CardHeader class="pb-4">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <CardTitle>Daftar Aset</CardTitle>
-              <CardDescription>Aset reviewer aktif dan jalur cepat ke detail atau penyesuaian harga tanah.</CardDescription>
-            </div>
-            <SlidersHorizontal class="h-4 w-4 text-muted-foreground" />
+      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card v-for="card in summaryCards" :key="card.key" class="border-slate-200/80 shadow-sm">
+          <CardContent class="p-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ card.label }}</p>
+            <p class="mt-3 text-4xl font-semibold text-slate-950">{{ summary[card.key] ?? 0 }}</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card class="border-slate-200/80 shadow-sm">
+        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Daftar Aset Aktif</CardTitle>
           </div>
+          <AdminTableToolbar
+            :search-value="form.q"
+            search-placeholder="Cari alamat aset atau nomor request"
+            filter-title="Filter aset reviewer"
+            filter-description="Saring aset berdasarkan status request dan pekerjaan yang masih perlu penyesuaian."
+            :active-filter-count="activeFilterCount"
+            @search="(value) => { form.q = value; applyFilters(); }"
+            @apply-filters="applyFilters"
+            @reset-filters="resetFilters"
+          >
+            <div class="space-y-4">
+              <div class="space-y-2">
+                <Label for="reviewer_asset_status_filter">Status</Label>
+                <Select v-model="form.status">
+                  <SelectTrigger id="reviewer_asset_status_filter">
+                    <SelectValue placeholder="Semua status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Status</SelectItem>
+                    <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <label class="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-700">
+                <Checkbox
+                  :model-value="form.needs_adjustment"
+                  @update:model-value="(value) => { form.needs_adjustment = Boolean(value); }"
+                />
+                <span>Hanya tampilkan aset yang masih perlu penyesuaian</span>
+              </label>
+            </div>
+          </AdminTableToolbar>
         </CardHeader>
         <CardContent>
-          <div class="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Request</TableHead>
-                  <TableHead>Alamat</TableHead>
-                  <TableHead>Jenis</TableHead>
-                  <TableHead>LT / LB</TableHead>
-                  <TableHead>Pembanding</TableHead>
-                  <TableHead>Range</TableHead>
-                  <TableHead>Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow v-for="asset in assets.data" :key="asset.id">
-                  <TableCell>
-                    <p class="font-medium text-foreground">{{ asset.request_number }}</p>
-                    <div class="mt-2"><StatusBadge :status="asset.request_status" /></div>
-                  </TableCell>
-                  <TableCell>{{ asset.address }}</TableCell>
-                  <TableCell>{{ asset.asset_type?.label }}</TableCell>
-                  <TableCell>{{ formatArea(asset.land_area) }} / {{ formatArea(asset.building_area) }}</TableCell>
-                  <TableCell>{{ asset.selected_comparables_count }} dipilih / {{ asset.comparables_count }} total</TableCell>
-                  <TableCell>{{ formatCurrency(asset.estimated_value_low) }} - {{ formatCurrency(asset.estimated_value_high) }}</TableCell>
-                  <TableCell>
-                    <div class="flex flex-wrap gap-2">
-                      <Button variant="link" class="h-auto px-0" as-child>
-                        <Link :href="asset.detail_url">Detail</Link>
-                      </Button>
-                      <Button variant="link" class="h-auto px-0" as-child>
-                        <Link :href="asset.land_adjustment_url || asset.adjustment_url">Adjust Harga Tanah</Link>
-                      </Button>
-                      <Button v-if="asset.has_btb && asset.btb_url" variant="link" class="h-auto px-0" as-child>
-                        <Link :href="asset.btb_url">BTB Bangunan</Link>
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-                <TableRow v-if="!assets.data?.length">
-                  <TableCell :colspan="7" class="text-center text-muted-foreground">Belum ada aset reviewer yang sesuai filter.</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-          <div class="mt-4 border-t pt-4">
-            <PaginationBar :links="assets.links || []" />
-          </div>
+          <AdminDataTable
+            :columns="columns"
+            :rows="records.data"
+            :meta="records.meta"
+            :default-per-page="filters.per_page ?? 12"
+            empty-text="Belum ada aset reviewer yang cocok dengan filter saat ini."
+          >
+            <template #cell-request="{ row }">
+              <div class="space-y-2">
+                <div class="font-medium text-slate-950">{{ row.request_number }}</div>
+                <StatusBadge :status="row.request_status" />
+              </div>
+            </template>
+
+            <template #cell-address="{ row }">
+              <Button variant="link" class="h-auto px-0 text-left font-medium" as-child>
+                <Link :href="row.detail_url">{{ row.address }}</Link>
+              </Button>
+            </template>
+
+            <template #cell-asset_type="{ row }">
+              {{ row.asset_type?.label || '-' }}
+            </template>
+
+            <template #cell-area="{ row }">
+              {{ formatArea(row.land_area) }} / {{ formatArea(row.building_area) }}
+            </template>
+
+            <template #cell-comparables="{ row }">
+              {{ row.selected_comparables_count }} dipilih / {{ row.comparables_count }} total
+            </template>
+
+            <template #cell-range="{ row }">
+              <div>{{ formatCurrency(row.estimated_value_low) }} - {{ formatCurrency(row.estimated_value_high) }}</div>
+              <div class="mt-1 text-xs text-slate-500">Nilai final: {{ formatCurrency(row.market_value_final) }}</div>
+            </template>
+
+            <template #cell-actions="{ row }">
+              <div class="flex flex-wrap gap-3">
+                <Button variant="link" class="h-auto px-0" as-child>
+                  <Link :href="row.detail_url">Detail</Link>
+                </Button>
+                <Button variant="link" class="h-auto px-0" as-child>
+                  <Link :href="row.land_adjustment_url || row.adjustment_url">Adjust Harga Tanah</Link>
+                </Button>
+                <Button v-if="row.has_btb && row.btb_url" variant="link" class="h-auto px-0" as-child>
+                  <Link :href="row.btb_url">BTB Bangunan</Link>
+                </Button>
+              </div>
+            </template>
+          </AdminDataTable>
         </CardContent>
       </Card>
     </div>

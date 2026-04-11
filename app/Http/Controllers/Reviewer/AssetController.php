@@ -26,7 +26,7 @@ class AssetController extends Controller
     {
         $filters = $request->filters();
 
-        $assets = AppraisalAsset::query()
+        $baseQuery = AppraisalAsset::query()
             ->with(['request:id,request_number,status'])
             ->withCount([
                 'comparables',
@@ -57,15 +57,39 @@ class AssetController extends Controller
                             ->orWhereNull('market_value_final');
                     });
             })
-            ->latest('updated_at')
-            ->paginate(12)
+            ->latest('updated_at');
+
+        $assets = (clone $baseQuery)
+            ->paginate($filters['per_page'])
             ->withQueryString()
             ->through(fn (AppraisalAsset $asset): array => $this->workspace->serializeAssetListItem($asset));
+
+        $summaryBase = AppraisalAsset::query()
+            ->whereHas('request', fn (Builder $query): Builder => $query->whereIn('status', $this->workspace->reviewerStatuses()));
 
         return Inertia::render('Reviewer/Assets/Index', [
             'filters' => $filters,
             'statusOptions' => $this->workspace->reviewStatusOptions(),
-            'assets' => $assets,
+            'summary' => [
+                'total' => (clone $summaryBase)->count(),
+                'butuh_penyesuaian' => (clone $summaryBase)
+                    ->whereHas('comparables', fn (Builder $query): Builder => $query->where('is_selected', true))
+                    ->where(function (Builder $query): void {
+                        $query
+                            ->whereNull('estimated_value_low')
+                            ->orWhereNull('estimated_value_high')
+                            ->orWhereNull('market_value_final');
+                    })
+                    ->count(),
+                'sudah_punya_range' => (clone $summaryBase)
+                    ->whereNotNull('estimated_value_low')
+                    ->whereNotNull('estimated_value_high')
+                    ->count(),
+                'siap_nilai_final' => (clone $summaryBase)
+                    ->whereNotNull('market_value_final')
+                    ->count(),
+            ],
+            'records' => $this->paginatedRecordsPayload($assets),
         ]);
     }
 

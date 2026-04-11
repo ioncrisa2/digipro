@@ -22,13 +22,17 @@ class DashboardController extends Controller
 
     public function __invoke(): Response
     {
+        $reviewerStatuses = $this->workspace->reviewerStatuses();
+        $requestBase = AppraisalRequest::query()->whereIn('status', $reviewerStatuses);
+        $assetBase = AppraisalAsset::query()
+            ->whereHas('request', fn (Builder $query): Builder => $query->whereIn('status', $reviewerStatuses));
+        $selectedComparableBase = AppraisalAssetComparable::query()
+            ->where('is_selected', true)
+            ->whereHas('asset.request', fn (Builder $query): Builder => $query->whereIn('status', $reviewerStatuses));
+
         $stats = [
-            'ready_review' => AppraisalRequest::query()
-                ->where('status', AppraisalStatusEnum::ContractSigned)
-                ->count(),
-            'in_progress' => AppraisalRequest::query()
-                ->where('status', AppraisalStatusEnum::ValuationOnProgress)
-                ->count(),
+            'ready_review' => (clone $requestBase)->where('status', AppraisalStatusEnum::ContractSigned)->count(),
+            'in_progress' => (clone $requestBase)->where('status', AppraisalStatusEnum::ValuationOnProgress)->count(),
             'completed' => AppraisalRequest::query()
                 ->whereIn('status', [
                     AppraisalStatusEnum::ValuationCompleted,
@@ -36,8 +40,7 @@ class DashboardController extends Controller
                     AppraisalStatusEnum::ReportPreparation,
                     AppraisalStatusEnum::ReportReady,
                     AppraisalStatusEnum::Completed,
-                ])
-                ->count(),
+                ])->count(),
             'assets_need_adjustment' => AppraisalAsset::query()
                 ->whereHas('request', function (Builder $query): void {
                     $query->whereIn('status', [
@@ -53,12 +56,14 @@ class DashboardController extends Controller
                         ->orWhereNull('market_value_final');
                 })
                 ->count(),
+            'total_queue' => (clone $requestBase)->count(),
+            'comparables_touched_today' => (clone $selectedComparableBase)->whereDate('updated_at', Carbon::today())->count(),
         ];
 
         $queuePreview = AppraisalRequest::query()
             ->with('user:id,name')
             ->withCount('assets')
-            ->whereIn('status', $this->workspace->reviewerStatuses())
+            ->whereIn('status', $reviewerStatuses)
             ->latest('requested_at')
             ->limit(6)
             ->get()
@@ -70,7 +75,7 @@ class DashboardController extends Controller
             ->withCount([
                 'comparables as selected_comparables_count' => fn (Builder $query): Builder => $query->where('is_selected', true),
             ])
-            ->whereHas('request', fn (Builder $query): Builder => $query->whereIn('status', $this->workspace->reviewerStatuses()))
+            ->whereHas('request', fn (Builder $query): Builder => $query->whereIn('status', $reviewerStatuses))
             ->latest('updated_at')
             ->limit(6)
             ->get()
@@ -99,8 +104,39 @@ class DashboardController extends Controller
             ])
             ->values();
 
+        $featuredReview = AppraisalRequest::query()
+            ->with('user:id,name')
+            ->withCount('assets')
+            ->whereIn('status', $reviewerStatuses)
+            ->orderByRaw("CASE
+                WHEN status = ? THEN 0
+                WHEN status = ? THEN 1
+                WHEN status = ? THEN 2
+                ELSE 3
+            END", [
+                AppraisalStatusEnum::ContractSigned->value,
+                AppraisalStatusEnum::ValuationOnProgress->value,
+                AppraisalStatusEnum::ValuationCompleted->value,
+            ])
+            ->latest('requested_at')
+            ->first();
+
+        $focusSummary = [
+            'aset_aktif' => (clone $assetBase)->count(),
+            'aset_sudah_ada_range' => (clone $assetBase)
+                ->whereNotNull('estimated_value_low')
+                ->whereNotNull('estimated_value_high')
+                ->count(),
+            'aset_sudah_nilai_final' => (clone $assetBase)
+                ->whereNotNull('market_value_final')
+                ->count(),
+            'selected_comparables' => (clone $selectedComparableBase)->count(),
+        ];
+
         return Inertia::render('Reviewer/Dashboard', [
             'stats' => $stats,
+            'featuredReview' => $featuredReview ? $this->workspace->serializeReviewListItem($featuredReview) : null,
+            'focusSummary' => $focusSummary,
             'queuePreview' => $queuePreview,
             'assetPreview' => $assetPreview,
             'activityPreview' => $activityPreview,

@@ -1,17 +1,15 @@
 <script setup>
-import { Building2, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-vue-next'
+import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-vue-next'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
 </script>
 
 <template>
   <div class="relative">
-    <div class="flex items-center gap-3">
-      <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm border border-white/20">
-        <Building2 class="h-6 w-6 text-white" />
-      </div>
-      <div class="leading-tight">
-        <div class="text-2xl font-semibold tracking-tight">DigiPro</div>
-        <div class="text-xs text-white/70">Valuation Platform</div>
-      </div>
+    <div class="flex items-center">
+      <BrandLockup
+        wrapper-class="shadow-[0_20px_40px_rgba(2,6,23,0.28)]"
+        logo-class="w-[232px] sm:w-[272px]"
+      />
     </div>
 
     <div class="mt-16 space-y-6">
@@ -19,7 +17,7 @@ import { Building2, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-vue-next'
         Kelola appraisal properti dengan lebih cepat dan terstruktur.
       </h2>
       <p class="text-sm text-white/70">
-        Portal DigiPro membantu tim appraisal, reviewer, dan manajemen memantau proses dari awal hingga laporan final.
+        Portal DigiPro by KJPP HJAR membantu tim appraisal, reviewer, dan manajemen memantau proses dari awal hingga laporan final.
       </p>
 
       <div class="space-y-4">

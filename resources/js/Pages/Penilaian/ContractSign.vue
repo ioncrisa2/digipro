@@ -162,8 +162,8 @@ const submitSignature = () => {
                     </div>
 
                     <p class="text-sm leading-relaxed">
-                        DigiPro menyampaikan penawaran layanan Estimasi Rentang Harga Properti berdasarkan dokumen, foto, dan informasi
-                        yang diunggah pengguna serta data pembanding pada Bank Data DigiPro. Layanan ini dilakukan tanpa inspeksi lapangan
+                        DigiPro by KJPP HJAR menyampaikan penawaran layanan Estimasi Rentang Harga Properti berdasarkan dokumen, foto, dan informasi
+                        yang diunggah pengguna serta data pembanding pada Bank Data DigiPro by KJPP HJAR. Layanan ini dilakukan tanpa inspeksi lapangan
                         dan tanpa pengukuran fisik. Hasil layanan berupa rentang estimasi (batas bawah - batas atas), bukan nilai tunggal/final.
                     </p>
 

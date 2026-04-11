@@ -29,9 +29,10 @@ class ComparableController extends Controller
     {
         $filters = $request->filters();
 
-        $comparables = AppraisalAssetComparable::query()
+        $baseQuery = AppraisalAssetComparable::query()
             ->with(['asset:id,appraisal_request_id,address', 'asset.request:id,request_number,status'])
             ->withCount('landAdjustments')
+            ->whereHas('asset.request', fn (Builder $query): Builder => $query->whereIn('status', $this->workspace->reviewerStatuses()))
             ->when($filters['asset_id'], fn (Builder $query): Builder => $query->where('appraisal_asset_id', $filters['asset_id']))
             ->when($filters['is_selected'] !== '' && $filters['is_selected'] !== 'all', function (Builder $query) use ($filters): void {
                 $query->where('is_selected', $filters['is_selected'] === '1');
@@ -45,16 +46,34 @@ class ComparableController extends Controller
                         ->orWhereHas('asset', fn (Builder $assetQuery): Builder => $assetQuery->where('address', 'like', "%{$q}%"));
                 });
             })
+            ->latest('updated_at');
+
+        $comparables = (clone $baseQuery)
             ->orderBy('appraisal_asset_id')
             ->orderByRaw('COALESCE(`manual_rank`, `rank`, 9999)')
-            ->orderByDesc('updated_at')
-            ->paginate(15)
+            ->paginate($filters['per_page'])
             ->withQueryString()
             ->through(fn (AppraisalAssetComparable $comparable): array => $this->workspace->serializeComparableListItem($comparable));
 
+        $summaryBase = AppraisalAssetComparable::query()
+            ->whereHas('asset.request', fn (Builder $query): Builder => $query->whereIn('status', $this->workspace->reviewerStatuses()));
+
         return Inertia::render('Reviewer/Comparables/Index', [
             'filters' => $filters,
-            'comparables' => $comparables,
+            'summary' => [
+                'total' => (clone $summaryBase)->count(),
+                'dipakai' => (clone $summaryBase)->where('is_selected', true)->count(),
+                'perlu_penyesuaian' => (clone $summaryBase)
+                    ->where('is_selected', true)
+                    ->where(function (Builder $query): void {
+                        $query
+                            ->whereNull('adjusted_unit_value')
+                            ->orWhereNull('indication_value');
+                    })
+                    ->count(),
+                'diperbarui_hari_ini' => (clone $summaryBase)->whereDate('updated_at', today())->count(),
+            ],
+            'records' => $this->paginatedRecordsPayload($comparables),
         ]);
     }
 

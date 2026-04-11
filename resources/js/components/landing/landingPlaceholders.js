@@ -38,7 +38,7 @@ export const createLandingPlaceholderImage = ({
 }
 
 export const landingHeroFallback = createLandingPlaceholderImage({
-  title: 'DigiPro Property Visual',
+  title: 'DigiPro by KJPP HJAR',
   subtitle: 'Replace this with the main hero property photo',
   palette: ['#20150d', '#3b2b1b', '#d97706'],
 })
@@ -46,19 +46,19 @@ export const landingHeroFallback = createLandingPlaceholderImage({
 export const landingProcessSteps = [
   {
     title: 'Ajukan Permohonan',
-    description: 'User mengisi kebutuhan penilaian dan mengunggah dokumen utama secara digital.',
+    description: 'Pengguna mengisi permohonan dengan data yang valid dan sesuai kebutuhan penilaian.',
   },
   {
     title: 'Verifikasi Admin',
-    description: 'Tim memeriksa kelengkapan dokumen dan menerbitkan penawaran tanpa proses berulang.',
+    description: 'Admin memverifikasi dokumen yang diajukan sebelum permohonan diproses lebih lanjut.',
   },
   {
     title: 'Appraisal Review',
-    description: 'Reviewer memproses adjustment tanah dan BTB dalam workspace yang terstruktur.',
+    description: 'Reviewer melakukan review terhadap permohonan yang masuk.',
   },
   {
     title: 'Laporan Siap',
-    description: 'Invoice, kontrak, dan laporan penilaian tersedia untuk ditinjau dan diunduh.',
+    description: 'Laporan penilaian siap ditinjau dan diunduh setelah proses selesai.',
   },
 ]
 

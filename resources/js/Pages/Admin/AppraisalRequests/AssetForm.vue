@@ -461,7 +461,7 @@ const submit = () => {
         <Card>
           <CardHeader>
             <CardTitle>Metadata Legal untuk Report</CardTitle>
-            <CardDescription>Field ini dipakai untuk menyusun bagian legalitas pada draft report DigiPro.</CardDescription>
+            <CardDescription>Field ini dipakai untuk menyusun bagian legalitas pada draft report DigiPro by KJPP HJAR.</CardDescription>
           </CardHeader>
           <CardContent class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             <div class="space-y-2">

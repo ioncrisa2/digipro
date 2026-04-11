@@ -4,6 +4,7 @@ import { Link, router, usePage } from '@inertiajs/vue3'
 import { Menu } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
 
 const navItems = ['Features', 'Showcase', 'Process', 'Testimonials', 'FAQ']
 
@@ -37,15 +38,12 @@ const goLogin = () => router.visit('/login')
     <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
       <div
         @click="navigateHome"
-        class="flex items-center gap-3 cursor-pointer"
+        class="cursor-pointer"
       >
-        <div class="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-semibold">
-          DP
-        </div>
-        <div class="leading-tight">
-          <div class="text-xl font-semibold tracking-tight text-slate-900">DigiPro</div>
-          <div class="text-xs text-slate-500">Valuation Platform</div>
-        </div>
+        <BrandLockup
+          wrapper-class="border border-slate-200/80 bg-white shadow-sm"
+          logo-class="w-[180px] sm:w-[208px]"
+        />
       </div>
 
       <div class="hidden md:flex items-center gap-6">

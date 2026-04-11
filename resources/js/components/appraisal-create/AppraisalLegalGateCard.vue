@@ -16,7 +16,7 @@ defineProps({
   representativeLetterNotice: {
     type: Object,
     default: () => ({
-      title: 'Surat Representatif DigiPro',
+      title: 'Surat Representatif DigiPro by KJPP HJAR',
       description: '',
     }),
   },
@@ -124,7 +124,7 @@ const emit = defineEmits([
           <div class="min-w-0">
             <div class="flex items-center gap-2">
               <p class="text-sm font-semibold text-sky-900">
-                {{ representativeLetterNotice?.title || 'Surat Representatif DigiPro' }}
+                {{ representativeLetterNotice?.title || 'Surat Representatif DigiPro by KJPP HJAR' }}
               </p>
               <Badge variant="outline" class="border-sky-200 bg-sky-100 px-1.5 py-0 text-[10px] font-medium text-sky-700">
                 Disiapkan sistem
@@ -133,7 +133,7 @@ const emit = defineEmits([
             <p class="mt-1 text-xs leading-relaxed text-sky-800/80">
               {{
                 representativeLetterNotice?.description ||
-                'Setelah kontrak ditandatangani, DigiPro akan menyiapkan surat representatif berdasarkan data permohonan.'
+                'Setelah kontrak ditandatangani, DigiPro by KJPP HJAR akan menyiapkan surat representatif berdasarkan data permohonan.'
               }}
             </p>
           </div>

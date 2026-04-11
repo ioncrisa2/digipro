@@ -306,9 +306,9 @@ class AppraisalRequestRevisionService
     private function requestFileTypeLabel(?string $type): string
     {
         return match ((string) $type) {
-            'agreement_pdf' => 'Agreement DigiPro',
+            'agreement_pdf' => 'Agreement DigiPro by KJPP HJAR',
             'contract_signed_pdf' => 'PDF Kontrak Ditandatangani',
-            'disclaimer_pdf' => 'Disclaimer DigiPro',
+            'disclaimer_pdf' => 'Disclaimer DigiPro by KJPP HJAR',
             'npwp' => 'NPWP',
             'representative' => 'Surat Kuasa',
             'permission' => 'Surat Izin',

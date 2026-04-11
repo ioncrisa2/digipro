@@ -4,7 +4,7 @@ import { computed } from 'vue'
 const props = defineProps({
   coverPath: { type: String, default: '' },
   alt: { type: String, default: 'Cover' },
-  fallbackText: { type: String, default: 'DigiPro' },
+  fallbackText: { type: String, default: 'DigiPro by KJPP HJAR' },
   wrapperClass: {
     type: String,
     default: 'aspect-[16/10] bg-slate-100 overflow-hidden',
