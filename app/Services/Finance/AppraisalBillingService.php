@@ -198,21 +198,23 @@ class AppraisalBillingService
         );
     }
 
-    public function financeDocumentStatusLabel(?string $status): string
+    public function financeDocumentStatusLabel(mixed $status): string
     {
-        return FinanceDocumentStatusEnum::tryFrom((string) $status)?->label()
+        return FinanceDocumentStatusEnum::tryFrom((string) $this->enumValue($status))?->label()
             ?? FinanceDocumentStatusEnum::Draft->label();
     }
 
-    public function withholdingTaxTypeLabel(?string $type): string
+    public function withholdingTaxTypeLabel(mixed $type): string
     {
-        return WithholdingTaxTypeEnum::tryFrom((string) $type)?->label()
+        return WithholdingTaxTypeEnum::tryFrom((string) $this->enumValue($type))?->label()
             ?? WithholdingTaxTypeEnum::PPh23->label();
     }
 
-    public function taxIdentityTypeLabel(?string $type): ?string
+    public function taxIdentityTypeLabel(mixed $type): ?string
     {
-        return TaxIdentityTypeEnum::tryFrom((string) $type)?->label();
+        $value = $this->enumValue($type);
+
+        return $value === null ? null : TaxIdentityTypeEnum::tryFrom((string) $value)?->label();
     }
 
     public function invoiceNumber(AppraisalRequest $record, ?Payment $payment = null): string
@@ -300,5 +302,10 @@ class AppraisalBillingService
         $text = trim((string) $value);
 
         return $text === '' ? null : $text;
+    }
+
+    private function enumValue(mixed $value): mixed
+    {
+        return $value instanceof \BackedEnum ? $value->value : $value;
     }
 }

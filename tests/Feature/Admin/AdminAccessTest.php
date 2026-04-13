@@ -1,8 +1,11 @@
 <?php
 
 use App\Enums\AppraisalStatusEnum;
-use App\Enums\PurposeEnum;
 use App\Enums\ContractStatusEnum;
+use App\Enums\FinanceDocumentStatusEnum;
+use App\Enums\PurposeEnum;
+use App\Enums\TaxIdentityTypeEnum;
+use App\Enums\WithholdingTaxTypeEnum;
 use Carbon\Carbon;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetFile;
@@ -103,6 +106,37 @@ function createReviewerUser(bool $withSystemMenus = true): User
     }
 
     return $user;
+}
+
+function createFinanceBillingRequest(array $attributes = []): AppraisalRequest
+{
+    $requester = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    return AppraisalRequest::create(array_merge([
+        'user_id' => $requester->id,
+        'request_number' => 'REQ-BILLING-' . str_pad((string) fake()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT),
+        'purpose' => PurposeEnum::JualBeli,
+        'status' => AppraisalStatusEnum::ContractSigned,
+        'requested_at' => now(),
+        'client_name' => 'PT Billing Demo',
+        'finance_billing_name' => 'PT Billing Demo',
+        'finance_billing_address' => 'Jl. Keuangan No. 10',
+        'finance_tax_identity_type' => TaxIdentityTypeEnum::NPWP->value,
+        'finance_tax_identity_number' => '01.234.567.8-999.000',
+        'finance_billing_email' => 'finance@example.com',
+        'billing_dpp_amount' => 10000000,
+        'billing_vat_rate_percent' => 11,
+        'billing_vat_amount' => 1100000,
+        'billing_total_amount' => 11100000,
+        'billing_withholding_tax_type' => WithholdingTaxTypeEnum::PPh23->value,
+        'billing_withholding_tax_rate_percent' => 2,
+        'billing_withholding_tax_amount' => 200000,
+        'billing_net_amount' => 10900000,
+        'fee_total' => 11100000,
+        'finance_document_status' => FinanceDocumentStatusEnum::Draft->value,
+    ], $attributes));
 }
 
 it('allows admin users to access the vue admin dashboard', function () {
@@ -341,6 +375,173 @@ it('renders the appraisal request index for admin users', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Admin/AppraisalRequests/Index')
             ->where('records.meta.total', 1));
+});
+
+it('renders the admin billings index in the vue workspace', function () {
+    $admin = createAdminUser();
+
+    createFinanceBillingRequest([
+        'request_number' => 'REQ-BILLING-INDEX-001',
+        'billing_invoice_number' => 'INV-2026-10001',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.finance.billings.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Finance/Billings/Index')
+            ->where('summary.total', 1)
+            ->where('records.data.0.request_number', 'REQ-BILLING-INDEX-001')
+            ->where('records.data.0.nomor_invoice', 'INV-2026-10001'));
+});
+
+it('renders the admin billing detail in the vue workspace', function () {
+    $admin = createAdminUser();
+
+    $record = createFinanceBillingRequest([
+        'request_number' => 'REQ-BILLING-SHOW-001',
+        'billing_invoice_number' => 'INV-2026-10002',
+        'billing_invoice_date' => '2026-03-10',
+        'finance_document_status' => FinanceDocumentStatusEnum::InvoiceIssued->value,
+    ]);
+
+    $payment = Payment::create([
+        'appraisal_request_id' => $record->id,
+        'amount' => 11100000,
+        'method' => 'gateway',
+        'gateway' => 'midtrans',
+        'external_payment_id' => 'MID-BILLING-SHOW-001',
+        'status' => 'pending',
+        'proof_type' => 'gateway_id',
+        'metadata' => [
+            'invoice_number' => 'INV-2026-10002',
+        ],
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.finance.billings.show', $record))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Finance/Billings/Show')
+            ->where('record.request_number', 'REQ-BILLING-SHOW-001')
+            ->where('record.ringkasan_tagihan.nama_tagihan', 'PT Billing Demo')
+            ->where('record.payment.id', $payment->id)
+            ->where('record.payment.show_url', route('admin.finance.payments.show', $payment)));
+});
+
+it('renders the admin billing edit page in the vue workspace', function () {
+    $admin = createAdminUser();
+
+    $record = createFinanceBillingRequest([
+        'request_number' => 'REQ-BILLING-EDIT-001',
+        'billing_invoice_number' => 'INV-2026-10003',
+        'finance_document_status' => FinanceDocumentStatusEnum::InvoiceIssued->value,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.finance.billings.edit', $record))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Finance/Billings/Edit')
+            ->where('record.request_number', 'REQ-BILLING-EDIT-001')
+            ->where('record.billing_invoice_number', 'INV-2026-10003')
+            ->where('record.finance_billing_name', 'PT Billing Demo'));
+});
+
+it('updates a billing from the vue admin workspace', function () {
+    Storage::fake('public');
+
+    $admin = createAdminUser();
+    $record = createFinanceBillingRequest([
+        'request_number' => 'REQ-BILLING-UPDATE-001',
+        'billing_invoice_number' => null,
+        'tax_invoice_number' => null,
+        'withholding_receipt_number' => null,
+        'finance_document_status' => FinanceDocumentStatusEnum::Draft->value,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('admin.finance.billings.update', $record), [
+            'billing_dpp_amount' => 12000000,
+            'billing_withholding_tax_type' => WithholdingTaxTypeEnum::PPh23->value,
+            'finance_billing_name' => 'PT Billing Final',
+            'finance_billing_address' => 'Jl. Pajak No. 20',
+            'finance_tax_identity_type' => TaxIdentityTypeEnum::NPWP->value,
+            'finance_tax_identity_number' => '09.876.543.2-111.000',
+            'finance_billing_email' => 'billing-final@example.com',
+            'billing_invoice_number' => 'INV-2026-10004',
+            'billing_invoice_date' => '2026-03-11',
+            'tax_invoice_number' => 'FP-2026-10004',
+            'tax_invoice_date' => '2026-03-12',
+            'withholding_receipt_number' => 'BUPOT-2026-10004',
+            'withholding_receipt_date' => '2026-03-13',
+            'finance_document_status' => FinanceDocumentStatusEnum::Complete->value,
+            'billing_invoice_file' => UploadedFile::fake()->create('invoice.pdf', 120, 'application/pdf'),
+            'tax_invoice_file' => UploadedFile::fake()->create('tax.pdf', 120, 'application/pdf'),
+            'withholding_receipt_file' => UploadedFile::fake()->create('withholding.pdf', 120, 'application/pdf'),
+        ])
+        ->assertRedirect(route('admin.finance.billings.show', $record));
+
+    $record->refresh();
+
+    expect($record->finance_billing_name)->toBe('PT Billing Final');
+    expect($record->billing_dpp_amount)->toBe(12000000);
+    expect($record->billing_vat_amount)->toBe(1320000);
+    expect($record->billing_total_amount)->toBe(13320000);
+    expect($record->billing_withholding_tax_amount)->toBe(240000);
+    expect($record->billing_net_amount)->toBe(13080000);
+    expect($record->finance_document_status?->value ?? $record->finance_document_status)->toBe(FinanceDocumentStatusEnum::Complete->value);
+
+    Storage::disk('public')->assertExists($record->billing_invoice_file_path);
+    Storage::disk('public')->assertExists($record->tax_invoice_file_path);
+    Storage::disk('public')->assertExists($record->withholding_receipt_file_path);
+});
+
+it('renders the admin tax invoices index in the vue workspace', function () {
+    $admin = createAdminUser();
+
+    createFinanceBillingRequest([
+        'request_number' => 'REQ-TAX-INDEX-001',
+        'billing_invoice_number' => 'INV-2026-10005',
+        'tax_invoice_number' => 'FP-2026-10005',
+        'tax_invoice_date' => '2026-03-14',
+        'finance_document_status' => FinanceDocumentStatusEnum::TaxInvoiceRecorded->value,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.finance.tax-invoices.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Finance/TaxInvoices/Index')
+            ->where('records.data.0.request_number', 'REQ-TAX-INDEX-001')
+            ->where('records.data.0.nomor_faktur_pajak', 'FP-2026-10005'));
+});
+
+it('renders the admin withholding receipts index in the vue workspace', function () {
+    $admin = createAdminUser();
+
+    createFinanceBillingRequest([
+        'request_number' => 'REQ-WHT-INDEX-001',
+        'billing_invoice_number' => 'INV-2026-10006',
+        'tax_invoice_number' => 'FP-2026-10006',
+        'withholding_receipt_number' => 'BUPOT-2026-10006',
+        'withholding_receipt_date' => '2026-03-15',
+        'finance_document_status' => FinanceDocumentStatusEnum::WithholdingRecorded->value,
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->get(route('admin.finance.withholding-receipts.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Finance/WithholdingReceipts/Index')
+            ->where('records.data.0.request_number', 'REQ-WHT-INDEX-001')
+            ->where('records.data.0.nomor_bukti_potong', 'BUPOT-2026-10006'));
 });
 
 it('renders the admin payments index in the vue workspace', function () {
