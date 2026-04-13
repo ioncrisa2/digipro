@@ -36,6 +36,7 @@ use App\Models\Testimonial;
 use App\Models\TermsDocument;
 use App\Models\User;
 use App\Models\ValuationSetting;
+use App\Notifications\AppraisalPhysicalReportUpdated;
 use App\Notifications\AppraisalStatusUpdated;
 use App\Models\District;
 use App\Models\Village;
@@ -2227,6 +2228,51 @@ it('blocks payment verification from the vue admin workflow when payment is not 
     $record->refresh();
 
     expect($record->status)->toBe(AppraisalStatusEnum::ContractSigned);
+});
+
+it('updates physical report shipping details from the vue admin workflow and notifies the customer', function () {
+    Notification::fake();
+
+    $admin = createAdminUser();
+    $requester = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $record = AppraisalRequest::create([
+        'user_id' => $requester->id,
+        'request_number' => 'REQ-PHYSICAL-001',
+        'purpose' => PurposeEnum::JualBeli,
+        'status' => AppraisalStatusEnum::Completed,
+        'requested_at' => now(),
+        'report_format' => 'both',
+        'physical_copies_count' => 1,
+        'report_generated_at' => now()->subHour(),
+        'report_pdf_path' => 'appraisal-requests/1/reports/final/report.pdf',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.appraisal-requests.actions.physical-report.update', $record), [
+            'action' => 'mark_shipped',
+            'courier' => 'JNE',
+            'tracking_number' => 'JNE-123456',
+            'notes' => 'Dikirim sore hari',
+        ])
+        ->assertRedirect();
+
+    $record->refresh();
+
+    expect($record->physical_report_printed_at)->not->toBeNull();
+    expect($record->physical_report_shipped_at)->not->toBeNull();
+    expect($record->physical_report_courier)->toBe('JNE');
+    expect($record->physical_report_tracking_number)->toBe('JNE-123456');
+
+    Notification::assertSentTo($requester, AppraisalPhysicalReportUpdated::class, function (AppraisalPhysicalReportUpdated $notification) use ($record): bool {
+        return $notification->appraisalId === $record->id
+            && $notification->event === 'shipped'
+            && $notification->courier === 'JNE'
+            && $notification->trackingNumber === 'JNE-123456';
+    });
 });
 
 it('renders the basic edit page for admin users', function () {
