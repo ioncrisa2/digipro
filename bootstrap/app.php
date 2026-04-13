@@ -6,6 +6,8 @@ use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsureCustomerRole;
 use App\Http\Middleware\EnsureNotReviewerRole;
 use App\Http\Middleware\EnsureReviewerRole;
+use App\Http\Middleware\EnsureSuperAdminRole;
+use App\Http\Middleware\RecordUserActivity;
 use App\Http\Middleware\EnsureSystemSectionPermission;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -25,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'customer.role' => EnsureCustomerRole::class,
             'not.reviewer' => EnsureNotReviewerRole::class,
             'reviewer.role' => EnsureReviewerRole::class,
+            'super_admin.role' => EnsureSuperAdminRole::class,
             'system.section' => EnsureSystemSectionPermission::class,
         ]);
 
@@ -34,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             HandleInertiaRequests::class,
+            RecordUserActivity::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

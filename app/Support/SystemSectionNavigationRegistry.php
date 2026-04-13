@@ -500,6 +500,16 @@ class SystemSectionNavigationRegistry
                 'pathPrefixes' => ['/admin/backup'],
                 'requiredPermission' => SystemNavigation::MANAGE_ADMIN_BACKUPS,
             ],
+            [
+                'key' => 'admin.activity-logs',
+                'label' => 'Activity Log',
+                'icon' => 'History',
+                'surface' => 'admin',
+                'routeName' => 'admin.activity-logs.index',
+                'activePatterns' => ['admin.activity-logs.*'],
+                'pathPrefixes' => ['/admin/aktivitas-pengguna'],
+                'requiredPermission' => SystemNavigation::MANAGE_ADMIN_ACTIVITY_LOGS,
+            ],
         ];
     }
 }

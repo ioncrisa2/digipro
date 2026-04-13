@@ -119,6 +119,14 @@ class SystemMenuManagementRegistry
                 'permission' => SystemNavigation::MANAGE_ADMIN_BACKUPS,
                 'items' => ['Backup Request'],
             ],
+            [
+                'key' => 'activity-logs',
+                'surface' => 'admin',
+                'label' => 'Activity Log',
+                'description' => 'Monitoring aktivitas user untuk kebutuhan audit dan pengawasan super admin.',
+                'permission' => SystemNavigation::MANAGE_ADMIN_ACTIVITY_LOGS,
+                'items' => ['Activity Log'],
+            ],
         ];
     }
 }

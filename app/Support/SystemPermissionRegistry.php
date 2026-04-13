@@ -34,6 +34,7 @@ class SystemPermissionRegistry
             ...self::reviewerSectionPermissions(),
             ...self::adminSectionPermissions(),
             SystemNavigation::MANAGE_ADMIN_BACKUPS,
+            SystemNavigation::MANAGE_ADMIN_ACTIVITY_LOGS,
         ];
     }
 
@@ -91,6 +92,10 @@ class SystemPermissionRegistry
             SystemNavigation::MANAGE_ADMIN_BACKUPS => [
                 'title' => 'Admin Workspace',
                 'label' => 'Manage Admin Backups',
+            ],
+            SystemNavigation::MANAGE_ADMIN_ACTIVITY_LOGS => [
+                'title' => 'Admin Workspace',
+                'label' => 'Manage Admin Activity Logs',
             ],
         ];
     }

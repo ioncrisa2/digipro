@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AccessControlController;
+use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\AppraisalRequestController;
 use App\Http\Controllers\Admin\AppraisalRequestCancellationController;
@@ -312,5 +313,16 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::get('/', [BackupController::class, 'index'])->name('index');
                 Route::get('/{appraisalRequest}/download', [BackupController::class, 'download'])->name('download');
                 Route::post('/restore', [BackupController::class, 'restore'])->name('restore');
+            });
+
+        Route::middleware([
+            'system.section:' . SystemNavigation::MANAGE_ADMIN_ACTIVITY_LOGS,
+            'super_admin.role',
+        ])
+            ->prefix('aktivitas-pengguna')
+            ->name('activity-logs.')
+            ->group(function (): void {
+                Route::get('/', [ActivityLogController::class, 'index'])->name('index');
+                Route::get('/{activityLog}', [ActivityLogController::class, 'show'])->name('show');
             });
     });
