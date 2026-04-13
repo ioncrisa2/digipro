@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Admin\Concerns\InteractsWithAppraisalRequests;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreAppraisalAssetFileRequest;
 use App\Http\Requests\Admin\UpsertAppraisalAssetRequest;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetFile;
 use App\Models\AppraisalRequest;
+use App\Support\Admin\AppraisalAssetFormBuilder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -16,11 +16,14 @@ use Inertia\Response;
 
 class AppraisalAssetController extends Controller
 {
-    use InteractsWithAppraisalRequests;
+    public function __construct(
+        private readonly AppraisalAssetFormBuilder $assetFormBuilder,
+    ) {
+    }
 
     public function appraisalRequestAssetCreate(Request $request, AppraisalRequest $appraisalRequest): Response
     {
-        return inertia('Admin/AppraisalRequests/AssetForm', $this->buildAssetEditorProps($request, $appraisalRequest));
+        return inertia('Admin/AppraisalRequests/AssetForm', $this->assetFormBuilder->buildEditorProps($request, $appraisalRequest));
     }
 
     public function appraisalRequestAssetEdit(
@@ -28,16 +31,16 @@ class AppraisalAssetController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalAsset $asset
     ): Response {
-        $this->ensureAssetBelongsToRequest($appraisalRequest, $asset);
+        $this->assetFormBuilder->ensureBelongsToRequest($appraisalRequest, $asset);
 
-        return inertia('Admin/AppraisalRequests/AssetForm', $this->buildAssetEditorProps($request, $appraisalRequest, $asset));
+        return inertia('Admin/AppraisalRequests/AssetForm', $this->assetFormBuilder->buildEditorProps($request, $appraisalRequest, $asset));
     }
 
     public function storeAppraisalRequestAsset(
         UpsertAppraisalAssetRequest $request,
         AppraisalRequest $appraisalRequest
     ): RedirectResponse {
-        $asset = $appraisalRequest->assets()->create($this->assetPayload($request->validated()));
+        $asset = $appraisalRequest->assets()->create($this->assetFormBuilder->assetPayload($request->validated()));
 
         return redirect()
             ->route('admin.appraisal-requests.show', $appraisalRequest)
@@ -49,9 +52,9 @@ class AppraisalAssetController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalAsset $asset
     ): RedirectResponse {
-        $this->ensureAssetBelongsToRequest($appraisalRequest, $asset);
+        $this->assetFormBuilder->ensureBelongsToRequest($appraisalRequest, $asset);
 
-        $asset->update($this->assetPayload($request->validated()));
+        $asset->update($this->assetFormBuilder->assetPayload($request->validated()));
 
         return redirect()
             ->route('admin.appraisal-requests.show', $appraisalRequest)
@@ -62,7 +65,7 @@ class AppraisalAssetController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalAsset $asset
     ): RedirectResponse {
-        $this->ensureAssetBelongsToRequest($appraisalRequest, $asset);
+        $this->assetFormBuilder->ensureBelongsToRequest($appraisalRequest, $asset);
 
         foreach ($asset->files as $file) {
             Storage::disk('public')->delete($file->path);
@@ -78,11 +81,11 @@ class AppraisalAssetController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalAsset $asset
     ): RedirectResponse {
-        $this->ensureAssetBelongsToRequest($appraisalRequest, $asset);
+        $this->assetFormBuilder->ensureBelongsToRequest($appraisalRequest, $asset);
 
         $validated = $request->validated();
         $file = $request->file('file');
-        $directory = $this->assetFileDirectory($validated['type']);
+        $directory = $this->assetFormBuilder->assetFileDirectory($validated['type']);
         $storedPath = $file->storeAs(
             "appraisal-requests/{$appraisalRequest->id}/assets/{$asset->id}/{$directory}",
             now()->format('YmdHis') . '-' . uniqid() . '.' . $file->getClientOriginalExtension(),
@@ -105,7 +108,7 @@ class AppraisalAssetController extends Controller
         AppraisalAsset $asset,
         AppraisalAssetFile $file
     ): RedirectResponse {
-        $this->ensureAssetBelongsToRequest($appraisalRequest, $asset);
+        $this->assetFormBuilder->ensureBelongsToRequest($appraisalRequest, $asset);
         abort_unless((int) $file->appraisal_asset_id === (int) $asset->id, 404);
 
         Storage::disk('public')->delete($file->path);
