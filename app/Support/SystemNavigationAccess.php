@@ -13,10 +13,32 @@ class SystemNavigationAccess
             return [];
         }
 
-        return array_values(array_filter(
+        $explicitPermissions = array_values(array_filter(
             SystemPermissionRegistry::sectionPermissions(),
             fn (string $permission): bool => $user->can($permission)
         ));
+
+        if ($explicitPermissions !== []) {
+            return $explicitPermissions;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return SystemPermissionRegistry::sectionPermissions();
+        }
+
+        if ($user->hasRole('admin')) {
+            return SystemPermissionRegistry::adminSectionPermissions();
+        }
+
+        if ($user->hasRole('Reviewer')) {
+            return array_values(array_unique([
+                ...SystemPermissionRegistry::reviewerSectionPermissions(),
+                SystemNavigation::MANAGE_ADMIN_REF_GUIDELINES,
+                SystemNavigation::MANAGE_ADMIN_MASTER_DATA,
+            ]));
+        }
+
+        return [];
     }
 
     public static function hasSectionAccess(?User $user, string $permission): bool

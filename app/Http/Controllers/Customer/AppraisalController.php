@@ -25,19 +25,23 @@ use App\Services\AppraisalRequestCancellationService;
 use App\Services\Admin\AdminNotificationService;
 use App\Services\Customer\AppraisalRequestService;
 use App\Services\Customer\AppraisalService;
+use App\Services\Customer\CustomerAppraisalWorkflowService;
 use App\Services\Revisions\AppraisalRequestRevisionSubmissionService;
 use App\Services\Workflow\AppraisalMarketPreviewService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 /**
  * Handles appraisal request pages and consent flows.
  */
 class AppraisalController extends Controller
 {
-    private const MAX_NEGOTIATION_ROUNDS = 3;
+    public function __construct(
+        private readonly CustomerAppraisalWorkflowService $workflowService,
+        private readonly AdminNotificationService $adminNotificationService,
+    ) {
+    }
 
     public function index(AppraisalIndexRequest $request, AppraisalService $appraisalService)
     {
@@ -59,12 +63,6 @@ class AppraisalController extends Controller
      */
     public function create(AppraisalCreatePageRequest $request, AppraisalService $appraisalService)
     {
-        if (! $this->hasReadyBillingProfile($request->user())) {
-            return redirect()
-                ->route('profile.edit')
-                ->with('error', 'Lengkapi profil billing terlebih dahulu sebelum membuat permohonan penilaian.');
-        }
-
         $provinceId = $request->provinceId();
         $regencyId = $request->regencyId();
         $districtId = $request->districtId();
@@ -112,7 +110,7 @@ class AppraisalController extends Controller
         int $id,
         AppraisalRequestCancellationService $cancellationService
     ) {
-        $record = $this->resolveUserAppraisalRequest($request, $id);
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
 
         try {
             $cancellation = $cancellationService->submitByCustomer(
@@ -126,7 +124,7 @@ class AppraisalController extends Controller
                 ->with('error', $exception->getMessage());
         }
 
-        app(AdminNotificationService::class)->notifyAdmins(
+        $this->adminNotificationService->notifyAdmins(
             'Pengajuan pembatalan baru',
             ($record->request_number ?? ('#' . $record->id)) . ' mengajukan pembatalan request dan menunggu review admin.',
             route('admin.appraisal-requests.cancellations.show', $cancellation),
@@ -152,7 +150,7 @@ class AppraisalController extends Controller
         int $id,
         AppraisalRequestRevisionSubmissionService $revisionService
     ) {
-        $record = $this->resolveUserAppraisalRequest($request, $id);
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
 
         try {
             return inertia('Penilaian/Revision', $revisionService->buildPagePayload($record));
@@ -169,7 +167,7 @@ class AppraisalController extends Controller
         AppraisalRequestRevisionSubmissionService $revisionService
     ) {
         /** @var AppraisalRequest $record */
-        $record = $this->resolveUserAppraisalRequest($request, $id);
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
 
         try {
             $revisionService->submitOpenBatch(
@@ -207,33 +205,15 @@ class AppraisalController extends Controller
 
     public function acceptOffer(CustomerAccessRequest $request, int $id)
     {
-        $record = $this->resolveUserAppraisalRequest($request, $id);
-        $status = $this->getStatusValue($record);
-        if ($status !== AppraisalStatusEnum::OfferSent->value) {
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
+
+        try {
+            $this->workflowService->acceptOffer($record, (int) $request->user()->id);
+        } catch (\RuntimeException $exception) {
             return redirect()
                 ->route('appraisal.offer.page', ['id' => $record->id])
-                ->with('error', 'Penawaran belum dapat disetujui pada status saat ini.');
+                ->with('error', $exception->getMessage());
         }
-
-        if (empty($record->contract_number) || empty($record->fee_total)) {
-            return redirect()
-                ->route('appraisal.offer.page', ['id' => $record->id])
-                ->with('error', 'Data penawaran belum lengkap. Hubungi admin untuk pembaruan penawaran.');
-        }
-
-        $record->update([
-            'status' => AppraisalStatusEnum::WaitingSignature,
-            'contract_status' => ContractStatusEnum::WaitingSignature,
-        ]);
-
-        $record->offerNegotiations()->create([
-            'user_id' => $request->user()->id,
-            'action' => 'accept_offer',
-            'round' => $this->countNegotiationRounds($record),
-            'offered_fee' => $record->fee_total,
-            'selected_fee' => $record->fee_total,
-            'meta' => ['flow' => 'direct_accept'],
-        ]);
 
         return redirect()
             ->route('appraisal.contract.page', ['id' => $record->id])
@@ -242,49 +222,20 @@ class AppraisalController extends Controller
 
     public function submitOfferNegotiation(SubmitOfferNegotiationRequest $request, int $id)
     {
-        $record = $this->resolveUserAppraisalRequest($request, $id);
-        $status = $this->getStatusValue($record);
-
-        if ($status !== AppraisalStatusEnum::OfferSent->value) {
-            return redirect()
-                ->route('appraisal.offer.page', ['id' => $record->id])
-                ->with('error', 'Negosiasi hanya dapat diajukan saat penawaran berstatus dikirim.');
-        }
-
-        if (empty($record->contract_number) || empty($record->fee_total)) {
-            return redirect()
-                ->route('appraisal.offer.page', ['id' => $record->id])
-                ->with('error', 'Data penawaran belum lengkap. Hubungi admin untuk pembaruan penawaran.');
-        }
-
-        $roundsUsed = $this->countNegotiationRounds($record);
-        if ($roundsUsed >= self::MAX_NEGOTIATION_ROUNDS) {
-            return redirect()
-                ->route('appraisal.offer.page', ['id' => $record->id])
-                ->with('error', 'Batas negosiasi maksimal 3 putaran telah tercapai.');
-        }
-
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
         $data = $request->validated();
-
-        $round = $roundsUsed + 1;
-
-        $record->offerNegotiations()->create([
-            'user_id' => $request->user()->id,
-            'action' => 'counter_request',
-            'round' => $round,
-            'offered_fee' => $record->fee_total,
-            'expected_fee' => $data['expected_fee'] ?? null,
-            'reason' => trim((string) $data['reason']),
-            'meta' => [
-                'status_before' => $status,
-                'contract_status_before' => $record->contract_status?->value ?? $record->contract_status,
-            ],
-        ]);
-
-        $record->update([
-            'status' => AppraisalStatusEnum::WaitingOffer,
-            'contract_status' => ContractStatusEnum::Negotiation,
-        ]);
+        try {
+            $round = $this->workflowService->submitOfferNegotiation(
+                $record,
+                (int) $request->user()->id,
+                isset($data['expected_fee']) ? (int) $data['expected_fee'] : null,
+                (string) $data['reason'],
+            );
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.offer.page', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
 
         $this->notifyAdmins(
             $request,
@@ -301,48 +252,20 @@ class AppraisalController extends Controller
 
     public function selectOffer(SelectOfferRequest $request, int $id)
     {
-        $record = $this->resolveUserAppraisalRequest($request, $id);
-        $status = $this->getStatusValue($record);
-
-        if ($status !== AppraisalStatusEnum::OfferSent->value) {
-            return redirect()
-                ->route('appraisal.offer.page', ['id' => $record->id])
-                ->with('error', 'Pemilihan penawaran hanya dapat dilakukan saat status penawaran aktif.');
-        }
-
-        $roundsUsed = $this->countNegotiationRounds($record);
-        if ($roundsUsed < self::MAX_NEGOTIATION_ROUNDS) {
-            return redirect()
-                ->route('appraisal.offer.page', ['id' => $record->id])
-                ->with('error', 'Pemilihan akhir penawaran tersedia setelah 3 putaran negosiasi.');
-        }
-
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
         $data = $request->validated();
-
-        $selectedFee = (int) $data['selected_fee'];
-        $offeredFees = $this->getOfferedFeeOptions($record);
-
-        if (! in_array($selectedFee, $offeredFees, true)) {
+        try {
+            $this->workflowService->selectOffer(
+                $record,
+                (int) $request->user()->id,
+                (int) $data['selected_fee'],
+                isset($data['reason']) ? (string) $data['reason'] : null,
+            );
+        } catch (\RuntimeException $exception) {
             return redirect()
                 ->route('appraisal.offer.page', ['id' => $record->id])
-                ->with('error', 'Fee terpilih tidak termasuk dalam riwayat penawaran yang tersedia.');
+                ->with('error', $exception->getMessage());
         }
-
-        $record->offerNegotiations()->create([
-            'user_id' => $request->user()->id,
-            'action' => 'accept_offer',
-            'round' => $roundsUsed,
-            'offered_fee' => $record->fee_total,
-            'selected_fee' => $selectedFee,
-            'reason' => isset($data['reason']) ? trim((string) $data['reason']) : null,
-            'meta' => ['flow' => 'offer_selection_after_limit'],
-        ]);
-
-        $record->update([
-            'fee_total' => $selectedFee,
-            'status' => AppraisalStatusEnum::WaitingSignature,
-            'contract_status' => ContractStatusEnum::WaitingSignature,
-        ]);
 
         return redirect()
             ->route('appraisal.contract.page', ['id' => $record->id])
@@ -358,12 +281,10 @@ class AppraisalController extends Controller
 
     public function contractSignaturePage(CustomerAccessRequest $request, int $id, AppraisalService $appraisalService)
     {
-        $record = AppraisalRequest::query()
-            ->where('user_id', $request->user()->id)
-            ->findOrFail($id);
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
 
         $status = $record->status?->value ?? $record->status;
-        if (! $this->isContractAccessibleStatus($status)) {
+        if (! $this->workflowService->isContractAccessibleStatus((string) $status)) {
             return redirect()
                 ->route('appraisal.show', ['id' => $record->id])
                 ->with('error', 'Kontrak belum siap untuk ditandatangani.');
@@ -380,52 +301,22 @@ class AppraisalController extends Controller
         AppraisalService $appraisalService
     )
     {
-        $record = $this->resolveUserAppraisalRequest($request, $id);
-
-        $status = $this->getStatusValue($record);
-        if ($status !== AppraisalStatusEnum::WaitingSignature->value) {
-            return redirect()
-                ->route('appraisal.show', ['id' => $record->id])
-                ->with('error', 'Status saat ini tidak dapat menandatangani kontrak.');
-        }
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
 
         $request->validated();
 
         try {
-            $snapshot = $this->createSignedContractSnapshot($request, $record, $appraisalService);
+            $this->workflowService->signContract($request, $record, $appraisalService);
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.show', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
         } catch (\Throwable $e) {
             report($e);
             return redirect()
                 ->route('appraisal.contract.page', ['id' => $record->id])
                 ->with('error', 'Gagal memproses tanda tangan digital. Silakan coba lagi.');
         }
-
-        $record->offerNegotiations()->create([
-            'user_id' => $request->user()->id,
-            'action' => 'contract_sign_mock',
-            'round' => $this->countNegotiationRounds($record),
-            'offered_fee' => $record->fee_total,
-            'selected_fee' => $record->fee_total,
-            'reason' => 'Mock digital signature (clickwrap).',
-            'meta' => [
-                'flow' => 'mock_contract_signature',
-                'provider' => 'mock',
-                'method' => 'clickwrap',
-                'signature_id' => $snapshot['signature_id'],
-                'signed_at' => $snapshot['signed_at'],
-                'signed_by_name' => $snapshot['signed_by_name'],
-                'signed_by_email' => $snapshot['signed_by_email'],
-                'ip' => $snapshot['ip'],
-                'user_agent' => $snapshot['user_agent'],
-                'document_hash' => $snapshot['document_hash'],
-                'signed_pdf_path' => $snapshot['signed_pdf_path'],
-            ],
-        ]);
-
-        $record->update([
-            'status' => AppraisalStatusEnum::ContractSigned,
-            'contract_status' => ContractStatusEnum::ContractSigned,
-        ]);
 
         return redirect()
             ->route('appraisal.payment.page', ['id' => $record->id])
@@ -437,7 +328,7 @@ class AppraisalController extends Controller
         int $id,
         AppraisalMarketPreviewService $previewService
     ) {
-        $record = $this->resolveUserAppraisalRequest($request, $id);
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
         $oldStatus = $record->status?->label() ?? 'Preview Kajian Siap';
 
         try {
@@ -478,7 +369,7 @@ class AppraisalController extends Controller
         int $id,
         AppraisalMarketPreviewService $previewService
     ) {
-        $record = $this->resolveUserAppraisalRequest($request, $id);
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
         $validated = $request->validated();
 
         try {
@@ -532,12 +423,10 @@ class AppraisalController extends Controller
 
     public function downloadContractPdf(CustomerAccessRequest $request, int $id, AppraisalService $appraisalService)
     {
-        $record = AppraisalRequest::query()
-            ->where('user_id', $request->user()->id)
-            ->findOrFail($id);
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
 
         $status = $record->status?->value ?? $record->status;
-        if (! $this->isContractAccessibleStatus($status)) {
+        if (! $this->workflowService->isContractAccessibleStatus((string) $status)) {
             return redirect()
                 ->route('appraisal.show', ['id' => $record->id])
                 ->with('error', 'Dokumen kontrak belum tersedia pada status saat ini.');
@@ -585,126 +474,6 @@ class AppraisalController extends Controller
         return redirect()->route('appraisal.list');
     }
 
-    private function resolveUserAppraisalRequest(Request $request, int $id): AppraisalRequest
-    {
-        return AppraisalRequest::query()
-            ->where('user_id', $request->user()->id)
-            ->findOrFail($id);
-    }
-
-    private function getStatusValue(AppraisalRequest $record): string
-    {
-        return $record->status?->value ?? (string) $record->status;
-    }
-
-    private function countNegotiationRounds(AppraisalRequest $record): int
-    {
-        return (int) $record->offerNegotiations()
-            ->where('action', 'counter_request')
-            ->count();
-    }
-
-    private function isContractAccessibleStatus(string $status): bool
-    {
-        return in_array($status, [
-            AppraisalStatusEnum::WaitingSignature->value,
-            AppraisalStatusEnum::ContractSigned->value,
-            AppraisalStatusEnum::ValuationOnProgress->value,
-            AppraisalStatusEnum::ValuationCompleted->value,
-            AppraisalStatusEnum::PreviewReady->value,
-            AppraisalStatusEnum::ReportPreparation->value,
-            AppraisalStatusEnum::ReportReady->value,
-            AppraisalStatusEnum::Completed->value,
-        ], true);
-    }
-
-    private function hasReadyBillingProfile(?User $user): bool
-    {
-        if (! $user) {
-            return false;
-        }
-
-        return filled($user->phone_number)
-            && filled($user->billing_recipient_name)
-            && filled($user->billing_address_detail);
-    }
-
-    /**
-     * @return array<int, int>
-     */
-    private function getOfferedFeeOptions(AppraisalRequest $record): array
-    {
-        $fees = $record->offerNegotiations()
-            ->where('action', 'counter_request')
-            ->whereNotNull('offered_fee')
-            ->pluck('offered_fee')
-            ->map(fn ($fee): int => (int) $fee)
-            ->values();
-
-        if ($record->fee_total !== null) {
-            $fees->push((int) $record->fee_total);
-        }
-
-        return $fees->unique()->values()->all();
-    }
-
-    private function createSignedContractSnapshot(
-        Request $request,
-        AppraisalRequest $record,
-        AppraisalService $appraisalService
-    ): array {
-        $signedAt = now();
-        $signatureId = (string) Str::uuid();
-        $signerName = (string) ($request->user()?->name ?? '-');
-        $signerEmail = (string) ($request->user()?->email ?? '-');
-        $userAgent = substr((string) $request->userAgent(), 0, 255);
-        $ipAddress = (string) $request->ip();
-
-        $doc = $appraisalService->buildContractDocumentPayload($record);
-        $doc['accepted_at'] = $signedAt->toDateTimeString();
-        $doc['signature'] = array_merge((array) ($doc['signature'] ?? []), [
-            'is_signed' => true,
-            'signed_at' => $signedAt->toDateTimeString(),
-            'signed_by_name' => $signerName,
-            'signed_by_email' => $signerEmail,
-            'signature_id' => $signatureId,
-            'method' => 'clickwrap',
-            'provider' => 'mock',
-        ]);
-
-        $pdfBinary = Pdf::loadView('pdfs.appraisal-contract-offer', [
-            'doc' => $doc,
-        ])
-            ->setPaper('a4', 'portrait')
-            ->output();
-
-        $documentHash = 'sha256:' . hash('sha256', $pdfBinary);
-        $requestNumber = preg_replace('/[^A-Za-z0-9\-_.]/', '-', (string) ($record->request_number ?? ('REQ-' . $record->id)));
-        $storedName = "signed-contract-{$requestNumber}-{$signedAt->format('YmdHis')}.pdf";
-        $storedPath = "appraisal-requests/{$record->id}/contracts/{$storedName}";
-
-        Storage::disk('public')->put($storedPath, $pdfBinary);
-
-        $record->files()->create([
-            'type' => 'contract_signed_pdf',
-            'path' => $storedPath,
-            'original_name' => "Penawaran-Tertandatangani-{$requestNumber}.pdf",
-            'mime' => 'application/pdf',
-            'size' => strlen($pdfBinary),
-        ]);
-
-        return [
-            'signature_id' => $signatureId,
-            'signed_at' => $signedAt->toIso8601String(),
-            'signed_by_name' => $signerName,
-            'signed_by_email' => $signerEmail,
-            'ip' => $ipAddress,
-            'user_agent' => $userAgent,
-            'document_hash' => $documentHash,
-            'signed_pdf_path' => $storedPath,
-        ];
-    }
-
     private function notifyAdmins(
         Request $request,
         AppraisalRequest $record,
@@ -712,24 +481,14 @@ class AppraisalController extends Controller
         string $body,
         string $icon = 'heroicon-o-bell-alert'
     ): void {
-        $adminUsers = $this->resolveAdminUsers($request);
-        if ($adminUsers->isEmpty()) {
-            return;
-        }
-
         $url = route('admin.appraisal-requests.show', ['appraisalRequest' => $record->id]);
 
-        app(AdminNotificationService::class)->notifyAdmins(
+        $this->adminNotificationService->notifyAdmins(
             $title,
             $body,
             $url,
             $icon,
             $request->user()?->id,
         );
-    }
-
-    private function resolveAdminUsers(Request $request)
-    {
-        return app(AdminNotificationService::class)->recipients($request->user()?->id);
     }
 }

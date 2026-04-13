@@ -357,6 +357,11 @@ class AppraisalRequestController extends Controller
                 (int) $validated['billing_dpp_amount'],
                 $appraisalRequest->user
             );
+        } elseif (array_key_exists('fee_total', $validated) && $validated['fee_total'] !== null) {
+            $billingAttributes = $billingService->appraisalAttributesFromDpp(
+                (int) $billingService->deriveFromGross((int) $validated['fee_total'])['billing_dpp_amount'],
+                $appraisalRequest->user
+            );
         }
 
         $appraisalRequest->update([

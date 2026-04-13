@@ -79,7 +79,7 @@
     </style>
 </head>
 <body>
-<div class="eyebrow">DigiPro by KJPP HJAR - Platform Digital Penilaian Properti</div>
+<div class="eyebrow">DigiPro - Platform Digital Penilaian Properti</div>
 
 <h1 class="title">{{ $doc['title'] ?? 'SURAT REPRESENTATIF' }}</h1>
 <p class="subtitle">{{ $doc['subtitle'] ?? '' }}</p>
@@ -110,9 +110,9 @@
 </table>
 
 <p>
-    Saya yang bertanda tangan secara elektronik melalui platform DigiPro by KJPP HJAR menyatakan bahwa data, informasi,
+    Saya yang bertanda tangan secara elektronik melalui platform DigiPro menyatakan bahwa data, informasi,
     dan dokumen yang saya kirimkan untuk permohonan penilaian properti adalah benar dan dapat dipertanggungjawabkan.
-    Pernyataan ini dibuat sebagai bagian dari proses digital DigiPro by KJPP HJAR untuk mendukung penyusunan dokumen layanan
+    Pernyataan ini dibuat sebagai bagian dari proses digital DigiPro untuk mendukung penyusunan dokumen layanan
     dan keluaran penilaian.
 </p>
 
@@ -150,7 +150,7 @@
 </ol>
 
 <p>
-    Demikian surat representatif ini dibuat dan dilekatkan pada proses permohonan penilaian di DigiPro by KJPP HJAR untuk
+    Demikian surat representatif ini dibuat dan dilekatkan pada proses permohonan penilaian di DigiPro untuk
     digunakan sebagaimana mestinya dalam konteks layanan platform digital.
 </p>
 
@@ -159,7 +159,7 @@
     <p style="margin-top: 28px; font-weight: 700;">{{ $doc['signature']['signed_by_name'] ?? '-' }}</p>
     <p style="margin-top: 4px;">{{ $doc['signature']['signed_by_email'] ?? '-' }}</p>
     <p class="muted" style="margin-top: 8px;">
-        Ditandatangani secara elektronik melalui DigiPro by KJPP HJAR pada {{ $doc['signature']['signed_at'] ?? '-' }}<br>
+        Ditandatangani secara elektronik melalui DigiPro pada {{ $doc['signature']['signed_at'] ?? '-' }}<br>
         Signature ID: {{ $doc['signature']['signature_id'] ?? '-' }}<br>
         Hash Referensi: {{ $doc['signature']['document_hash'] ?? '-' }}
     </p>

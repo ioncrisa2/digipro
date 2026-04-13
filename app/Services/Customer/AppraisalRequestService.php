@@ -39,8 +39,9 @@ class AppraisalRequestService
 
         $format = 'both';
         $copies = 1;
-        $reportType = in_array(($validated['report_type'] ?? 'terinci'), ['terinci', 'singkat'], true)
-            ? (string) $validated['report_type']
+        $reportTypeInput = $validated['report_type'] ?? 'terinci';
+        $reportType = in_array($reportTypeInput, ['terinci', 'singkat'], true)
+            ? (string) $reportTypeInput
             : 'terinci';
 
         // Kolom `purpose` masih wajib di schema, jadi set default aman.

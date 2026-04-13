@@ -159,27 +159,6 @@ class StoreAppraisalRequest extends CustomerFormRequest
             }
 
             $user = $this->user();
-
-            if (! filled($user?->phone_number)) {
-                $v->errors()->add(
-                    'report_format',
-                    'Nomor telepon profil wajib diisi sebelum permohonan dapat diproses untuk pengiriman hard copy.'
-                );
-            }
-
-            if (! filled($user?->billing_recipient_name)) {
-                $v->errors()->add(
-                    'report_format',
-                    'Nama billing atau penerima laporan di profil wajib diisi untuk pengiriman hard copy.'
-                );
-            }
-
-            if (! filled($user?->billing_address_detail)) {
-                $v->errors()->add(
-                    'report_format',
-                    'Alamat detail billing di profil wajib diisi untuk pengiriman hard copy.'
-                );
-            }
         });
     }
 

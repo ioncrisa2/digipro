@@ -322,10 +322,7 @@ class AppraisalRequestWorkflowService
         $contractStatusBefore = $this->contractStatusValue($record);
         $actionType = $contractStatusBefore === ContractStatusEnum::Negotiation->value ? 'offer_revised' : 'offer_sent';
         $round = $this->countNegotiationRounds($record);
-        $billingPayload = $this->billingService->appraisalAttributesFromDpp(
-            (int) $data['billing_dpp_amount'],
-            $record->user
-        );
+        $billingPayload = $this->resolveOfferBillingPayload($record, $data);
         $feeTotal = (int) $billingPayload['billing_total_amount'];
         $contractDate = optional($record->contract_date)->toDateString() ?: now()->toDateString();
 
@@ -550,6 +547,25 @@ class AppraisalRequestWorkflowService
         return (int) $record->offerNegotiations()
             ->where('action', 'counter_request')
             ->count();
+    }
+
+    private function resolveOfferBillingPayload(AppraisalRequest $record, array $data): array
+    {
+        if (isset($data['billing_dpp_amount']) && $data['billing_dpp_amount'] !== null) {
+            return $this->billingService->appraisalAttributesFromDpp(
+                (int) $data['billing_dpp_amount'],
+                $record->user
+            );
+        }
+
+        if (isset($data['fee_total']) && $data['fee_total'] !== null) {
+            return $this->billingService->appraisalAttributesFromDpp(
+                (int) $this->billingService->deriveFromGross((int) $data['fee_total'])['billing_dpp_amount'],
+                $record->user
+            );
+        }
+
+        throw new RuntimeException('Nilai penawaran wajib diisi sebelum penawaran dapat dikirim.');
     }
 
     private function hasPendingRevisionWork(AppraisalRequest $record): bool
