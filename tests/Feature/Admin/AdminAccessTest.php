@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetFile;
 use App\Models\AppraisalRequest;
+use App\Models\AppraisalRequestCancellation;
 use App\Models\AppraisalRequestFile;
 use App\Models\AppraisalRequestRevisionBatch;
 use App\Models\AppraisalRequestRevisionItem;
@@ -376,6 +377,122 @@ it('renders the appraisal request index for admin users', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Admin/AppraisalRequests/Index')
             ->where('records.meta.total', 1));
+});
+
+it('reviews an appraisal cancellation request from the vue admin workspace', function () {
+    Notification::fake();
+
+    $admin = createAdminUser();
+    $requester = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $record = AppraisalRequest::create([
+        'user_id' => $requester->id,
+        'request_number' => 'REQ-ADMIN-CXL-REVIEW-001',
+        'purpose' => PurposeEnum::JualBeli,
+        'status' => AppraisalStatusEnum::CancellationReviewPending,
+        'contract_status' => ContractStatusEnum::WaitingSignature,
+        'requested_at' => now(),
+    ]);
+
+    $cancellation = AppraisalRequestCancellation::query()->create([
+        'appraisal_request_id' => $record->id,
+        'user_id' => $requester->id,
+        'status_before_request' => AppraisalStatusEnum::Submitted->value,
+        'phone_snapshot' => '08123456789',
+        'whatsapp_snapshot' => '08123456789',
+        'reason' => 'Mohon dibatalkan karena dokumen agunan belum siap.',
+        'review_status' => 'pending',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.appraisal-requests.cancellations.in-progress', $cancellation))
+        ->assertRedirect();
+
+    $cancellation->refresh();
+
+    expect($cancellation->review_status)->toBe('in_progress')
+        ->and($cancellation->reviewed_by)->toBe($admin->id)
+        ->and($cancellation->contacted_at)->not->toBeNull();
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.appraisal-requests.cancellations.approve', $cancellation), [
+            'review_note' => 'Pembatalan disetujui setelah verifikasi oleh admin.',
+        ])
+        ->assertRedirect(route('admin.appraisal-requests.cancellations.show', $cancellation));
+
+    $record->refresh();
+    $cancellation->refresh();
+
+    expect($record->status)->toBe(AppraisalStatusEnum::Cancelled)
+        ->and($record->contract_status)->toBe(ContractStatusEnum::Cancelled)
+        ->and($record->cancelled_by)->toBe($admin->id)
+        ->and($record->cancellation_reason)->toBe('Pembatalan disetujui setelah verifikasi oleh admin.');
+
+    expect($cancellation->review_status)->toBe('approved')
+        ->and($cancellation->review_note)->toBe('Pembatalan disetujui setelah verifikasi oleh admin.')
+        ->and($cancellation->reviewed_at)->not->toBeNull();
+
+    Notification::assertSentTo(
+        $requester,
+        AppraisalStatusUpdated::class,
+        fn (AppraisalStatusUpdated $notification) => $notification->newStatus === AppraisalStatusEnum::Cancelled->label()
+            && $notification->detail === 'Pembatalan disetujui setelah verifikasi oleh admin.'
+    );
+});
+
+it('rejects an appraisal cancellation request from the vue admin workspace', function () {
+    Notification::fake();
+
+    $admin = createAdminUser();
+    $requester = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $record = AppraisalRequest::create([
+        'user_id' => $requester->id,
+        'request_number' => 'REQ-ADMIN-CXL-REJECT-001',
+        'purpose' => PurposeEnum::JualBeli,
+        'status' => AppraisalStatusEnum::CancellationReviewPending,
+        'contract_status' => ContractStatusEnum::None,
+        'requested_at' => now(),
+    ]);
+
+    $cancellation = AppraisalRequestCancellation::query()->create([
+        'appraisal_request_id' => $record->id,
+        'user_id' => $requester->id,
+        'status_before_request' => AppraisalStatusEnum::Submitted->value,
+        'phone_snapshot' => '08129876543',
+        'whatsapp_snapshot' => '08129876543',
+        'reason' => 'Ingin dibatalkan.',
+        'review_status' => 'pending',
+    ]);
+
+    $this
+        ->actingAs($admin)
+        ->post(route('admin.appraisal-requests.cancellations.reject', $cancellation), [
+            'review_note' => 'Pengajuan ditolak karena proses appraisal tetap berjalan.',
+        ])
+        ->assertRedirect(route('admin.appraisal-requests.cancellations.show', $cancellation));
+
+    $record->refresh();
+    $cancellation->refresh();
+
+    expect($record->status)->toBe(AppraisalStatusEnum::Submitted)
+        ->and($cancellation->review_status)->toBe('rejected')
+        ->and($cancellation->review_note)->toBe('Pengajuan ditolak karena proses appraisal tetap berjalan.')
+        ->and($cancellation->reviewed_by)->toBe($admin->id)
+        ->and($cancellation->reviewed_at)->not->toBeNull();
+
+    Notification::assertSentTo(
+        $requester,
+        AppraisalStatusUpdated::class,
+        fn (AppraisalStatusUpdated $notification) => $notification->newStatus === AppraisalStatusEnum::Submitted->label()
+            && $notification->detail === 'Pengajuan ditolak karena proses appraisal tetap berjalan.'
+    );
 });
 
 it('renders the admin billings index in the vue workspace', function () {

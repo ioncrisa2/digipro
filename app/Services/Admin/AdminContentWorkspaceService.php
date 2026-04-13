@@ -196,6 +196,18 @@ class AdminContentWorkspaceService
         ];
     }
 
+    public function articleCategoryFormPagePayload(?ArticleCategory $articleCategory, string $mode): array
+    {
+        return [
+            'mode' => $mode,
+            'record' => $this->articleCategoryFormPayload($articleCategory),
+            'indexUrl' => route('admin.content.categories.index'),
+            'submitUrl' => $mode === 'create'
+                ? route('admin.content.categories.store')
+                : route('admin.content.categories.update', $articleCategory),
+        ];
+    }
+
     public function articleCategoryFormPayload(?ArticleCategory $articleCategory = null): array
     {
         return [
@@ -207,6 +219,22 @@ class AdminContentWorkspaceService
             'is_active' => (bool) ($articleCategory?->is_active ?? true),
             'show_in_nav' => (bool) ($articleCategory?->show_in_nav ?? false),
         ];
+    }
+
+    public function saveArticleCategory(array $validated, ?ArticleCategory $articleCategory = null): ArticleCategory
+    {
+        if ($articleCategory === null) {
+            return ArticleCategory::query()->create($validated);
+        }
+
+        $articleCategory->update($validated);
+
+        return $articleCategory;
+    }
+
+    public function deleteArticleCategory(ArticleCategory $articleCategory): void
+    {
+        $articleCategory->delete();
     }
 
     public function reorderArticleCategories(array $ids): void
@@ -249,6 +277,18 @@ class AdminContentWorkspaceService
         ];
     }
 
+    public function tagFormPagePayload(?Tag $tag, string $mode): array
+    {
+        return [
+            'mode' => $mode,
+            'record' => $this->tagFormPayload($tag),
+            'indexUrl' => route('admin.content.tags.index'),
+            'submitUrl' => $mode === 'create'
+                ? route('admin.content.tags.store')
+                : route('admin.content.tags.update', $tag),
+        ];
+    }
+
     public function tagFormPayload(?Tag $tag = null): array
     {
         return [
@@ -260,12 +300,23 @@ class AdminContentWorkspaceService
         ];
     }
 
-    public function createTag(array $validated): void
+    public function saveTag(array $validated, ?Tag $tag = null): Tag
     {
-        Tag::query()->create([
-            ...$validated,
-            'sort_order' => $this->nextSortOrder(Tag::query()),
-        ]);
+        if ($tag === null) {
+            return Tag::query()->create([
+                ...$validated,
+                'sort_order' => $this->nextSortOrder(Tag::query()),
+            ]);
+        }
+
+        $tag->update($validated);
+
+        return $tag;
+    }
+
+    public function deleteTag(Tag $tag): void
+    {
+        $tag->delete();
     }
 
     public function reorderTags(array $ids): void

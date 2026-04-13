@@ -88,17 +88,13 @@ class ContentController extends Controller
 
     public function articleCategoriesCreate(): Response
     {
-        return inertia('Admin/ArticleCategories/Form', [
-            'mode' => 'create',
-            'record' => $this->contentWorkspaceService->articleCategoryFormPayload(),
-            'indexUrl' => route('admin.content.categories.index'),
-            'submitUrl' => route('admin.content.categories.store'),
-        ]);
+        return inertia('Admin/ArticleCategories/Form', $this->contentWorkspaceService
+            ->articleCategoryFormPagePayload(null, 'create'));
     }
 
     public function articleCategoriesStore(StoreArticleCategoryRequest $request): RedirectResponse
     {
-        ArticleCategory::query()->create($request->validated());
+        $this->contentWorkspaceService->saveArticleCategory($request->validated());
 
         return redirect()
             ->route('admin.content.categories.index')
@@ -107,19 +103,15 @@ class ContentController extends Controller
 
     public function articleCategoriesEdit(ArticleCategory $articleCategory): Response
     {
-        return inertia('Admin/ArticleCategories/Form', [
-            'mode' => 'edit',
-            'record' => $this->contentWorkspaceService->articleCategoryFormPayload($articleCategory),
-            'indexUrl' => route('admin.content.categories.index'),
-            'submitUrl' => route('admin.content.categories.update', $articleCategory),
-        ]);
+        return inertia('Admin/ArticleCategories/Form', $this->contentWorkspaceService
+            ->articleCategoryFormPagePayload($articleCategory, 'edit'));
     }
 
     public function articleCategoriesUpdate(
         StoreArticleCategoryRequest $request,
         ArticleCategory $articleCategory
     ): RedirectResponse {
-        $articleCategory->update($request->validated());
+        $this->contentWorkspaceService->saveArticleCategory($request->validated(), $articleCategory);
 
         return redirect()
             ->route('admin.content.categories.index')
@@ -128,7 +120,7 @@ class ContentController extends Controller
 
     public function articleCategoriesDestroy(ArticleCategory $articleCategory): RedirectResponse
     {
-        $articleCategory->delete();
+        $this->contentWorkspaceService->deleteArticleCategory($articleCategory);
 
         return redirect()
             ->route('admin.content.categories.index')
@@ -152,17 +144,13 @@ class ContentController extends Controller
 
     public function tagsCreate(): Response
     {
-        return inertia('Admin/Tags/Form', [
-            'mode' => 'create',
-            'record' => $this->contentWorkspaceService->tagFormPayload(),
-            'indexUrl' => route('admin.content.tags.index'),
-            'submitUrl' => route('admin.content.tags.store'),
-        ]);
+        return inertia('Admin/Tags/Form', $this->contentWorkspaceService
+            ->tagFormPagePayload(null, 'create'));
     }
 
     public function tagsStore(StoreTagRequest $request): RedirectResponse
     {
-        $this->contentWorkspaceService->createTag($request->validated());
+        $this->contentWorkspaceService->saveTag($request->validated());
 
         return redirect()
             ->route('admin.content.tags.index')
@@ -171,17 +159,13 @@ class ContentController extends Controller
 
     public function tagsEdit(Tag $tag): Response
     {
-        return inertia('Admin/Tags/Form', [
-            'mode' => 'edit',
-            'record' => $this->contentWorkspaceService->tagFormPayload($tag),
-            'indexUrl' => route('admin.content.tags.index'),
-            'submitUrl' => route('admin.content.tags.update', $tag),
-        ]);
+        return inertia('Admin/Tags/Form', $this->contentWorkspaceService
+            ->tagFormPagePayload($tag, 'edit'));
     }
 
     public function tagsUpdate(StoreTagRequest $request, Tag $tag): RedirectResponse
     {
-        $tag->update($request->validated());
+        $this->contentWorkspaceService->saveTag($request->validated(), $tag);
 
         return redirect()
             ->route('admin.content.tags.index')
@@ -190,7 +174,7 @@ class ContentController extends Controller
 
     public function tagsDestroy(Tag $tag): RedirectResponse
     {
-        $tag->delete();
+        $this->contentWorkspaceService->deleteTag($tag);
 
         return redirect()
             ->route('admin.content.tags.index')

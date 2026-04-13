@@ -8,22 +8,22 @@ use App\Http\Requests\Admin\UpsertAppraisalAssetRequest;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetFile;
 use App\Models\AppraisalRequest;
-use App\Support\Admin\AppraisalAssetFormBuilder;
+use App\Services\Admin\AdminAppraisalAssetWorkspaceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Response;
 
 class AppraisalAssetController extends Controller
 {
     public function __construct(
-        private readonly AppraisalAssetFormBuilder $assetFormBuilder,
+        private readonly AdminAppraisalAssetWorkspaceService $workspaceService,
     ) {
     }
 
     public function appraisalRequestAssetCreate(Request $request, AppraisalRequest $appraisalRequest): Response
     {
-        return inertia('Admin/AppraisalRequests/AssetForm', $this->assetFormBuilder->buildEditorProps($request, $appraisalRequest));
+        return inertia('Admin/AppraisalRequests/AssetForm', $this->workspaceService
+            ->createPagePayload($request, $appraisalRequest));
     }
 
     public function appraisalRequestAssetEdit(
@@ -31,16 +31,15 @@ class AppraisalAssetController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalAsset $asset
     ): Response {
-        $this->assetFormBuilder->ensureBelongsToRequest($appraisalRequest, $asset);
-
-        return inertia('Admin/AppraisalRequests/AssetForm', $this->assetFormBuilder->buildEditorProps($request, $appraisalRequest, $asset));
+        return inertia('Admin/AppraisalRequests/AssetForm', $this->workspaceService
+            ->editPagePayload($request, $appraisalRequest, $asset));
     }
 
     public function storeAppraisalRequestAsset(
         UpsertAppraisalAssetRequest $request,
         AppraisalRequest $appraisalRequest
     ): RedirectResponse {
-        $asset = $appraisalRequest->assets()->create($this->assetFormBuilder->assetPayload($request->validated()));
+        $asset = $this->workspaceService->createAsset($appraisalRequest, $request->validated());
 
         return redirect()
             ->route('admin.appraisal-requests.show', $appraisalRequest)
@@ -52,9 +51,7 @@ class AppraisalAssetController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalAsset $asset
     ): RedirectResponse {
-        $this->assetFormBuilder->ensureBelongsToRequest($appraisalRequest, $asset);
-
-        $asset->update($this->assetFormBuilder->assetPayload($request->validated()));
+        $this->workspaceService->updateAsset($appraisalRequest, $asset, $request->validated());
 
         return redirect()
             ->route('admin.appraisal-requests.show', $appraisalRequest)
@@ -65,13 +62,7 @@ class AppraisalAssetController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalAsset $asset
     ): RedirectResponse {
-        $this->assetFormBuilder->ensureBelongsToRequest($appraisalRequest, $asset);
-
-        foreach ($asset->files as $file) {
-            Storage::disk('public')->delete($file->path);
-        }
-
-        $asset->delete();
+        $this->workspaceService->deleteAsset($appraisalRequest, $asset);
 
         return back()->with('success', 'Aset berhasil dihapus.');
     }
@@ -81,24 +72,12 @@ class AppraisalAssetController extends Controller
         AppraisalRequest $appraisalRequest,
         AppraisalAsset $asset
     ): RedirectResponse {
-        $this->assetFormBuilder->ensureBelongsToRequest($appraisalRequest, $asset);
-
-        $validated = $request->validated();
-        $file = $request->file('file');
-        $directory = $this->assetFormBuilder->assetFileDirectory($validated['type']);
-        $storedPath = $file->storeAs(
-            "appraisal-requests/{$appraisalRequest->id}/assets/{$asset->id}/{$directory}",
-            now()->format('YmdHis') . '-' . uniqid() . '.' . $file->getClientOriginalExtension(),
-            'public'
+        $this->workspaceService->storeAssetFile(
+            $appraisalRequest,
+            $asset,
+            $request->validated(),
+            $request->file('file')
         );
-
-        $asset->files()->create([
-            'type' => $validated['type'],
-            'path' => $storedPath,
-            'original_name' => $file->getClientOriginalName(),
-            'mime' => $file->getMimeType(),
-            'size' => $file->getSize(),
-        ]);
 
         return back()->with('success', 'File aset berhasil diunggah.');
     }
@@ -108,11 +87,7 @@ class AppraisalAssetController extends Controller
         AppraisalAsset $asset,
         AppraisalAssetFile $file
     ): RedirectResponse {
-        $this->assetFormBuilder->ensureBelongsToRequest($appraisalRequest, $asset);
-        abort_unless((int) $file->appraisal_asset_id === (int) $asset->id, 404);
-
-        Storage::disk('public')->delete($file->path);
-        $file->delete();
+        $this->workspaceService->deleteAssetFile($appraisalRequest, $asset, $file);
 
         return back()->with('success', 'File aset berhasil dihapus.');
     }

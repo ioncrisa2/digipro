@@ -14,167 +14,104 @@ use App\Http\Requests\Admin\UploadFinalReportRequest;
 use App\Http\Requests\Admin\UpdateAppraisalPhysicalReportRequest;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestRevisionItem;
-use App\Services\Admin\AppraisalFieldCorrectionService;
-use App\Services\Admin\AppraisalRequestAdminWorkflowService;
-use App\Services\Admin\AppraisalRequestRevisionReviewService;
-use App\Services\Admin\AppraisalRequestRevisionService;
-use App\Services\Admin\AppraisalRequestWorkflowService;
+use App\Services\Admin\AdminAppraisalRequestWorkflowWorkspaceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AppraisalRequestWorkflowController extends Controller
 {
+    public function __construct(
+        private readonly AdminAppraisalRequestWorkflowWorkspaceService $workspaceService,
+    ) {
+    }
+
     public function storeRevisionBatch(
         StoreAppraisalRequestRevisionBatchRequest $request,
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestRevisionService $revisionService
     ): RedirectResponse {
-        try {
-            $revisionService->createBatch(
-                $appraisalRequest,
-                (int) $request->user()->id,
-                $request->resolvedItems(),
-                $request->string('admin_note')->toString()
-            );
-
-            return back()->with('success', 'Permintaan revisi berhasil dibuat dan customer perlu memperbaiki item yang diminta.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        return $this->handleAction(fn () => $this->workspaceService->storeRevisionBatch(
+            $appraisalRequest,
+            (int) $request->user()->id,
+            $request->resolvedItems(),
+            $request->string('admin_note')->toString()
+        ));
     }
 
     public function sendOffer(
         StoreAppraisalOfferRequest $request,
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestWorkflowService $workflowService
     ): RedirectResponse {
-        try {
-            $result = $workflowService->sendOffer(
-                $appraisalRequest,
-                (int) $request->user()->id,
-                $request->validated()
-            );
-
-            $message = $result['action'] === 'offer_revised'
-                ? 'Counter offer berhasil dikirim.'
-                : 'Penawaran berhasil dikirim.';
-
-            return back()->with('success', $message);
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        return $this->handleAction(fn () => $this->workspaceService->sendOffer(
+            $appraisalRequest,
+            (int) $request->user()->id,
+            $request->validated()
+        ));
     }
 
     public function approveLatestNegotiation(
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestWorkflowService $workflowService,
         AdminActionRequest $request
     ): RedirectResponse {
-        try {
-            $workflowService->approveLatestNegotiation($appraisalRequest, (int) $request->user()->id);
-
-            return back()->with('success', 'Harapan fee user disetujui. Request langsung masuk ke tahap tanda tangan kontrak.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        return $this->handleAction(fn () => $this->workspaceService->approveLatestNegotiation(
+            $appraisalRequest,
+            (int) $request->user()->id
+        ));
     }
 
     public function verifyDocs(
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestWorkflowService $workflowService,
         AdminActionRequest $request
     ): RedirectResponse {
-        try {
-            $workflowService->verifyDocs($appraisalRequest, (int) $request->user()->id);
-
-            return back()->with('success', 'Dokumen berhasil diverifikasi. Request masuk ke tahap menunggu penawaran.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        return $this->handleAction(fn () => $this->workspaceService->verifyDocs(
+            $appraisalRequest,
+            (int) $request->user()->id
+        ));
     }
 
-    public function markDocsIncomplete(
-        AppraisalRequest $appraisalRequest,
-        AppraisalRequestWorkflowService $workflowService
-    ): RedirectResponse {
-        try {
-            $workflowService->markDocsIncomplete($appraisalRequest);
-
-            return back()->with('success', 'Request berhasil ditandai dokumen kurang.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+    public function markDocsIncomplete(AppraisalRequest $appraisalRequest): RedirectResponse
+    {
+        return $this->handleAction(fn () => $this->workspaceService->markDocsIncomplete($appraisalRequest));
     }
 
-    public function markContractSigned(
-        AppraisalRequest $appraisalRequest,
-        AppraisalRequestWorkflowService $workflowService
-    ): RedirectResponse {
-        try {
-            $workflowService->markContractSigned($appraisalRequest);
-
-            return back()->with('success', 'Status kontrak berhasil diperbarui menjadi ditandatangani.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+    public function markContractSigned(AppraisalRequest $appraisalRequest): RedirectResponse
+    {
+        return $this->handleAction(fn () => $this->workspaceService->markContractSigned($appraisalRequest));
     }
 
-    public function verifyPayment(
-        AppraisalRequest $appraisalRequest,
-        AppraisalRequestWorkflowService $workflowService
-    ): RedirectResponse {
-        try {
-            $workflowService->verifyPayment($appraisalRequest);
-
-            return back()->with('success', 'Pembayaran terverifikasi. Request masuk ke proses valuasi.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+    public function verifyPayment(AppraisalRequest $appraisalRequest): RedirectResponse
+    {
+        return $this->handleAction(fn () => $this->workspaceService->verifyPayment($appraisalRequest));
     }
 
     public function updatePhysicalReport(
         UpdateAppraisalPhysicalReportRequest $request,
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestAdminWorkflowService $adminWorkflowService
     ): RedirectResponse {
-        try {
-            $result = $adminWorkflowService->updatePhysicalReport(
-                $appraisalRequest,
-                (int) $request->user()->id,
-                $request->validated()
-            );
-
-            return back()->with('success', (string) ($result['message'] ?? 'Detail pengiriman hard copy berhasil diperbarui.'));
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        return $this->handleAction(fn () => $this->workspaceService->updatePhysicalReport(
+            $appraisalRequest,
+            (int) $request->user()->id,
+            $request->validated()
+        ));
     }
 
     public function cancelRequest(
         StoreAppraisalCancellationRequest $request,
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestAdminWorkflowService $adminWorkflowService
     ): RedirectResponse {
-        try {
-            $adminWorkflowService->cancelRequest(
-                $appraisalRequest,
-                (int) $request->user()->id,
-                trim((string) $request->string('reason')->toString())
-            );
-
-            return back()->with('success', 'Request berhasil dibatalkan dan alasan pembatalan sudah tersimpan.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        return $this->handleAction(fn () => $this->workspaceService->cancelRequest(
+            $appraisalRequest,
+            (int) $request->user()->id,
+            trim((string) $request->string('reason')->toString())
+        ));
     }
 
     public function downloadReportDraft(
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestAdminWorkflowService $adminWorkflowService
     ): StreamedResponse|RedirectResponse {
         try {
-            $download = $adminWorkflowService->resolveDraftDownload($appraisalRequest);
+            $download = $this->workspaceService->resolveDraftDownload($appraisalRequest);
 
             return Storage::disk((string) $download['disk'])
                 ->download((string) $download['path'], (string) $download['download_name']);
@@ -186,99 +123,77 @@ class AppraisalRequestWorkflowController extends Controller
     public function saveReportConfiguration(
         StoreAppraisalReportConfigurationRequest $request,
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestAdminWorkflowService $adminWorkflowService
     ): RedirectResponse {
-        try {
-            $adminWorkflowService->saveReportConfiguration(
-                $appraisalRequest,
-                (int) $request->user()->id,
-                $request->validated()
-            );
-
-            return back()->with('success', 'Konfigurasi report berhasil disimpan dan draft diperbarui.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        return $this->handleAction(fn () => $this->workspaceService->saveReportConfiguration(
+            $appraisalRequest,
+            (int) $request->user()->id,
+            $request->validated()
+        ));
     }
 
     public function storeFieldCorrection(
         StoreAppraisalFieldCorrectionRequest $request,
         AppraisalRequest $appraisalRequest,
-        AppraisalFieldCorrectionService $fieldCorrectionService
     ): RedirectResponse {
-        try {
-            $fieldCorrectionService->apply(
+        return $this->handleAction(function () use ($request, $appraisalRequest): string {
+            return $this->workspaceService->storeFieldCorrection(
                 $appraisalRequest,
                 (int) $request->user()->id,
                 (string) $request->input('target_key'),
                 $request->normalizedValue(),
                 $request->string('reason')->toString()
             );
-
-            return back()->with('success', 'Data request berhasil diperbaiki oleh admin.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        } catch (\Illuminate\Validation\ValidationException $exception) {
-            return back()->withErrors($exception->errors())->withInput();
-        }
+        }, handleValidationErrors: true);
     }
 
     public function uploadFinalReport(
         UploadFinalReportRequest $request,
         AppraisalRequest $appraisalRequest,
-        AppraisalRequestAdminWorkflowService $adminWorkflowService
     ): RedirectResponse {
-        try {
-            $adminWorkflowService->uploadFinalReport(
-                $appraisalRequest,
-                $request->validated()['report_pdf'],
-                (int) $request->user()->id
-            );
-
-            return back()->with('success', 'PDF laporan final berhasil diunggah. Request selesai dan laporan sudah bisa diunduh customer.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        return $this->handleAction(fn () => $this->workspaceService->uploadFinalReport(
+            $appraisalRequest,
+            $request->validated()['report_pdf'],
+            (int) $request->user()->id
+        ));
     }
 
     public function approveRevisionItem(
         AppraisalRequest $appraisalRequest,
         AppraisalRequestRevisionItem $revisionItem,
-        AppraisalRequestRevisionReviewService $reviewService,
         AdminActionRequest $request
     ): RedirectResponse {
-        try {
-            $reviewService->approveItem(
-                $appraisalRequest,
-                $revisionItem,
-                (int) $request->user()->id
-            );
-
-            return back()->with('success', 'Dokumen revisi berhasil disetujui.');
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        return $this->handleAction(fn () => $this->workspaceService->approveRevisionItem(
+            $appraisalRequest,
+            $revisionItem,
+            (int) $request->user()->id
+        ));
     }
 
     public function rejectRevisionItem(
         AppraisalRequest $appraisalRequest,
         AppraisalRequestRevisionItem $revisionItem,
-        AppraisalRequestRevisionReviewService $reviewService,
         RejectAppraisalRevisionItemRequest $request
     ): RedirectResponse {
-        $validated = $request->validated();
+        return $this->handleAction(fn () => $this->workspaceService->rejectRevisionItem(
+            $appraisalRequest,
+            $revisionItem,
+            (int) $request->user()->id,
+            (string) $request->validated('review_note')
+        ));
+    }
 
+    private function handleAction(callable $callback, bool $handleValidationErrors = false): RedirectResponse
+    {
         try {
-            $reviewService->rejectItem(
-                $appraisalRequest,
-                $revisionItem,
-                (int) $request->user()->id,
-                (string) $validated['review_note']
-            );
-
-            return back()->with('success', 'Item revisi dibuka kembali dan customer diminta mengunggah ulang dokumen.');
+            return back()->with('success', $callback());
         } catch (\RuntimeException $exception) {
             return back()->with('error', $exception->getMessage());
+        } catch (ValidationException $exception) {
+            if (! $handleValidationErrors) {
+                throw $exception;
+            }
+
+            return back()->withErrors($exception->errors())->withInput();
         }
     }
 }

@@ -40,45 +40,33 @@ class ContentLegalController extends Controller
 
     public function faqsCreate(): Response
     {
-        return inertia('Admin/SimpleContent/Form', [
-            'resource' => ['key' => 'faqs', 'title' => 'FAQ', 'singular' => 'FAQ'],
-            'mode' => 'create',
-            'record' => $this->legalContentWorkspaceService->faqFormPayload(),
-            'indexUrl' => route('admin.content.legal.faqs.index'),
-            'submitUrl' => route('admin.content.legal.faqs.store'),
-            'links' => $this->legalContentWorkspaceService->legalModuleLinks(),
-        ]);
+        return inertia('Admin/SimpleContent/Form', $this->legalContentWorkspaceService
+            ->faqFormPagePayload(null, 'create'));
     }
 
     public function faqsStore(StoreFaqRequest $request): RedirectResponse
     {
-        Faq::query()->create($request->validated());
+        $this->legalContentWorkspaceService->saveFaq($request->validated());
 
         return redirect()->route('admin.content.legal.faqs.index')->with('success', 'FAQ berhasil ditambahkan.');
     }
 
     public function faqsEdit(Faq $faq): Response
     {
-        return inertia('Admin/SimpleContent/Form', [
-            'resource' => ['key' => 'faqs', 'title' => 'FAQ', 'singular' => 'FAQ'],
-            'mode' => 'edit',
-            'record' => $this->legalContentWorkspaceService->faqFormPayload($faq),
-            'indexUrl' => route('admin.content.legal.faqs.index'),
-            'submitUrl' => route('admin.content.legal.faqs.update', $faq),
-            'links' => $this->legalContentWorkspaceService->legalModuleLinks(),
-        ]);
+        return inertia('Admin/SimpleContent/Form', $this->legalContentWorkspaceService
+            ->faqFormPagePayload($faq, 'edit'));
     }
 
     public function faqsUpdate(StoreFaqRequest $request, Faq $faq): RedirectResponse
     {
-        $faq->update($request->validated());
+        $this->legalContentWorkspaceService->saveFaq($request->validated(), $faq);
 
         return redirect()->route('admin.content.legal.faqs.index')->with('success', 'FAQ berhasil diperbarui.');
     }
 
     public function faqsDestroy(Faq $faq): RedirectResponse
     {
-        $faq->delete();
+        $this->legalContentWorkspaceService->deleteFaq($faq);
 
         return redirect()->route('admin.content.legal.faqs.index')->with('success', 'FAQ berhasil dihapus.');
     }
@@ -98,15 +86,8 @@ class ContentLegalController extends Controller
 
     public function featuresCreate(): Response
     {
-        return inertia('Admin/SimpleContent/Form', [
-            'resource' => ['key' => 'features', 'title' => 'Fitur', 'singular' => 'Fitur'],
-            'mode' => 'create',
-            'record' => $this->legalContentWorkspaceService->featureFormPayload(),
-            'iconOptions' => $this->legalContentWorkspaceService->featureIconOptions(),
-            'indexUrl' => route('admin.content.legal.features.index'),
-            'submitUrl' => route('admin.content.legal.features.store'),
-            'links' => $this->legalContentWorkspaceService->legalModuleLinks(),
-        ]);
+        return inertia('Admin/SimpleContent/Form', $this->legalContentWorkspaceService
+            ->featureFormPagePayload(null, 'create'));
     }
 
     public function featuresStore(StoreFeatureRequest $request): RedirectResponse
@@ -121,15 +102,8 @@ class ContentLegalController extends Controller
 
     public function featuresEdit(Feature $feature): Response
     {
-        return inertia('Admin/SimpleContent/Form', [
-            'resource' => ['key' => 'features', 'title' => 'Fitur', 'singular' => 'Fitur'],
-            'mode' => 'edit',
-            'record' => $this->legalContentWorkspaceService->featureFormPayload($feature),
-            'iconOptions' => $this->legalContentWorkspaceService->featureIconOptions(),
-            'indexUrl' => route('admin.content.legal.features.index'),
-            'submitUrl' => route('admin.content.legal.features.update', $feature),
-            'links' => $this->legalContentWorkspaceService->legalModuleLinks(),
-        ]);
+        return inertia('Admin/SimpleContent/Form', $this->legalContentWorkspaceService
+            ->featureFormPagePayload($feature, 'edit'));
     }
 
     public function featuresUpdate(StoreFeatureRequest $request, Feature $feature): RedirectResponse
@@ -172,14 +146,8 @@ class ContentLegalController extends Controller
 
     public function testimonialsCreate(): Response
     {
-        return inertia('Admin/SimpleContent/Form', [
-            'resource' => ['key' => 'testimonials', 'title' => 'Testimoni', 'singular' => 'Testimoni'],
-            'mode' => 'create',
-            'record' => $this->legalContentWorkspaceService->testimonialFormPayload(),
-            'indexUrl' => route('admin.content.legal.testimonials.index'),
-            'submitUrl' => route('admin.content.legal.testimonials.store'),
-            'links' => $this->legalContentWorkspaceService->legalModuleLinks(),
-        ]);
+        return inertia('Admin/SimpleContent/Form', $this->legalContentWorkspaceService
+            ->testimonialFormPagePayload(null, 'create'));
     }
 
     public function testimonialsStore(StoreTestimonialRequest $request): RedirectResponse
@@ -194,14 +162,8 @@ class ContentLegalController extends Controller
 
     public function testimonialsEdit(Testimonial $testimonial): Response
     {
-        return inertia('Admin/SimpleContent/Form', [
-            'resource' => ['key' => 'testimonials', 'title' => 'Testimoni', 'singular' => 'Testimoni'],
-            'mode' => 'edit',
-            'record' => $this->legalContentWorkspaceService->testimonialFormPayload($testimonial),
-            'indexUrl' => route('admin.content.legal.testimonials.index'),
-            'submitUrl' => route('admin.content.legal.testimonials.update', $testimonial),
-            'links' => $this->legalContentWorkspaceService->legalModuleLinks(),
-        ]);
+        return inertia('Admin/SimpleContent/Form', $this->legalContentWorkspaceService
+            ->testimonialFormPagePayload($testimonial, 'edit'));
     }
 
     public function testimonialsUpdate(StoreTestimonialRequest $request, Testimonial $testimonial): RedirectResponse
@@ -241,7 +203,7 @@ class ContentLegalController extends Controller
 
     public function termsDocumentsStore(StoreLegalDocumentRequest $request): RedirectResponse
     {
-        TermsDocument::query()->create($request->validated());
+        $this->legalContentWorkspaceService->saveLegalDocument(new TermsDocument(), $request->validated());
 
         return redirect()->route('admin.content.legal.terms.index')->with('success', 'Dokumen terms berhasil ditambahkan.');
     }
@@ -259,14 +221,14 @@ class ContentLegalController extends Controller
 
     public function termsDocumentsUpdate(StoreLegalDocumentRequest $request, TermsDocument $termsDocument): RedirectResponse
     {
-        $termsDocument->update($request->validated());
+        $this->legalContentWorkspaceService->saveLegalDocument($termsDocument, $request->validated());
 
         return redirect()->route('admin.content.legal.terms.index')->with('success', 'Dokumen terms berhasil diperbarui.');
     }
 
     public function termsDocumentsDestroy(TermsDocument $termsDocument): RedirectResponse
     {
-        $termsDocument->delete();
+        $this->legalContentWorkspaceService->deleteLegalDocument($termsDocument);
 
         return redirect()->route('admin.content.legal.terms.index')->with('success', 'Dokumen terms berhasil dihapus.');
     }
@@ -290,7 +252,7 @@ class ContentLegalController extends Controller
 
     public function privacyPoliciesStore(StoreLegalDocumentRequest $request): RedirectResponse
     {
-        PrivacyPolicy::query()->create($request->validated());
+        $this->legalContentWorkspaceService->saveLegalDocument(new PrivacyPolicy(), $request->validated());
 
         return redirect()->route('admin.content.legal.privacy.index')->with('success', 'Dokumen privacy berhasil ditambahkan.');
     }
@@ -308,14 +270,14 @@ class ContentLegalController extends Controller
 
     public function privacyPoliciesUpdate(StoreLegalDocumentRequest $request, PrivacyPolicy $privacyPolicy): RedirectResponse
     {
-        $privacyPolicy->update($request->validated());
+        $this->legalContentWorkspaceService->saveLegalDocument($privacyPolicy, $request->validated());
 
         return redirect()->route('admin.content.legal.privacy.index')->with('success', 'Dokumen privacy berhasil diperbarui.');
     }
 
     public function privacyPoliciesDestroy(PrivacyPolicy $privacyPolicy): RedirectResponse
     {
-        $privacyPolicy->delete();
+        $this->legalContentWorkspaceService->deleteLegalDocument($privacyPolicy);
 
         return redirect()->route('admin.content.legal.privacy.index')->with('success', 'Dokumen privacy berhasil dihapus.');
     }
@@ -364,7 +326,7 @@ class ContentLegalController extends Controller
             return redirect()->route('admin.content.legal.consent.index')->with('error', 'Dokumen published tidak bisa dihapus.');
         }
 
-        $consentDocument->delete();
+        $this->legalContentWorkspaceService->deleteConsentDocument($consentDocument);
 
         return redirect()->route('admin.content.legal.consent.index')->with('success', 'Dokumen consent berhasil dihapus.');
     }

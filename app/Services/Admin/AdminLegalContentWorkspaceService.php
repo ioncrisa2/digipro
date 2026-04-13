@@ -17,6 +17,19 @@ use Illuminate\Support\Facades\Storage;
 
 class AdminLegalContentWorkspaceService
 {
+    public function faqFormPagePayload(?Faq $faq, string $mode): array
+    {
+        return $this->simpleContentFormPagePayload(
+            resource: ['key' => 'faqs', 'title' => 'FAQ', 'singular' => 'FAQ'],
+            mode: $mode,
+            record: $this->faqFormPayload($faq),
+            indexUrl: route('admin.content.legal.faqs.index'),
+            submitUrl: $mode === 'create'
+                ? route('admin.content.legal.faqs.store')
+                : route('admin.content.legal.faqs.update', $faq),
+        );
+    }
+
     public function faqsIndexPayload(array $filters): array
     {
         return $this->simpleContentIndexPayload(
@@ -61,6 +74,22 @@ class AdminLegalContentWorkspaceService
         ];
     }
 
+    public function saveFaq(array $validated, ?Faq $faq = null): Faq
+    {
+        if ($faq === null) {
+            return Faq::query()->create($validated);
+        }
+
+        $faq->update($validated);
+
+        return $faq;
+    }
+
+    public function deleteFaq(Faq $faq): void
+    {
+        $faq->delete();
+    }
+
     public function reorderFaqs(array $ids): void
     {
         DB::transaction(function () use ($ids): void {
@@ -103,6 +132,22 @@ class AdminLegalContentWorkspaceService
                 'heroMedia' => $this->heroMediaPayload(),
                 'heroUploadUrl' => route('admin.content.legal.features.hero-background.update'),
                 'platformPreviewMedia' => $this->platformPreviewMediaPayload(),
+            ],
+        );
+    }
+
+    public function featureFormPagePayload(?Feature $feature, string $mode): array
+    {
+        return $this->simpleContentFormPagePayload(
+            resource: ['key' => 'features', 'title' => 'Fitur', 'singular' => 'Fitur'],
+            mode: $mode,
+            record: $this->featureFormPayload($feature),
+            indexUrl: route('admin.content.legal.features.index'),
+            submitUrl: $mode === 'create'
+                ? route('admin.content.legal.features.store')
+                : route('admin.content.legal.features.update', $feature),
+            extra: [
+                'iconOptions' => $this->featureIconOptions(),
             ],
         );
     }
@@ -181,6 +226,19 @@ class AdminLegalContentWorkspaceService
 
         $setting = LandingMediaSetting::query()->firstOrNew(['key' => 'platform_preview_slide_' . $slot]);
         $this->replaceLandingMedia($setting, $image, 'landing/platform-preview');
+    }
+
+    public function testimonialFormPagePayload(?Testimonial $testimonial, string $mode): array
+    {
+        return $this->simpleContentFormPagePayload(
+            resource: ['key' => 'testimonials', 'title' => 'Testimoni', 'singular' => 'Testimoni'],
+            mode: $mode,
+            record: $this->testimonialFormPayload($testimonial),
+            indexUrl: route('admin.content.legal.testimonials.index'),
+            submitUrl: $mode === 'create'
+                ? route('admin.content.legal.testimonials.store')
+                : route('admin.content.legal.testimonials.update', $testimonial),
+        );
     }
 
     public function testimonialsIndexPayload(array $filters): array
@@ -263,6 +321,22 @@ class AdminLegalContentWorkspaceService
         }
 
         $testimonial->delete();
+    }
+
+    public function saveLegalDocument(Model $document, array $validated): Model
+    {
+        if ($document->exists) {
+            $document->update($validated);
+
+            return $document;
+        }
+
+        return $document::query()->create($validated);
+    }
+
+    public function deleteLegalDocument(Model $document): void
+    {
+        $document->delete();
     }
 
     public function legalDocumentsIndexPayload(array $filters, string $modelClass, string $routePrefix, string $documentType): array
@@ -415,6 +489,11 @@ class AdminLegalContentWorkspaceService
         $consentDocument->save();
     }
 
+    public function deleteConsentDocument(ConsentDocument $consentDocument): void
+    {
+        $consentDocument->delete();
+    }
+
     public function appraisalUserConsentsIndexPayload(array $filters, int $perPage): array
     {
         $records = AppraisalUserConsent::query()
@@ -520,6 +599,25 @@ class AdminLegalContentWorkspaceService
             'summary' => $summary,
             'records' => $records,
             'createUrl' => $createUrl,
+            'links' => $this->legalModuleLinks(),
+            ...$extra,
+        ];
+    }
+
+    private function simpleContentFormPagePayload(
+        array $resource,
+        string $mode,
+        array $record,
+        string $indexUrl,
+        string $submitUrl,
+        array $extra = [],
+    ): array {
+        return [
+            'resource' => $resource,
+            'mode' => $mode,
+            'record' => $record,
+            'indexUrl' => $indexUrl,
+            'submitUrl' => $submitUrl,
             'links' => $this->legalModuleLinks(),
             ...$extra,
         ];
