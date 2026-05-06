@@ -24,6 +24,13 @@ Route::middleware(['auth', 'verified', 'customer.role'])
         Route::post('/permohonan-penilaian/{id}/offer/cancel', [AppraisalController::class, 'cancelOffer'])->name('appraisal.offer.cancel');
         Route::post('/permohonan-penilaian/{id}/cancellation-request', [AppraisalController::class, 'submitCancellationRequest'])->name('appraisal.cancellation-request.store');
         Route::get('/permohonan-penilaian/{id}/kontrak', [AppraisalController::class, 'contractSignaturePage'])->name('appraisal.contract.page');
+        Route::get('/permohonan-penilaian/{id}/kontrak/onboarding', [AppraisalController::class, 'contractOnboardingPage'])->name('appraisal.contract.onboarding.page');
+        Route::post('/permohonan-penilaian/{id}/kontrak/onboarding/identity', [AppraisalController::class, 'saveContractOnboardingIdentity'])->name('appraisal.contract.onboarding.identity');
+        Route::post('/permohonan-penilaian/{id}/kontrak/onboarding/register-user', [AppraisalController::class, 'registerContractPeruriUser'])->name('appraisal.contract.onboarding.register-user');
+        Route::post('/permohonan-penilaian/{id}/kontrak/onboarding/submit-kyc', [AppraisalController::class, 'submitContractPeruriKyc'])->name('appraisal.contract.onboarding.submit-kyc');
+        Route::post('/permohonan-penilaian/{id}/kontrak/onboarding/set-specimen', [AppraisalController::class, 'setContractPeruriSpecimen'])->name('appraisal.contract.onboarding.set-specimen');
+        Route::post('/permohonan-penilaian/{id}/kontrak/onboarding/register-keyla', [AppraisalController::class, 'registerContractKeyla'])->name('appraisal.contract.onboarding.register-keyla');
+        Route::post('/permohonan-penilaian/{id}/kontrak/onboarding/refresh', [AppraisalController::class, 'refreshContractOnboarding'])->name('appraisal.contract.onboarding.refresh');
         Route::get('/permohonan-penilaian/{id}/kontrak/pdf', [AppraisalController::class, 'downloadContractPdf'])->name('appraisal.contract.pdf');
         Route::post('/permohonan-penilaian/{id}/kontrak/sign', [AppraisalController::class, 'signContract'])->name('appraisal.contract.sign');
         Route::get('/permohonan-penilaian/{id}/preview-kajian-pasar', [AppraisalController::class, 'marketPreviewPage'])->name('appraisal.market-preview.page');

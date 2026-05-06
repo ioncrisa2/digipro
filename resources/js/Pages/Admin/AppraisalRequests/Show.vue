@@ -121,6 +121,18 @@ const props = defineProps({
       },
     }),
   },
+  contractSigning: {
+    type: Object,
+    default: () => ({
+      status: null,
+      selected_public_appraiser_signer_id: null,
+      signer_snapshot: null,
+      signer_options: {
+        public_appraisers: [],
+      },
+      configuration_url: null,
+    }),
+  },
   physicalReport: {
     type: Object,
     default: () => ({
@@ -184,6 +196,7 @@ const {
   offerAction,
   marketPreview,
   reportPreparation,
+  contractSigning,
   physicalReport,
   approveLatestNegotiationAction,
   paymentVerification,
@@ -203,6 +216,9 @@ const finalReportForm = useForm({
 const reportConfigForm = useForm({
   report_reviewer_signer_id: props.reportPreparation?.selected_review_signer_id ? String(props.reportPreparation.selected_review_signer_id) : '',
   report_public_appraiser_signer_id: props.reportPreparation?.selected_public_appraiser_signer_id ? String(props.reportPreparation.selected_public_appraiser_signer_id) : '',
+});
+const contractSignerForm = useForm({
+  contract_public_appraiser_signer_id: props.contractSigning?.selected_public_appraiser_signer_id ? String(props.contractSigning.selected_public_appraiser_signer_id) : '',
 });
 const physicalReportForm = useForm({
   action: 'save_details',
@@ -546,6 +562,16 @@ const submitReportConfiguration = () => {
   }
 
   reportConfigForm.post(reportPreparation.value.configuration_url, {
+    preserveScroll: true,
+  });
+};
+
+const submitContractSignerConfiguration = () => {
+  if (!contractSigning.value?.configuration_url) {
+    return;
+  }
+
+  contractSignerForm.post(contractSigning.value.configuration_url, {
     preserveScroll: true,
   });
 };
@@ -1976,6 +2002,47 @@ const submitRevisionItem = () => {
                 <div class="rounded-2xl border bg-white p-4">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Ringkasan Komersial</p>
                   <div class="mt-4 space-y-4 text-sm text-slate-700">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Penandatangan Kontrak (Peruri)</p>
+                      <div class="mt-3 space-y-3">
+                        <div class="space-y-2">
+                          <Label class="text-xs">Penilai Publik</Label>
+                          <Select v-model="contractSignerForm.contract_public_appraiser_signer_id">
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih penilai publik..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem
+                                v-for="option in contractSigning.signer_options?.public_appraisers || []"
+                                :key="option.value"
+                                :value="String(option.value)"
+                              >
+                                {{ option.label }}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p class="text-xs text-slate-500">
+                            Wajib ditetapkan sebelum customer menandatangani kontrak.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          :disabled="contractSignerForm.processing || !contractSigning.configuration_url || !contractSignerForm.contract_public_appraiser_signer_id"
+                          @click="submitContractSignerConfiguration"
+                        >
+                          Simpan Penandatangan Kontrak
+                        </Button>
+                        <div v-if="contractSigning.signer_snapshot?.public_appraiser" class="rounded-xl bg-white p-3 text-xs text-slate-600">
+                          <p>Penilai Publik: {{ contractSigning.signer_snapshot?.public_appraiser?.name || '-' }}</p>
+                          <p class="mt-1">Email Peruri: {{ contractSigning.signer_snapshot?.public_appraiser?.email || '-' }}</p>
+                          <p class="mt-1">Ditetapkan: {{ formatDateTime(contractSigning.signer_snapshot?.configured_at) }}</p>
+                        </div>
+                        <p v-else class="text-xs text-amber-700">
+                          Penandatangan kontrak belum ditetapkan.
+                        </p>
+                      </div>
+                    </div>
                     <div>
                       <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Pemohon</p>
                       <p class="mt-2 text-sm text-slate-950">{{ requester.name || '-' }}</p>

@@ -46,7 +46,7 @@ const submit = () => {
       </div>
 
       <Button type="submit" class="h-11 w-full bg-slate-900 text-white hover:bg-slate-800" :disabled="form.processing">
-        {{ form.processing ? 'Mengirim...' : 'Kirim Link Reset' }}
+        {{ form.processing ? 'Mengirim…' : 'Kirim Link Reset' }}
       </Button>
 
       <div class="text-center text-sm text-slate-500">

@@ -106,6 +106,7 @@ class PaymentController extends Controller
                 'snap_script_url' => $this->midtrans->snapScriptUrl(),
                 'create_session_url' => route('appraisal.payment.session', ['id' => $record->id]),
                 'configured' => filled($this->midtrans->clientKey()) && filled($this->midtrans->merchantId()),
+                'enabled_payments' => $this->midtrans->enabledPayments(),
             ],
             'canStartCheckout' => $status === AppraisalStatusEnum::ContractSigned->value,
         ]);

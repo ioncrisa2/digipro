@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Contracts\DigitalSignatureProvider;
+use App\Services\Peruri\PeruriSignItProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Auth\Notifications\VerifyEmail;
@@ -15,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(DigitalSignatureProvider::class, PeruriSignItProvider::class);
     }
 
     /**

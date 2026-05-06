@@ -4,34 +4,32 @@ import BrandLockup from '@/components/brand/BrandLockup.vue'
 </script>
 
 <template>
-  <div class="auth-shell relative min-h-screen overflow-hidden bg-[#071319] text-slate-900">
+  <div class="auth-shell min-h-dvh bg-slate-950 text-slate-50">
     <NotificationCenter />
 
-    <div class="pointer-events-none absolute inset-0">
-      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.18),transparent_30%),radial-gradient(circle_at_20%_20%,rgba(45,212,191,0.16),transparent_28%),radial-gradient(circle_at_80%_15%,rgba(56,189,248,0.16),transparent_24%),linear-gradient(180deg,#071319_0%,#081924_48%,#071119_100%)]"></div>
-      <div class="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:radial-gradient(circle_at_center,black,transparent_78%)]"></div>
-      <div class="absolute -left-20 top-20 h-72 w-72 rounded-full bg-emerald-300/10 blur-3xl"></div>
-      <div class="absolute -right-16 bottom-10 h-80 w-80 rounded-full bg-sky-300/10 blur-3xl"></div>
-    </div>
+    <a
+      href="#auth-content"
+      class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-slate-950 focus:shadow"
+    >
+      Lewati ke konten
+    </a>
 
-    <main class="relative flex min-h-screen items-center justify-center px-6 py-10 sm:px-8">
+    <main
+      id="auth-content"
+      tabindex="-1"
+      class="mx-auto flex min-h-dvh max-w-7xl items-center justify-center px-6 pt-[calc(env(safe-area-inset-top)+3rem)] pb-[calc(env(safe-area-inset-bottom)+3rem)] sm:px-8"
+    >
       <div class="w-full max-w-[560px]">
-        <div class="relative">
-          <div class="absolute inset-6 rounded-[2rem] bg-emerald-300/10 blur-3xl"></div>
-
-          <div class="relative overflow-hidden rounded-[2rem] border border-white/12 bg-white/[0.94] p-1 shadow-[0_35px_120px_rgba(2,6,23,0.55)]">
-            <div class="rounded-[calc(2rem-4px)] border border-slate-200/70 bg-white/90 px-6 py-8 sm:px-9 sm:py-10">
-              <div class="mb-8 flex justify-center">
-                <div class="flex w-fit items-center rounded-[1.25rem] border border-emerald-950/10 bg-[#18332f] p-2 text-white shadow-[0_18px_40px_rgba(8,15,23,0.12)]">
-                  <BrandLockup
-                    wrapper-class="shadow-[0_10px_24px_rgba(2,6,23,0.24)]"
-                    logo-class="w-[220px] sm:w-[248px]"
-                  />
-                </div>
-              </div>
-
-              <slot></slot>
+        <div class="rounded-3xl border border-white/10 bg-white p-1 shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
+          <div class="rounded-[1.4rem] bg-white px-6 py-8 sm:px-10 sm:py-10">
+            <div class="mb-8 flex justify-center">
+              <BrandLockup
+                wrapper-class="border border-slate-200 bg-white shadow-sm"
+                logo-class="w-[220px] sm:w-[248px]"
+              />
             </div>
+
+            <slot></slot>
           </div>
         </div>
 
@@ -42,18 +40,3 @@ import BrandLockup from '@/components/brand/BrandLockup.vue'
     </main>
   </div>
 </template>
-
-<style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
-:global(.auth-shell) {
-  font-family: 'Instrument Sans', sans-serif;
-}
-
-:global(.auth-shell h1),
-:global(.auth-shell h2),
-:global(.auth-shell h3),
-:global(.auth-shell .auth-title) {
-  font-family: 'Space Grotesk', sans-serif;
-}
-</style>

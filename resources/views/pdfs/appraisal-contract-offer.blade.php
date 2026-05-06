@@ -2,441 +2,444 @@
 <html lang="id">
 <head>
     <meta charset="utf-8">
-    <title>Penawaran Layanan Estimasi Rentang Harga Properti</title>
+    <title>{{ $doc['title'] ?? 'Penawaran Layanan Estimasi Rentang Harga Properti' }}</title>
     <style>
-        @page { margin: 24px 22px; }
+        @page { margin: 20px 22px; size: A4; }
+        * { box-sizing: border-box; }
         body {
+            margin: 0;
+            padding: 0;
             font-family: DejaVu Sans, sans-serif;
-            font-size: 10.5px;
-            line-height: 1.5;
+            font-size: 10px;
+            line-height: 1.45;
             color: #111827;
         }
         .page {
-            position: relative;
+            padding: 16px 18px 20px;
         }
-        .top-rule {
-            height: 5px;
-            background: #0f172a;
-            border-bottom: 2px solid #38bdf8;
-            margin-bottom: 16px;
-        }
-        .brand-row {
+        .header-table,
+        .item-table,
+        .asset-table,
+        .signing-section,
+        .signature-meta-table {
             width: 100%;
             border-collapse: collapse;
+        }
+        .header-table {
             margin-bottom: 12px;
         }
-        .brand-mark {
-            width: 120px;
+        .header-logo-cell {
+            width: 92px;
             vertical-align: top;
         }
-        .brand-pill {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 999px;
-            background: #0f172a;
-            color: #e2e8f0;
-            font-size: 9px;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-        }
-        .brand-pill strong {
-            color: #ffffff;
+        .logo-box {
+            width: 72px;
+            height: 72px;
+            border: 3px solid #0f172a;
+            color: #0f172a;
+            text-align: center;
+            font-size: 28px;
             font-weight: 700;
+            line-height: 66px;
+            letter-spacing: 0.04em;
         }
-        .brand-pill span {
-            color: #38bdf8;
-        }
-        .brand-copy {
+        .header-info-cell {
             vertical-align: top;
-            text-align: right;
+            padding-left: 8px;
         }
-        .brand-copy .eyebrow {
-            font-size: 9px;
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            color: #64748b;
-            margin-bottom: 3px;
-        }
-        .brand-copy .title {
+        .office-name {
             margin: 0;
-            font-size: 18px;
-            line-height: 1.2;
+            font-size: 11px;
             font-weight: 700;
+            line-height: 1.35;
             text-transform: uppercase;
             color: #020617;
         }
-        .brand-copy .subtitle {
-            margin: 3px 0 0;
+        .office-sub {
+            margin-top: 4px;
+            font-size: 9px;
+            line-height: 1.5;
+            color: #334155;
+        }
+        .header-divider {
+            border: none;
+            border-top: 2px solid #0f172a;
+            margin: 8px 0 10px;
+        }
+        .letter-heading {
+            margin-bottom: 8px;
+        }
+        .letter-heading-left {
+            float: left;
+            max-width: 58%;
+        }
+        .letter-heading-right {
+            float: right;
+            max-width: 38%;
+            text-align: right;
+        }
+        .clearfix::after {
+            content: '';
+            display: block;
+            clear: both;
+        }
+        .doc-number,
+        .city-date {
             font-size: 10px;
-            color: #475569;
         }
-        .meta,
-        .subject-line,
-        .scope-table,
-        .summary-table,
-        .two-column,
-        .closing-grid {
-            width: 100%;
-            border-collapse: collapse;
+        .recipient {
+            margin: 10px 0 8px;
         }
-        .meta {
-            margin-bottom: 12px;
+        .recipient strong {
+            font-weight: 700;
         }
-        .meta td {
+        .perihal {
+            margin: 8px 0 10px;
+            text-align: center;
+            font-size: 10.5px;
+            font-weight: 700;
+            text-decoration: underline;
+            color: #0f172a;
+        }
+        .opening-para,
+        .body-copy,
+        .footer-line {
+            text-align: justify;
+        }
+        .opening-para,
+        .body-copy {
+            margin: 6px 0 10px;
+        }
+        .item-table {
+            margin-bottom: 6px;
+        }
+        .item-table td {
             vertical-align: top;
             padding: 2px 0;
         }
-        .meta .label,
-        .subject-line .label {
-            width: 110px;
-            color: #475569;
+        .item-num {
+            width: 28px;
+            font-weight: 700;
+            color: #0f172a;
         }
-        .recipient-block,
-        .section-title,
-        .footer-note {
-            margin-top: 14px;
+        .item-label {
+            width: 168px;
+            padding-right: 8px;
+            font-weight: 700;
+            color: #0f172a;
         }
-        .subject-line {
-            margin: 0 0 12px;
+        .item-colon {
+            width: 12px;
         }
-        .subject-line td {
-            vertical-align: top;
-            padding: 0;
-        }
-        .body-copy {
-            margin: 0 0 8px;
+        .item-content {
             text-align: justify;
         }
-        .section-title {
-            font-weight: 700;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: #0f172a;
-            border-top: 1px solid #cbd5e1;
-            padding-top: 8px;
+        .item-content p {
+            margin: 0 0 4px;
         }
-        .scope-table th,
-        .scope-table td,
-        .summary-table th,
-        .summary-table td,
-        .two-column td {
-            border: 1px solid #cbd5e1;
-            padding: 6px 7px;
-            vertical-align: top;
+        .item-content ul {
+            margin: 2px 0;
+            padding-left: 16px;
         }
-        .scope-table th,
-        .summary-table th {
-            background: #e2e8f0;
-            text-align: left;
-            color: #0f172a;
+        .item-content li {
+            margin-bottom: 2px;
         }
-        .scope-table .num {
-            width: 28px;
-            text-align: center;
-            font-weight: 700;
-        }
-        .scope-table .title-col {
-            width: 165px;
-            font-weight: 700;
-        }
-        .line-list {
-            margin: 0;
-            padding-left: 14px;
-        }
-        .line-list li {
-            margin: 0 0 3px;
-        }
-        .two-column {
-            margin-top: 10px;
-        }
-        .two-column td {
-            width: 50%;
-            padding: 9px 10px;
-        }
-        .column-title {
-            font-weight: 700;
-            margin-bottom: 7px;
-            text-transform: uppercase;
-            font-size: 9px;
-            letter-spacing: 0.08em;
-            color: #334155;
-        }
+        .bold { font-weight: 700; }
+        .underline { text-decoration: underline; }
+        .italic { font-style: italic; }
         .muted {
             color: #475569;
         }
-        .closing-grid {
-            margin-top: 16px;
+        .asset-table {
+            margin-top: 5px;
+            font-size: 9.2px;
         }
-        .closing-grid td {
+        .asset-table th,
+        .asset-table td {
+            border: 1px solid #94a3b8;
+            padding: 4px 5px;
+            vertical-align: top;
+        }
+        .asset-table th {
+            background: #e2e8f0;
+            text-align: center;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .asset-note {
+            margin-top: 4px;
+            font-size: 8.8px;
+            color: #475569;
+        }
+        .signing-section {
+            margin-top: 20px;
+        }
+        .signing-section td {
             width: 50%;
             vertical-align: top;
-            padding-right: 14px;
+            padding-right: 12px;
         }
-        .signature-box {
-            border: 1px dashed #94a3b8;
-            min-height: 58px;
-            margin: 10px 0 8px;
+        .sign-label {
+            margin-bottom: 4px;
+            font-weight: 700;
+            color: #0f172a;
         }
-        .signature-meta {
+        .sign-box {
+            height: 68px;
+            margin: 6px 0 5px;
+            border: 1px solid #94a3b8;
+        }
+        .sign-name {
+            font-size: 10px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .sign-title {
             font-size: 9px;
             color: #475569;
             line-height: 1.45;
         }
-        .sign-space {
-            height: 60px;
-        }
-        .footer-note {
+        .signature-meta-table {
+            margin-top: 6px;
             font-size: 9px;
+        }
+        .signature-meta-table td {
+            padding: 2px 0;
+            vertical-align: top;
+        }
+        .signature-meta-label {
+            width: 74px;
             color: #475569;
+        }
+        .footer-line {
+            margin-top: 14px;
+            padding-top: 6px;
             border-top: 1px solid #cbd5e1;
-            padding-top: 8px;
+            font-size: 8.5px;
+            color: #475569;
+        }
+        .fee-highlight {
+            font-weight: 700;
+            color: #0f172a;
         }
     </style>
 </head>
 <body>
 @php
-    $idr = fn ($value) => 'Rp ' . number_format((int) ($value ?? 0), 0, ',', '.');
     $assets = is_array($doc['assets'] ?? null) ? $doc['assets'] : [];
-    $scopeItems = is_array($doc['scope_items'] ?? null) ? $doc['scope_items'] : [];
-    $included = is_array($doc['included_scope'] ?? null) ? $doc['included_scope'] : [];
-    $excluded = is_array($doc['excluded_scope'] ?? null) ? $doc['excluded_scope'] : [];
-    $spiReferences = is_array($doc['spi_references'] ?? null) ? $doc['spi_references'] : [];
     $recipientLines = is_array($doc['recipient_lines'] ?? null) ? $doc['recipient_lines'] : [];
     $openingParagraphs = is_array($doc['opening_paragraphs'] ?? null) ? $doc['opening_paragraphs'] : [];
+    $scopeItems = is_array($doc['scope_items'] ?? null) ? $doc['scope_items'] : [];
     $supportContact = is_array($doc['support_contact'] ?? null) ? $doc['support_contact'] : [];
     $sender = is_array($doc['sender'] ?? null) ? $doc['sender'] : [];
     $approval = is_array($doc['approval'] ?? null) ? $doc['approval'] : [];
     $signature = is_array($doc['signature'] ?? null) ? $doc['signature'] : [];
-    $isSigned = (bool) ($signature['is_signed'] ?? false);
+    $signatures = is_array($doc['signatures'] ?? null) ? $doc['signatures'] : [];
+    $customerSignature = is_array($signatures['customer'] ?? null) ? $signatures['customer'] : [];
+    $publicAppraiserSignature = is_array($signatures['public_appraiser'] ?? null) ? $signatures['public_appraiser'] : [];
+
+    $isCustomerSigned = ($customerSignature['status'] ?? null) === 'signed'
+        || (bool) ($signature['is_signed'] ?? false);
+    $isPublicAppraiserSigned = ($publicAppraiserSignature['status'] ?? null) === 'signed';
+    $documentHash = (string) data_get($doc, 'envelope.document_hash', $signature['document_hash'] ?? '-');
+    $requestReference = trim((string) ($doc['request_reference'] ?? ''));
+    $subject = trim((string) ($doc['subject'] ?? 'Lingkup Penugasan Jasa Penilaian Properti'));
+    $officeName = (string) ($sender['organization'] ?? 'DigiPro by KJPP HJAR');
+    $officeDivision = (string) ($sender['division'] ?? 'Layanan Kajian Nilai Pasar Properti Digital');
 @endphp
 
 <div class="page">
-    <div class="top-rule"></div>
-
-    <table class="brand-row">
+    <table class="header-table">
         <tr>
-            <td class="brand-mark">
-                <div class="brand-pill"><strong>DIGI<span>PRO</span></strong></div>
+            <td class="header-logo-cell">
+                <div class="logo-box">DP</div>
             </td>
-            <td class="brand-copy">
-                <div class="eyebrow">Dokumen Penawaran</div>
-                <h1 class="title">{{ $doc['title'] ?? 'PENAWARAN LAYANAN ESTIMASI RENTANG HARGA PROPERTI' }}</h1>
-                <p class="subtitle">{{ $doc['subtitle'] ?? '(Tanpa Inspeksi Lapangan - Non-Reliance)' }}</p>
+            <td class="header-info-cell">
+                <p class="office-name">{{ $officeName }}</p>
+                <div class="office-sub">
+                    {{ $officeDivision }}<br>
+                    Penugasan berbasis dokumen, foto, dan data digital tanpa inspeksi lapangan.<br>
+                    Dukungan pelanggan: {{ $supportContact['phone'] ?? '-' }} / {{ $supportContact['whatsapp'] ?? '-' }}<br>
+                    Email: {{ $supportContact['email'] ?? '-' }}
+                </div>
             </td>
         </tr>
     </table>
+    <hr class="header-divider">
 
-    <table class="meta">
-        <tr>
-            <td class="label">Nomor</td>
-            <td>: {{ $doc['agr_no'] ?? '-' }}</td>
-            <td class="label">Tanggal</td>
-            <td>: {{ $doc['date_label'] ?? ($doc['date'] ?? '-') }}</td>
-        </tr>
-        <tr>
-            <td class="label">ID Permohonan</td>
-            <td>: {{ $doc['request_id'] ?? '-' }}</td>
-            <td class="label">Tujuan Kajian</td>
-            <td>: {{ $doc['valuation_objective_label'] ?? '-' }}</td>
-        </tr>
-    </table>
+    <div class="letter-heading clearfix">
+        <div class="letter-heading-left">
+            <div class="doc-number">{{ $doc['agr_no'] ?? '-' }}</div>
+            @if (!empty($doc['request_id']))
+                <div class="doc-number">ID Permohonan: {{ $doc['request_id'] }}</div>
+            @endif
+        </div>
+        <div class="letter-heading-right">
+            <div class="city-date">{{ $doc['city_date_line'] ?? ($doc['date_label'] ?? '-') }}</div>
+        </div>
+    </div>
 
-    <div class="recipient-block">
-        <div>{{ $doc['city_date_line'] ?? '-' }}</div>
-        <div style="margin-top: 8px;">Kepada Yth.</div>
+    <div class="recipient">
+        <strong>Kepada Yth.</strong><br>
         @forelse ($recipientLines as $line)
-            <div>{{ $line }}</div>
+            {{ $line }}<br>
         @empty
-            <div>{{ $doc['user_name'] ?? '-' }}</div>
+            {{ $doc['user_name'] ?? '-' }}<br>
         @endforelse
     </div>
 
-    <table class="subject-line">
-        <tr>
-            <td class="label">Perihal</td>
-            <td>: {{ $doc['subject'] ?? '-' }}</td>
-        </tr>
-    </table>
+    <div class="perihal">Perihal : {{ $subject }}</div>
 
-    @if (!empty($doc['request_reference']))
-        <p class="body-copy">{{ $doc['request_reference'] }}</p>
+    @if ($requestReference !== '')
+        <p class="opening-para">{{ $requestReference }}</p>
     @endif
 
     @foreach ($openingParagraphs as $paragraph)
         <p class="body-copy">{{ $paragraph }}</p>
     @endforeach
 
-    <div class="section-title">Ringkasan Aset</div>
-    <table class="summary-table">
-        <thead>
-        <tr>
-            <th style="width: 28px;">No</th>
-            <th>Label Aset</th>
-            <th>Lokasi Singkat</th>
-            <th>Dokumen Utama</th>
-            <th>Luas (Basis)</th>
-        </tr>
-        </thead>
-        <tbody>
-        @forelse ($assets as $asset)
+    @foreach ($scopeItems as $item)
+        @php
+            $title = trim((string) ($item['title'] ?? '-'));
+            $lines = is_array($item['lines'] ?? null) ? $item['lines'] : [];
+            $isAssetSection = (int) ($item['no'] ?? 0) === 4;
+            $isFeeSection = (int) ($item['no'] ?? 0) === 18;
+        @endphp
+        <table class="item-table">
             <tr>
-                <td>{{ $asset['no'] ?? '-' }}</td>
-                <td>{{ $asset['label'] ?? '-' }}</td>
-                <td>{{ $asset['address'] ?? '-' }}</td>
-                <td>{{ $asset['main_documents'] ?? '-' }}</td>
-                <td>{{ $asset['area_basis'] ?? '-' }}</td>
-            </tr>
-        @empty
-            <tr>
-                <td colspan="5">Belum ada data aset.</td>
-            </tr>
-        @endforelse
-        </tbody>
-    </table>
+                <td class="item-num">{{ $item['no'] ?? '-' }}.</td>
+                <td class="item-label">{{ $title }}</td>
+                <td class="item-colon">:</td>
+                <td class="item-content">
+                    @if ($isAssetSection)
+                        @if (!empty($lines))
+                            <p>{{ $lines[0] }}</p>
+                        @endif
 
-    <div class="section-title">Lingkup Penugasan</div>
-    <table class="scope-table">
-        <thead>
-        <tr>
-            <th class="num">No</th>
-            <th class="title-col">Uraian</th>
-            <th>Penjelasan</th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach ($scopeItems as $item)
-            <tr>
-                <td class="num">{{ $item['no'] ?? '-' }}</td>
-                <td class="title-col">{{ $item['title'] ?? '-' }}</td>
-                <td>
-                    @php $lines = is_array($item['lines'] ?? null) ? $item['lines'] : []; @endphp
-                    @if (count($lines) <= 1)
-                        {{ $lines[0] ?? '-' }}
+                        <table class="asset-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 24px;">No</th>
+                                    <th>Jenis Aset</th>
+                                    <th>Lokasi</th>
+                                    <th>Dokumen Utama</th>
+                                    <th>Luas (Basis)</th>
+                                    <th>Catatan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($assets as $index => $asset)
+                                    <tr>
+                                        <td style="text-align: center;">{{ $asset['no'] ?? ($index + 1) }}</td>
+                                        <td>{{ $asset['label'] ?? '-' }}</td>
+                                        <td>{{ $asset['address'] ?? '-' }}</td>
+                                        <td>{{ $asset['main_documents'] ?? '-' }}</td>
+                                        <td>{{ $asset['area_basis'] ?? '-' }}</td>
+                                        <td>{{ $asset['note'] ?? '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; color: #64748b;">Belum ada data aset.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+
+                        <div class="asset-note">
+                            Data aset mengikuti dokumen dan input yang diunggah pengguna pada sistem DigiPro by KJPP HJAR.
+                        </div>
+
+                        @foreach (array_slice($lines, 1) as $line)
+                            <p>{{ $line }}</p>
+                        @endforeach
+                    @elseif (count($lines) <= 1)
+                        @if (!empty($lines))
+                            <p class="{{ $isFeeSection ? 'fee-highlight' : '' }}">{{ $lines[0] }}</p>
+                        @else
+                            <p>-</p>
+                        @endif
                     @else
-                        <ul class="line-list">
+                        <ul>
                             @foreach ($lines as $line)
-                                <li>{{ $line }}</li>
+                                <li class="{{ $isFeeSection ? 'fee-highlight' : '' }}">{{ $line }}</li>
                             @endforeach
                         </ul>
                     @endif
                 </td>
             </tr>
-        @endforeach
-        </tbody>
-    </table>
+        </table>
+    @endforeach
 
-    <table class="two-column">
-        <tr>
-            <td>
-                <div class="column-title">Termasuk dalam Layanan</div>
-                <ul class="line-list">
-                    @foreach ($included as $line)
-                        <li>{{ $line }}</li>
-                    @endforeach
-                </ul>
-            </td>
-            <td>
-                <div class="column-title">Tidak Termasuk dalam Layanan</div>
-                <ul class="line-list">
-                    @foreach ($excluded as $line)
-                        <li>{{ $line }}</li>
-                    @endforeach
-                </ul>
-            </td>
-        </tr>
-    </table>
-
-    <div class="section-title">Rujukan SPI dan Catatan Penting</div>
-    <ul class="line-list">
-        @foreach ($spiReferences as $line)
-            <li>{{ $line }}</li>
-        @endforeach
-    </ul>
-
-    <div class="section-title">Ringkasan Komersial</div>
-    <table class="summary-table">
-        <tr>
-            <th>Komponen</th>
-            <th>Nilai</th>
-        </tr>
-        <tr>
-            <td>Biaya layanan per aset</td>
-            <td>{{ $idr($doc['fee_per_asset'] ?? 0) }}</td>
-        </tr>
-        <tr>
-            <td>Jumlah aset</td>
-            <td>{{ $doc['asset_count'] ?? 0 }}</td>
-        </tr>
-        <tr>
-            <td>Total biaya</td>
-            <td>{{ $idr($doc['total_fee'] ?? 0) }}</td>
-        </tr>
-        <tr>
-            <td>Pajak</td>
-            <td>{{ $doc['tax_note'] ?? '-' }}</td>
-        </tr>
-        <tr>
-            <td>Metode pembayaran</td>
-            <td>{{ $doc['payment_methods'] ?? '-' }}</td>
-        </tr>
-        <tr>
-            <td>SLA</td>
-            <td>{{ $doc['sla_text'] ?? '-' }}</td>
-        </tr>
-    </table>
-
-    <div class="section-title">Pernyataan Kunci</div>
-    <p class="body-copy">{{ $doc['statement_text'] ?? '-' }}</p>
-
-    <div class="section-title">Persetujuan</div>
-    <p class="body-copy muted">
-        Dengan menyetujui surat ini, pemberi tugas menyatakan memahami bahwa layanan DigiPro by KJPP HJAR dilaksanakan tanpa inspeksi lapangan
-        dan hasilnya hanya berupa kajian nilai pasar dalam bentuk range.
-    </p>
-
-    <table class="closing-grid">
+    <table class="signing-section">
         <tr>
             <td>
                 <div>Hormat kami,</div>
-                <div style="font-weight:700; margin-top:4px;">{{ $sender['organization'] ?? 'DigiPro by KJPP HJAR' }}</div>
-                <div class="muted">{{ $sender['division'] ?? '-' }}</div>
-                <div class="sign-space"></div>
-                <div style="font-weight:700;">{{ $sender['representative_name'] ?? '-' }}</div>
-                <div class="muted">{{ $sender['representative_title'] ?? '-' }}</div>
-                <div class="signature-meta" style="margin-top:8px;">
-                    Kontak: {{ $supportContact['phone'] ?? '-' }} / {{ $supportContact['whatsapp'] ?? '-' }}<br>
-                    Email: {{ $supportContact['email'] ?? '-' }}<br>
-                    Jam layanan: {{ $supportContact['availability_label'] ?? '-' }}
-                </div>
+                <div class="sign-label">{{ $officeName }}</div>
+                <div class="sign-box"></div>
+                <div class="sign-name">{{ $publicAppraiserSignature['name'] ?? ($sender['representative_name'] ?? '-') }}</div>
+                <div class="sign-title">{{ $sender['representative_title'] ?? 'Perwakilan DigiPro by KJPP HJAR' }}</div>
+                <div class="sign-title">{{ $officeDivision }}</div>
+
+                <table class="signature-meta-table">
+                    <tr>
+                        <td class="signature-meta-label">Status</td>
+                        <td>{{ $isPublicAppraiserSigned ? 'Sudah ditandatangani digital' : 'Belum ditandatangani digital' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="signature-meta-label">Waktu</td>
+                        <td>{{ $publicAppraiserSignature['signed_at'] ?? '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="signature-meta-label">Email</td>
+                        <td>{{ $publicAppraiserSignature['email'] ?? '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="signature-meta-label">Signature ID</td>
+                        <td>{{ $publicAppraiserSignature['external_order_id'] ?? '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="signature-meta-label">Hash</td>
+                        <td>{{ $documentHash ?: '-' }}</td>
+                    </tr>
+                </table>
             </td>
             <td>
                 <div>Persetujuan Pemberi Tugas,</div>
-                @if ($isSigned)
-                    <div class="signature-box"></div>
-                    <div style="font-weight:700;">{{ $signature['signed_by_name'] ?? ($approval['client_name'] ?? '-') }}</div>
-                    <div class="muted">{{ $approval['client_title'] ?? 'Pemberi Tugas / Pengguna Hasil' }}</div>
-                    <div class="signature-meta" style="margin-top:8px;">
-                        Ditandatangani digital pada {{ $signature['signed_at'] ?? '-' }}<br>
-                        Email: {{ $signature['signed_by_email'] ?? '-' }}<br>
-                        Signature ID: {{ $signature['signature_id'] ?? '-' }}<br>
-                        Hash: {{ $signature['document_hash'] ?? '-' }}
-                    </div>
-                @else
-                    <div class="signature-box"></div>
-                    <div style="font-weight:700;">{{ $approval['client_name'] ?? ($doc['user_name'] ?? '-') }}</div>
-                    <div class="muted">{{ $approval['client_title'] ?? 'Pemberi Tugas / Pengguna Hasil' }}</div>
-                    <div class="signature-meta" style="margin-top:8px;">
-                        Tanggal persetujuan: {{ $doc['accepted_at'] ?? '-' }}<br>
-                        ID/Email: {{ $doc['user_identifier'] ?? '-' }}<br>
-                        Consent ID: {{ $doc['consent_id'] ?? '-' }}
-                    </div>
-                @endif
+                <div class="sign-box"></div>
+                <div class="sign-name">
+                    {{ $customerSignature['name'] ?? ($signature['signed_by_name'] ?? ($approval['client_name'] ?? ($doc['user_name'] ?? '-'))) }}
+                </div>
+                <div class="sign-title">{{ $approval['client_title'] ?? 'Pemberi Tugas / Pengguna Hasil' }}</div>
+
+                <table class="signature-meta-table">
+                    <tr>
+                        <td class="signature-meta-label">Status</td>
+                        <td>{{ $isCustomerSigned ? 'Sudah ditandatangani digital' : 'Menunggu persetujuan digital' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="signature-meta-label">Waktu</td>
+                        <td>{{ $customerSignature['signed_at'] ?? ($signature['signed_at'] ?? ($doc['accepted_at'] ?? '-')) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="signature-meta-label">Email</td>
+                        <td>{{ $customerSignature['email'] ?? ($signature['signed_by_email'] ?? ($doc['user_identifier'] ?? '-')) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="signature-meta-label">Signature ID</td>
+                        <td>{{ $customerSignature['external_order_id'] ?? ($signature['signature_id'] ?? ($doc['consent_id'] ?? '-')) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="signature-meta-label">Hash</td>
+                        <td>{{ $documentHash ?: '-' }}</td>
+                    </tr>
+                </table>
             </td>
         </tr>
     </table>
 
-    <div class="footer-note">{{ $doc['disclaimer_footer'] ?? '' }}</div>
+    @if (!empty($doc['disclaimer_footer']))
+        <div class="footer-line">{{ $doc['disclaimer_footer'] }}</div>
+    @endif
 </div>
 </body>
 </html>

@@ -4,6 +4,7 @@ namespace App\Services\Customer\Payloads;
 
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalRequest;
+use App\Models\SignatureEnvelope;
 use Illuminate\Support\Facades\Storage;
 
 class AppraisalContractDocumentBuilder
@@ -17,6 +18,8 @@ class AppraisalContractDocumentBuilder
     {
         $record->loadMissing([
             'user:id,name,email',
+            'files:id,appraisal_request_id,type,path,original_name,mime,size,created_at',
+            'contractPublicAppraiserSigner:id,name,email',
             'assets:id,appraisal_request_id,asset_type,land_area,building_area,address',
             'assets.files:id,appraisal_asset_id,type,original_name',
             'offerNegotiations:id,appraisal_request_id,user_id,action,meta,created_at',
@@ -65,25 +68,82 @@ class AppraisalContractDocumentBuilder
             'availability_label' => (string) config('support.availability_label', '-'),
         ];
 
-        $signatureLog = $record->offerNegotiations
-            ->where('action', 'contract_sign_mock')
-            ->sortByDesc('id')
+        $envelope = $record->signatureEnvelopes()
+            ->where('document_type', 'contract')
+            ->where('provider', 'peruri_signit')
+            ->with('participants')
             ->first();
 
-        $signatureMeta = is_array($signatureLog?->meta) ? $signatureLog->meta : [];
-        $signedAt = $signatureMeta['signed_at'] ?? ($signatureLog?->created_at?->toDateTimeString());
-        $signedPdfPath = is_string($signatureMeta['signed_pdf_path'] ?? null)
-            ? $signatureMeta['signed_pdf_path']
-            : null;
+        $customerParticipant = $envelope?->participants?->firstWhere('role', 'customer');
+        $publicAppraiserParticipant = $envelope?->participants?->firstWhere('role', 'public_appraiser');
+
+        $signedContractFile = $record->files
+            ->sortByDesc('id')
+            ->firstWhere('type', 'contract_signed_pdf');
+
+        $originalPdfPath = $envelope?->original_pdf_path;
+        $originalPdfUrl = null;
+        if ($originalPdfPath && Storage::disk('public')->exists($originalPdfPath)) {
+            $originalPdfUrl = Storage::disk('public')->url($originalPdfPath);
+        }
+
+        $signedPdfPath = $envelope?->signed_pdf_path
+            ?: ($signedContractFile?->path ?? null);
 
         $signedPdfUrl = null;
         if ($signedPdfPath && Storage::disk('public')->exists($signedPdfPath)) {
             $signedPdfUrl = Storage::disk('public')->url($signedPdfPath);
         }
 
+        $legacySignatureLog = $record->offerNegotiations
+            ->whereIn('action', ['contract_sign_peruri_customer', 'contract_sign_mock'])
+            ->sortByDesc('id')
+            ->first();
+
+        $legacyMeta = is_array($legacySignatureLog?->meta) ? $legacySignatureLog->meta : [];
+
         $requestorName = $record->client_name ?: ($record->user?->name ?: '-');
         $openingParagraphs = $this->openingParagraphs($assetRows);
         $slaText = 'Estimasi waktu penyelesaian umumnya beberapa jam sejak data minimum dinyatakan lengkap oleh sistem, dengan batas waktu maksimum 1-24 jam.';
+
+        $customerSigned = ($customerParticipant?->status ?? null) === 'signed';
+
+        $envelopePayload = $envelope
+            ? [
+                'id' => $envelope->id,
+                'provider' => $envelope->provider,
+                'model' => $envelope->model,
+                'status' => $envelope->status,
+                'external_envelope_id' => $envelope->external_envelope_id,
+                'document_hash' => $envelope->document_hash,
+                'original_pdf_path' => $originalPdfPath,
+                'original_pdf_url' => $originalPdfUrl,
+                'signed_pdf_path' => $signedPdfPath,
+                'signed_pdf_url' => $signedPdfUrl,
+                'last_error' => $envelope->last_error,
+            ]
+            : null;
+
+        $signatures = [
+            'customer' => [
+                'role' => 'customer',
+                'status' => $customerParticipant?->status,
+                'signed_at' => optional($customerParticipant?->signed_at)->toDateTimeString(),
+                'name' => $customerParticipant?->name ?? ($record->user?->name ?: '-'),
+                'email' => $customerParticipant?->email ?? ($record->user?->email ?: '-'),
+                'external_order_id' => $customerParticipant?->external_order_id,
+                'external_envelope_id' => $envelope?->external_envelope_id,
+            ],
+            'public_appraiser' => [
+                'role' => 'public_appraiser',
+                'status' => $publicAppraiserParticipant?->status,
+                'signed_at' => optional($publicAppraiserParticipant?->signed_at)->toDateTimeString(),
+                'name' => $publicAppraiserParticipant?->name ?? ($record->contractPublicAppraiserSigner?->name ?: '-'),
+                'email' => $publicAppraiserParticipant?->email ?? ($record->contractPublicAppraiserSigner?->email ?: '-'),
+                'external_order_id' => $publicAppraiserParticipant?->external_order_id,
+                'external_envelope_id' => $envelope?->external_envelope_id,
+            ],
+        ];
 
         return [
             'title' => 'PENAWARAN LAYANAN ESTIMASI RENTANG HARGA PROPERTI',
@@ -146,17 +206,24 @@ class AppraisalContractDocumentBuilder
                 'client_title' => 'Pemberi Tugas / Pengguna Hasil',
             ],
             'signature' => [
-                'is_signed' => (bool) $signatureLog,
-                'signed_at' => $signedAt ?: '-',
-                'signed_by_name' => $signatureMeta['signed_by_name'] ?? ($signatureLog?->user?->name ?: '-'),
-                'signed_by_email' => $signatureMeta['signed_by_email'] ?? ($signatureLog?->user?->email ?: '-'),
-                'signature_id' => $signatureMeta['signature_id'] ?? '-',
-                'method' => $signatureMeta['method'] ?? ($signatureLog ? 'clickwrap' : '-'),
-                'provider' => $signatureMeta['provider'] ?? ($signatureLog ? 'mock' : '-'),
-                'document_hash' => $signatureMeta['document_hash'] ?? '-',
+                // Backward-compatible single signature payload (customer signature).
+                'is_signed' => $customerSigned || (bool) $legacySignatureLog,
+                'signed_at' => optional($customerParticipant?->signed_at)->toDateTimeString()
+                    ?: (string) ($legacyMeta['signed_at'] ?? ($legacySignatureLog?->created_at?->toDateTimeString() ?: '-')),
+                'signed_by_name' => $customerParticipant?->name ?? (string) ($legacyMeta['signed_by_name'] ?? ($legacySignatureLog?->user?->name ?: '-')),
+                'signed_by_email' => $customerParticipant?->email ?? (string) ($legacyMeta['signed_by_email'] ?? ($legacySignatureLog?->user?->email ?: '-')),
+                'signature_id' => $customerParticipant?->external_order_id
+                    ?? (string) ($legacyMeta['signature_id'] ?? ($legacyMeta['external_order_id'] ?? '-')),
+                'method' => (string) ($legacyMeta['method'] ?? ($customerSigned ? 'keyla' : '-')),
+                'provider' => (string) ($legacyMeta['provider'] ?? ($customerSigned ? 'peruri_signit' : '-')),
+                'document_hash' => $envelope?->document_hash ?? (string) ($legacyMeta['document_hash'] ?? '-'),
+                'original_pdf_path' => $originalPdfPath,
+                'original_pdf_url' => $originalPdfUrl,
                 'signed_pdf_path' => $signedPdfPath,
                 'signed_pdf_url' => $signedPdfUrl,
             ],
+            'envelope' => $envelopePayload,
+            'signatures' => $signatures,
         ];
     }
 

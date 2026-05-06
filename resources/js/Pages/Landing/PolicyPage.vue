@@ -32,17 +32,17 @@ const contentHtml = computed(() => {
 </script>
 
 <template>
-  <div class="landing-shell text-slate-900 bg-[#f7f4ef] min-h-screen flex flex-col selection:bg-slate-900 selection:text-white">
+  <div class="landing-shell text-slate-900 min-h-dvh flex flex-col selection:bg-slate-900 selection:text-white">
     <LandingNavbar />
 
-    <main class="flex-1 py-10 md:py-12 px-6">
+    <main id="content" class="flex-1 py-10 md:py-12 px-6">
       <div class="max-w-4xl mx-auto space-y-6">
         <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/70 p-6 md:p-8 shadow-sm">
           <div class="absolute -top-16 right-0 h-40 w-40 rounded-full bg-emerald-200/40 blur-3xl"></div>
           <div class="absolute -bottom-14 left-0 h-36 w-36 rounded-full bg-amber-200/40 blur-3xl"></div>
           <div class="relative">
-            <div class="text-xs uppercase tracking-wide text-slate-500">Legal</div>
-            <h1 class="text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 mt-1.5">{{ meta.title }}</h1>
+            <div class="text-xs uppercase text-slate-500">Legal</div>
+            <h1 class="mt-1.5 text-balance text-2xl font-semibold text-slate-900 md:text-3xl">{{ meta.title }}</h1>
             <div class="mt-2 text-xs md:text-sm text-slate-600">
               <span class="font-medium text-slate-700">{{ meta.company }}</span>
               <span class="mx-2 text-slate-400">|</span>

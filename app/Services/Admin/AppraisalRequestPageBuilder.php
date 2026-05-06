@@ -119,6 +119,17 @@ class AppraisalRequestPageBuilder
                 'signer_snapshot' => $appraisalRequest->report_signer_snapshot,
                 'signer_options' => $this->signerOptions(),
             ],
+            'contractSigning' => [
+                'status' => $appraisalRequest->status?->value ?? null,
+                'selected_public_appraiser_signer_id' => $appraisalRequest->contract_public_appraiser_signer_id,
+                'signer_snapshot' => $appraisalRequest->contract_signer_snapshot,
+                'signer_options' => [
+                    'public_appraisers' => $this->signerOptionsByRole('public_appraiser'),
+                ],
+                'configuration_url' => ($appraisalRequest->status?->value ?? null) === AppraisalStatusEnum::WaitingSignature->value
+                    ? route('admin.appraisal-requests.actions.contract-signer', $appraisalRequest)
+                    : null,
+            ],
             'requester' => [
                 'id' => $appraisalRequest->user?->id,
                 'name' => $appraisalRequest->user?->name ?? '-',
@@ -233,6 +244,7 @@ class AppraisalRequestPageBuilder
             'physicalReportPrintedBy:id,name',
             'reportReviewerSigner',
             'reportPublicAppraiserSigner',
+            'contractPublicAppraiserSigner',
             'files',
             'assets.files',
             'payments' => fn ($query) => $query->latest('id'),

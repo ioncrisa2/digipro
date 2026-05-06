@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -84,6 +85,60 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+
+    --landing-bg: #f7f4ef;
+    --landing-muted: #f4eee5;
+    --landing-invert: #111827;
+    --landing-text: #0f172a;
+    --landing-font-display: 'Space Grotesk', var(--font-sans);
+
+    --blog-bg: oklch(0.985 0 0);
+    --blog-text: var(--foreground);
+    --blog-font-display: 'Space Grotesk', var(--font-sans);
+
+    --auth-bg: oklch(0.145 0 0);
+    --auth-text: oklch(0.985 0 0);
+    --auth-font-display: 'Space Grotesk', var(--font-sans);
+}
+
+.landing-shell {
+    font-family: var(--font-sans);
+    background: var(--landing-bg);
+    color: var(--landing-text);
+}
+
+.landing-shell h1,
+.landing-shell h2,
+.landing-shell h3,
+.landing-shell .landing-title {
+    font-family: var(--landing-font-display);
+}
+
+.blog-shell {
+    font-family: var(--font-sans);
+    background: var(--blog-bg);
+    color: var(--blog-text);
+}
+
+.blog-shell h1,
+.blog-shell h2,
+.blog-shell h3,
+.blog-shell h4,
+.blog-shell .blog-title {
+    font-family: var(--blog-font-display);
+}
+
+.auth-shell {
+    font-family: var(--font-sans);
+    background: var(--auth-bg);
+    color: var(--auth-text);
+}
+
+.auth-shell h1,
+.auth-shell h2,
+.auth-shell h3,
+.auth-shell .auth-title {
+    font-family: var(--auth-font-display);
 }
 
 .dark {

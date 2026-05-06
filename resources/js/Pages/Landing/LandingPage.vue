@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 
 import LandingNavbar from '@/layouts/LandingNavbar.vue'
 import LandingFooter from '@/layouts/LandingFooter.vue'
@@ -22,6 +22,7 @@ import {
 
 import { Button } from '@/components/ui/button'
 import { ArrowUp } from 'lucide-vue-next'
+import { useReducedMotion } from '@/composables/useReducedMotion'
 
 const props = defineProps({
   features: { type: Array, default: () => [] },
@@ -32,8 +33,12 @@ const props = defineProps({
   platformPreviewImages: { type: Array, default: () => [] },
 })
 
+const { prefersReducedMotion } = useReducedMotion()
+
+const scrollBehavior = () => (prefersReducedMotion.value ? 'auto' : 'smooth')
+
 const scrollToTop = () => {
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  window.scrollTo({ top: 0, behavior: scrollBehavior() })
 }
 
 const resolvedHeroBackground = computed(() => props.heroBackgroundUrl || landingHeroFallback)
@@ -63,15 +68,18 @@ const goSlide = (index) => {
 }
 
 const nextSlide = () => {
+  if (slides.value.length <= 1) return
   activeSlide.value = (activeSlide.value + 1) % slides.value.length
 }
 
 const prevSlide = () => {
+  if (slides.value.length <= 1) return
   activeSlide.value = (activeSlide.value - 1 + slides.value.length) % slides.value.length
 }
 
 const nextTestimonial = () => {
   if (!props.testimonials?.length) return
+  if (props.testimonials.length <= 1) return
   testimonialIndex.value = (testimonialIndex.value + 1) % props.testimonials.length
 }
 
@@ -79,50 +87,99 @@ const goTestimonial = (index) => {
   testimonialIndex.value = index
 }
 
+const stopTimers = () => {
+  if (slideTimer) window.clearInterval(slideTimer)
+  if (testimonialTimer) window.clearInterval(testimonialTimer)
+  slideTimer = null
+  testimonialTimer = null
+}
+
+const startTimers = () => {
+  stopTimers()
+  if (prefersReducedMotion.value) return
+
+  if (slides.value.length > 1) slideTimer = window.setInterval(nextSlide, 5000)
+  if (props.testimonials?.length > 1) testimonialTimer = window.setInterval(nextTestimonial, 6500)
+}
+
+const scrollToHash = async () => {
+  const raw = window.location.hash || ''
+  const id = raw.startsWith('#') ? raw.slice(1) : raw
+  if (!id) return
+
+  await nextTick()
+  const el = document.getElementById(decodeURIComponent(id))
+  if (!el) return
+
+  el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
+}
+
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    stopTimers()
+    return
+  }
+
+  startTimers()
+}
+
 onMounted(() => {
-  slideTimer = window.setInterval(nextSlide, 5000)
-  testimonialTimer = window.setInterval(nextTestimonial, 6500)
+  scrollToHash()
+  startTimers()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 onBeforeUnmount(() => {
-  if (slideTimer) window.clearInterval(slideTimer)
-  if (testimonialTimer) window.clearInterval(testimonialTimer)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  stopTimers()
+})
+
+watch(prefersReducedMotion, () => {
+  startTimers()
 })
 </script>
 
 <template>
-  <div class="landing-shell bg-[#f5efe6] text-slate-900 selection:bg-slate-900 selection:text-white">
+  <div class="landing-shell text-slate-900 selection:bg-slate-900 selection:text-white">
     <LandingNavbar />
 
-    <LandingHeroSection :background-url="resolvedHeroBackground" />
+    <main id="content">
+      <LandingHeroSection :background-url="resolvedHeroBackground" />
 
-    <LandingPlatformPreviewSection
-      :slides="slides"
-      :active-slide="activeSlide"
-      :current-slide="currentSlide"
-      @previous="prevSlide"
-      @next="nextSlide"
-      @go="goSlide"
-    />
+      <LandingPlatformPreviewSection
+        :slides="slides"
+        :active-slide="activeSlide"
+        :current-slide="currentSlide"
+        @previous="prevSlide"
+        @next="nextSlide"
+        @go="goSlide"
+      />
 
-    <LandingFeaturesSection :feature-cards="featureCards" />
+      <LandingFeaturesSection :feature-cards="featureCards" />
 
-    <LandingWorkflowSection :process-steps="processSteps" />
+      <LandingWorkflowSection :process-steps="processSteps" />
 
-    <LandingRecentArticlesSection :articles="props.recentArticles" />
+      <LandingRecentArticlesSection :articles="props.recentArticles" />
 
-    <LandingTestimonialsSection
-      :testimonials="props.testimonials"
-      :testimonial-index="testimonialIndex"
-      :current-testimonial="currentTestimonial"
-      @go="goTestimonial"
-    />
+      <LandingTestimonialsSection
+        :testimonials="props.testimonials"
+        :testimonial-index="testimonialIndex"
+        :current-testimonial="currentTestimonial"
+        @go="goTestimonial"
+      />
 
-    <LandingFaqSection :faqs="props.faqs" />
+      <LandingFaqSection :faqs="props.faqs" />
 
-    <LandingFinalCtaSection />
+      <LandingFinalCtaSection />
+    </main>
 
-    <Button @click="scrollToTop" variant="outline" size="icon" class="fixed bottom-8 right-8 z-50 rounded-full bg-white shadow-lg hover:bg-slate-100">
+    <Button
+      aria-label="Kembali ke atas"
+      @click="scrollToTop"
+      variant="outline"
+      size="icon"
+      class="fixed bottom-8 right-8 z-50 rounded-full bg-white shadow-lg hover:bg-slate-100"
+    >
       <ArrowUp class="h-5 w-5 text-slate-900" />
     </Button>
 

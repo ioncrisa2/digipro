@@ -8,6 +8,7 @@ use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetComparable;
 use App\Models\AppraisalRequest;
 use App\Services\Reviewer\ReviewerWorkspaceService;
+use App\Services\Reviewer\PublicAppraiserContractWorkspaceService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -17,6 +18,7 @@ class DashboardController extends Controller
 {
     public function __construct(
         private readonly ReviewerWorkspaceService $workspace,
+        private readonly PublicAppraiserContractWorkspaceService $publicAppraiserContracts,
     ) {
     }
 
@@ -133,13 +135,27 @@ class DashboardController extends Controller
             'selected_comparables' => (clone $selectedComparableBase)->count(),
         ];
 
+        $reviewWorkQueues = collect($this->workspace->reviewQueueOptions([
+            'total' => $stats['total_queue'],
+            'siap_review' => $stats['ready_review'],
+            'sedang_review' => $stats['in_progress'],
+            'siap_preview' => (clone $requestBase)->where('status', AppraisalStatusEnum::ValuationCompleted)->count(),
+        ]))
+            ->map(fn (array $queue): array => [
+                ...$queue,
+                'url' => route('reviewer.reviews.index', $queue['value'] === 'all' ? [] : ['queue' => $queue['value']]),
+            ])
+            ->values();
+
         return Inertia::render('Reviewer/Dashboard', [
             'stats' => $stats,
             'featuredReview' => $featuredReview ? $this->workspace->serializeReviewListItem($featuredReview) : null,
             'focusSummary' => $focusSummary,
+            'reviewWorkQueues' => $reviewWorkQueues,
             'queuePreview' => $queuePreview,
             'assetPreview' => $assetPreview,
             'activityPreview' => $activityPreview,
+            'signingWorkspace' => $this->publicAppraiserContracts->dashboardSummary(request()->user()),
         ]);
     }
 }

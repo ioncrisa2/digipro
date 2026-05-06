@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdminActionRequest;
 use App\Http\Requests\Admin\RejectAppraisalRevisionItemRequest;
 use App\Http\Requests\Admin\StoreAppraisalCancellationRequest;
+use App\Http\Requests\Admin\StoreAppraisalContractSignerRequest;
 use App\Http\Requests\Admin\StoreAppraisalFieldCorrectionRequest;
 use App\Http\Requests\Admin\StoreAppraisalOfferRequest;
 use App\Http\Requests\Admin\StoreAppraisalReportConfigurationRequest;
@@ -78,6 +79,17 @@ class AppraisalRequestWorkflowController extends Controller
     public function markContractSigned(AppraisalRequest $appraisalRequest): RedirectResponse
     {
         return $this->handleAction(fn () => $this->workspaceService->markContractSigned($appraisalRequest));
+    }
+
+    public function saveContractSigner(
+        StoreAppraisalContractSignerRequest $request,
+        AppraisalRequest $appraisalRequest,
+    ): RedirectResponse {
+        return $this->handleAction(fn () => $this->workspaceService->saveContractSignerConfiguration(
+            $appraisalRequest,
+            (int) $request->user()->id,
+            $request->validated()
+        ));
     }
 
     public function verifyPayment(AppraisalRequest $appraisalRequest): RedirectResponse

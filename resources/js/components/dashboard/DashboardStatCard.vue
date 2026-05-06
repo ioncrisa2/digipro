@@ -40,11 +40,11 @@ defineProps({
     <div class="space-y-3">
       <div class="flex items-center gap-2">
         <span class="h-2.5 w-2.5 rounded-full" :class="accentClass" />
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+        <p class="text-xs font-semibold uppercase text-slate-500">
           {{ label }}
         </p>
       </div>
-      <h3 class="text-3xl font-semibold tracking-tight text-slate-950">
+      <h3 class="text-3xl font-semibold tabular-nums text-slate-950">
         {{ value }}
       </h3>
       <p class="flex items-center gap-1 text-xs text-slate-500">

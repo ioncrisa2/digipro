@@ -70,6 +70,13 @@ class AdminAppraisalRequestWorkflowWorkspaceService
         return 'Status kontrak berhasil diperbarui menjadi ditandatangani.';
     }
 
+    public function saveContractSignerConfiguration(AppraisalRequest $appraisalRequest, int $actorId, array $validated): string
+    {
+        $this->adminWorkflowService->saveContractSignerConfiguration($appraisalRequest, $actorId, $validated);
+
+        return 'Penilai publik untuk kontrak berhasil ditetapkan.';
+    }
+
     public function verifyPayment(AppraisalRequest $appraisalRequest): string
     {
         $this->workflowService->verifyPayment($appraisalRequest);

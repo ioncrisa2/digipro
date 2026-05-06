@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import { Link } from "@inertiajs/vue3";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Clock3, FileCheck2, FileWarning, HandCoins, ReceiptText } from "lucide-vue-next";
 
@@ -7,10 +8,6 @@ const props = defineProps({
   actionCenter: {
     type: Array,
     default: () => [],
-  },
-  onOpenAction: {
-    type: Function,
-    required: true,
   },
 });
 
@@ -61,7 +58,7 @@ const rowClass = (tone) => {
 <template>
   <section class="rounded-[2rem] border border-slate-200 bg-white p-6">
     <div class="space-y-2">
-      <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Butuh Tindakan</p>
+      <p class="text-xs font-semibold uppercase text-slate-500">Butuh Tindakan</p>
       <h2 class="text-lg font-semibold text-slate-950">Hal yang menunggu respon Anda</h2>
       <p class="text-sm leading-6 text-slate-500">Prioritaskan item ini agar permohonan aktif Anda bisa terus bergerak.</p>
     </div>
@@ -90,7 +87,13 @@ const rowClass = (tone) => {
           <div class="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-950">{{ item.count }}</div>
         </div>
 
-        <Button class="mt-4 w-full justify-between bg-white/80" variant="outline" @click="onOpenAction(item)">
+        <Button v-if="item.url" class="mt-4 w-full justify-between bg-white/80" variant="outline" as-child>
+          <Link :href="item.url">
+            Lihat Daftar
+            <ArrowRight class="h-4 w-4" />
+          </Link>
+        </Button>
+        <Button v-else class="mt-4 w-full justify-between bg-white/80" variant="outline" disabled>
           Lihat Daftar
           <ArrowRight class="h-4 w-4" />
         </Button>

@@ -9,10 +9,12 @@ use App\Models\AppraisalUserConsent;
 use App\Models\ConsentDocument;
 use App\Models\GuidelineSet;
 use App\Models\Payment;
+use App\Models\ReportSigner;
 use App\Models\User;
 use App\Services\Customer\AppraisalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -128,11 +130,40 @@ it('generates final legal documents only after payment is verified', function ()
     Storage::fake('public');
     createActiveGuidelineSetForCustomerAppraisal();
     config()->set('payment.midtrans.server_key', 'SB-Mid-server-test');
+    config()->set('peruri.base_url', 'https://peruri.test');
+    config()->set('peruri.api_version', 'v1');
+    config()->set('peruri.corporate_id', 'CORP-TEST');
+    config()->set('peruri.client_id', 'client-id');
+    config()->set('peruri.client_secret', 'client-secret');
+    config()->set('peruri.uploader_email', 'uploader@digipro.test');
+    config()->set('peruri.extra_headers', []);
+    config()->set('peruri.coordinates.contract.customer', [
+        'page' => 1,
+        'lower_left_x' => 360,
+        'lower_left_y' => 120,
+        'upper_right_x' => 540,
+        'upper_right_y' => 200,
+    ]);
+    config()->set('peruri.coordinates.contract.public_appraiser', [
+        'page' => 1,
+        'lower_left_x' => 40,
+        'lower_left_y' => 120,
+        'upper_right_x' => 220,
+        'upper_right_y' => 200,
+    ]);
 
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'name' => 'Nadia Customer',
         'email' => 'nadia@example.test',
+    ]);
+
+    $publicSigner = ReportSigner::query()->create([
+        'user_id' => null,
+        'role' => 'public_appraiser',
+        'name' => 'Penilai Publik A',
+        'email' => 'public@appraiser.test',
+        'is_active' => true,
     ]);
 
     $document = createPublishedConsentDocument();
@@ -158,6 +189,7 @@ it('generates final legal documents only after payment is verified', function ()
         'sertifikat_on_hand_confirmed' => true,
         'certificate_not_encumbered_confirmed' => true,
         'certificate_statements_accepted_at' => now(),
+        'contract_public_appraiser_signer_id' => $publicSigner->id,
     ]);
 
     AppraisalAsset::create([
@@ -169,9 +201,27 @@ it('generates final legal documents only after payment is verified', function ()
         'address' => 'Jl. Representatif DigiPro No. 7',
     ]);
 
+    $expiredDate = now()->endOfDay()->toIso8601String();
+
+    Http::fakeSequence()
+        ->push([
+            'status' => '00',
+            'message' => 'OK',
+            'data' => [
+                'accessToken' => 'access-token-test',
+                'expiredDate' => $expiredDate,
+            ],
+        ], 200)
+        ->push(['status' => '00', 'message' => 'OK', 'data' => ['isExpired' => false]], 200) // customer cert
+        ->push(['status' => '00', 'message' => 'OK', 'data' => ['isExpired' => false]], 200) // internal cert
+        ->push(['status' => '00', 'message' => 'OK', 'data' => ['orderIdTier' => 'TIER-123', 'orderId' => 'ORDER-CUST-1']], 200)
+        ->push(['status' => '00', 'message' => 'OK', 'data' => []], 200) // coordinate
+        ->push(['status' => '00', 'message' => 'OK', 'data' => []], 200); // signing
+
     $this->actingAs($user)
         ->post(route('appraisal.contract.sign', ['id' => $record->id]), [
             'agree_contract' => '1',
+            'keyla_token' => 'KEYLA123',
         ])
         ->assertRedirect(route('appraisal.payment.page', ['id' => $record->id]));
 
@@ -180,14 +230,6 @@ it('generates final legal documents only after payment is verified', function ()
     expect($record->status)->toBe(AppraisalStatusEnum::ContractSigned);
     expect($record->contract_status)->toBe(ContractStatusEnum::ContractSigned);
     expect($record->valuation_objective?->value ?? $record->valuation_objective)->toBe('kajian_nilai_pasar_dalam_bentuk_range');
-
-    $signedContract = AppraisalRequestFile::query()
-        ->where('appraisal_request_id', $record->id)
-        ->where('type', 'contract_signed_pdf')
-        ->sole();
-
-    expect($signedContract->original_name)->toContain('Penawaran-Tertandatangani-');
-    Storage::disk('public')->assertExists($signedContract->path);
 
     expect(AppraisalRequestFile::query()
         ->where('appraisal_request_id', $record->id)
@@ -235,7 +277,6 @@ it('generates final legal documents only after payment is verified', function ()
         ->pluck('type')
         ->all();
 
-    expect($types)->toContain('contract_signed_pdf');
     expect($types)->toContain('agreement_pdf');
     expect($types)->toContain('disclaimer_pdf');
     expect($types)->toContain('representative_letter_pdf');
@@ -271,8 +312,7 @@ it('generates final legal documents only after payment is verified', function ()
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Penilaian/Show')
-            ->where('request.request_files', fn ($files) => collect($files)->pluck('type')->contains('contract_signed_pdf')
-                && collect($files)->pluck('type')->contains('agreement_pdf')
+            ->where('request.request_files', fn ($files) => collect($files)->pluck('type')->contains('agreement_pdf')
                 && collect($files)->pluck('type')->contains('disclaimer_pdf')
                 && collect($files)->pluck('type')->contains('representative_letter_pdf'))
         );

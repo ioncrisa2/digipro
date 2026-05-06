@@ -33,14 +33,19 @@ const getClasses = (type) => {
 </script>
 
 <template>
-  <div class="fixed top-24 right-5 z-9999 flex flex-col gap-3 pointer-events-none">
+  <div
+    class="fixed top-24 right-5 z-50 flex flex-col gap-3 pointer-events-none"
+    role="status"
+    aria-live="polite"
+    aria-relevant="additions text"
+  >
     <TransitionGroup
-      enter-active-class="transition duration-300 ease-out"
-      enter-from-class="translate-x-full opacity-0"
+      enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
+      enter-from-class="translate-x-full opacity-0 motion-reduce:translate-x-0"
       enter-to-class="translate-x-0 opacity-100"
-      leave-active-class="transition duration-200 ease-in"
+      leave-active-class="transition duration-150 ease-in motion-reduce:transition-none"
       leave-from-class="translate-x-0 opacity-100"
-      leave-to-class="translate-x-full opacity-0"
+      leave-to-class="translate-x-full opacity-0 motion-reduce:translate-x-0"
     >
       <div
         v-for="note in notifications"
@@ -57,7 +62,8 @@ const getClasses = (type) => {
         <button
           type="button"
           @click="removeNotification(note.id)"
-          class="text-slate-400 hover:text-slate-600 transition-colors"
+          aria-label="Tutup notifikasi"
+          class="rounded-md text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
         >
           <X class="w-4 h-4" />
         </button>

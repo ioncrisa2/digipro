@@ -72,7 +72,7 @@ watch(
 
 <template>
   <aside
-    class="bg-slate-900 text-slate-100 shrink-0 flex flex-col transition-all duration-200 fixed inset-y-0 left-0 z-40 lg:static"
+    class="bg-slate-900 text-slate-100 shrink-0 flex flex-col transition-[transform] duration-200 motion-reduce:transition-none fixed inset-y-0 left-0 z-40 lg:static"
     :class="[
       sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       sidebarCollapsed ? 'lg:w-20' : 'lg:w-64',
@@ -87,12 +87,12 @@ watch(
         <span class="text-sm font-semibold">DG</span>
       </div>
       <div v-if="!sidebarCollapsed" class="flex flex-col leading-tight">
-        <span class="font-semibold text-sm tracking-tight">DIGIPRO BY KJPP HJAR</span>
+        <span class="font-semibold text-sm">DIGIPRO BY KJPP HJAR</span>
         <span class="text-[11px] text-slate-400">{{ portalLabel }}</span>
       </div>
       <button
         type="button"
-        class="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-300 hover:bg-slate-800 hover:text-white lg:hidden"
+        class="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-300 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 lg:hidden"
         aria-label="Tutup menu"
         @click="closeSidebar"
       >
@@ -100,13 +100,13 @@ watch(
       </button>
     </div>
 
-    <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+    <nav class="flex-1 overflow-y-auto overscroll-contain py-4 space-y-1">
       <div v-for="item in navItems" :key="item.key ?? item.routeName" class="mx-2">
         <Link
           v-if="!item.subItems?.length || sidebarCollapsed"
           :href="resolveHref(item)"
           :title="sidebarCollapsed ? item.label : ''"
-          class="flex items-center text-sm rounded-md transition-colors"
+          class="flex items-center text-sm rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
           :class="[
             sidebarCollapsed ? 'justify-center px-2 py-2' : 'px-4 py-2',
             isActive(item)
@@ -128,7 +128,7 @@ watch(
         <div v-else class="space-y-1">
           <button
             type="button"
-            class="flex items-center rounded-md px-4 py-2 text-sm transition-colors"
+            class="flex items-center rounded-md px-4 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             :class="[
               isActive(item)
                 ? 'bg-slate-800 text-white'
@@ -156,7 +156,7 @@ watch(
               v-for="subItem in item.subItems"
               :key="subItem.key ?? subItem.routeName"
               :href="resolveHref(subItem)"
-              class="flex items-center rounded-md px-4 py-2 text-sm transition-colors"
+              class="flex items-center rounded-md px-4 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
               :class="[
                 isActive(subItem)
                   ? 'bg-slate-800 text-white'
@@ -180,7 +180,7 @@ watch(
       <Link
         :href="profileHref"
         :title="sidebarCollapsed ? 'Profil Saya' : ''"
-        class="flex items-center rounded-md text-sm transition-colors"
+        class="flex items-center rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
         :class="[
           sidebarCollapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2',
           isProfileActive

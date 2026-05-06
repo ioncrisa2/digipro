@@ -56,9 +56,45 @@ const columns = [
   { key: 'name', label: 'Profil', cellClass: 'min-w-[220px]' },
   { key: 'role', label: 'Peran', cellClass: 'min-w-[160px]' },
   { key: 'credential', label: 'Sertifikasi', cellClass: 'min-w-[220px]' },
+  { key: 'peruri', label: 'Kesiapan Peruri', cellClass: 'min-w-[240px]' },
   { key: 'status', label: 'Status', cellClass: 'min-w-[120px]' },
   { key: 'actions', label: 'Aksi', cellClass: 'min-w-[180px]' },
 ];
+
+const peruriStatusLabel = (value, emptyLabel = 'Belum dicek') => {
+  switch (value) {
+    case 'ready':
+      return 'Siap';
+    case 'expired':
+      return 'Expired';
+    case 'inactive':
+      return 'Belum Aktif';
+    case 'missing_email':
+      return 'Email Belum Ada';
+    case 'error':
+      return 'Gagal Diperiksa';
+    case 'unknown':
+      return 'Belum Diketahui';
+    default:
+      return emptyLabel;
+  }
+};
+
+const peruriStatusClass = (value) => {
+  switch (value) {
+    case 'ready':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+    case 'expired':
+    case 'error':
+      return 'border-rose-200 bg-rose-50 text-rose-800';
+    case 'inactive':
+    case 'missing_email':
+    case 'unknown':
+      return 'border-amber-200 bg-amber-50 text-amber-800';
+    default:
+      return 'border-slate-200 bg-slate-50 text-slate-700';
+  }
+};
 </script>
 
 <template>
@@ -143,6 +179,22 @@ const columns = [
 
             <template #cell-credential="{ row }">
               <span class="text-sm text-slate-700">{{ row.certification_number || '-' }}</span>
+            </template>
+
+            <template #cell-peruri="{ row }">
+              <div class="space-y-2">
+                <div class="flex flex-wrap gap-2">
+                  <Badge variant="outline" :class="peruriStatusClass(row.peruri_certificate_status)">
+                    Sertifikat: {{ peruriStatusLabel(row.peruri_certificate_status) }}
+                  </Badge>
+                  <Badge variant="outline" :class="peruriStatusClass(row.peruri_keyla_status)">
+                    KEYLA: {{ peruriStatusLabel(row.peruri_keyla_status) }}
+                  </Badge>
+                </div>
+                <p class="text-xs text-slate-500">
+                  Dicek terakhir: {{ row.peruri_last_checked_at || '-' }}
+                </p>
+              </div>
             </template>
 
             <template #cell-status="{ row }">

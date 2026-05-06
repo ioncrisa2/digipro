@@ -9,10 +9,13 @@ use App\Http\Requests\Customer\AppraisalCreatePageRequest;
 use App\Http\Requests\Customer\AppraisalIndexRequest;
 use App\Http\Requests\Customer\CancelOfferRequest;
 use App\Http\Requests\Customer\CustomerAccessRequest;
+use App\Http\Requests\Customer\SaveCustomerSignatureIdentityRequest;
 use App\Http\Requests\Customer\SelectOfferRequest;
 use App\Http\Requests\Customer\SignContractRequest;
 use App\Http\Requests\Customer\StoreAppraisalRequest;
 use App\Http\Requests\Customer\StoreCustomerAppraisalCancellationRequest;
+use App\Http\Requests\Customer\SubmitCustomerSignatureKycRequest;
+use App\Http\Requests\Customer\SubmitCustomerSignatureSpecimenRequest;
 use App\Http\Requests\Customer\SubmitAppraisalRevisionBatchRequest;
 use App\Http\Requests\Customer\SubmitMarketPreviewAppealRequest;
 use App\Http\Requests\Customer\SubmitOfferNegotiationRequest;
@@ -26,6 +29,8 @@ use App\Services\Admin\AdminNotificationService;
 use App\Services\Customer\AppraisalRequestService;
 use App\Services\Customer\AppraisalService;
 use App\Services\Customer\CustomerAppraisalWorkflowService;
+use App\Services\Peruri\PeruriSignerReadinessService;
+use App\Services\Peruri\CustomerSignatureOnboardingService;
 use App\Services\Revisions\AppraisalRequestRevisionSubmissionService;
 use App\Services\Workflow\AppraisalMarketPreviewService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -40,6 +45,8 @@ class AppraisalController extends Controller
     public function __construct(
         private readonly CustomerAppraisalWorkflowService $workflowService,
         private readonly AdminNotificationService $adminNotificationService,
+        private readonly PeruriSignerReadinessService $readinessService,
+        private readonly CustomerSignatureOnboardingService $customerOnboardingService,
     ) {
     }
 
@@ -291,8 +298,165 @@ class AppraisalController extends Controller
         }
 
         $payload = $appraisalService->buildShowPayload($request->user()->id, $id);
+        $record->loadMissing(['user:id,name,email,phone_number,billing_nik,address', 'contractPublicAppraiserSigner:id,name,email,peruri_certificate_status,peruri_keyla_status,peruri_last_checked_at']);
+        $payload['signingReadiness'] = $this->readinessService->forContract(
+            $record,
+            $record->user?->email,
+            syncPublicSigner: true,
+            customer: $request->user(),
+        );
+        $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+
+        if (($record->status?->value ?? $record->status) !== AppraisalStatusEnum::WaitingSignature->value
+            && data_get($payload, 'signingReadiness.customer.overall.is_ready') !== true) {
+            data_set($payload, 'signingReadiness.customer.overall', [
+                'code' => 'ready',
+                'label' => 'Siap',
+                'message' => 'Tahap tanda tangan customer sudah dilewati pada permohonan ini.',
+                'is_ready' => true,
+                'tone' => 'success',
+            ]);
+            data_set($payload, 'signingReadiness.can_customer_sign', true);
+        }
+
+        if (($record->status?->value ?? $record->status) === AppraisalStatusEnum::WaitingSignature->value
+            && data_get($payload, 'signingReadiness.can_customer_sign') !== true) {
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('error', data_get($payload, 'signingReadiness.customer.overall.message', 'Selesaikan onboarding PDS/KEYLA terlebih dahulu.'));
+        }
 
         return inertia('Penilaian/ContractSign', $payload);
+    }
+
+    public function contractOnboardingPage(CustomerAccessRequest $request, int $id)
+    {
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
+
+        $status = $record->status?->value ?? $record->status;
+        if (! $this->workflowService->isContractAccessibleStatus((string) $status)) {
+            return redirect()
+                ->route('appraisal.show', ['id' => $record->id])
+                ->with('error', 'Kontrak belum siap untuk onboarding tanda tangan digital.');
+        }
+
+        $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+        $selectedProvinceId = $request->query('province_id');
+
+        return inertia('Penilaian/ContractOnboarding', $this->customerOnboardingService->onboardingPayload(
+            $record,
+            $request->user(),
+            is_numeric($selectedProvinceId) ? (int) $selectedProvinceId : null,
+        ));
+    }
+
+    public function saveContractOnboardingIdentity(SaveCustomerSignatureIdentityRequest $request, int $id)
+    {
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
+
+        $this->customerOnboardingService->saveIdentity($request->user(), $request->validated());
+        $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+
+        return redirect()
+            ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+            ->with('success', 'Identitas onboarding PDS berhasil disimpan.');
+    }
+
+    public function registerContractPeruriUser(CustomerAccessRequest $request, int $id)
+    {
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
+
+        try {
+            $this->customerOnboardingService->registerUser($request->user());
+            $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('success', 'Registrasi user PDS berhasil dikirim.');
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
+    }
+
+    public function submitContractPeruriKyc(SubmitCustomerSignatureKycRequest $request, int $id)
+    {
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
+
+        try {
+            $this->customerOnboardingService->submitKyc($request->user(), $request->file('kyc_video'));
+            $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('success', 'Video E-KYC berhasil dikirim ke PDS.');
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
+    }
+
+    public function setContractPeruriSpecimen(SubmitCustomerSignatureSpecimenRequest $request, int $id)
+    {
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
+
+        try {
+            $this->customerOnboardingService->setSpecimen($request->user(), $request->file('signature_image'));
+            $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('success', 'Specimen tanda tangan berhasil dikirim ke PDS.');
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
+    }
+
+    public function registerContractKeyla(CustomerAccessRequest $request, int $id)
+    {
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
+
+        try {
+            $this->customerOnboardingService->registerKeyla($request->user());
+            $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('success', 'QR KEYLA berhasil dibuat. Scan QR pada aplikasi KEYLA Anda.');
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
+    }
+
+    public function refreshContractOnboarding(CustomerAccessRequest $request, int $id)
+    {
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
+
+        try {
+            $readiness = $this->customerOnboardingService->syncReadiness($request->user());
+            $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+
+            if (in_array(data_get($readiness, 'certificate.code'), ['error'], true)
+                || in_array(data_get($readiness, 'keyla.code'), ['error'], true)) {
+                return redirect()
+                    ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                    ->with('error', data_get($readiness, 'last_error', 'Sinkronisasi readiness ke Peruri gagal.'));
+            }
+
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('success', 'Readiness customer diperbarui: ' . data_get($readiness, 'overall.message', 'status terbaru tersimpan.'));
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('error', $exception->getMessage());
+        }
     }
 
     public function signContract(
@@ -309,7 +473,7 @@ class AppraisalController extends Controller
             $this->workflowService->signContract($request, $record, $appraisalService);
         } catch (\RuntimeException $exception) {
             return redirect()
-                ->route('appraisal.show', ['id' => $record->id])
+                ->route('appraisal.contract.page', ['id' => $record->id])
                 ->with('error', $exception->getMessage());
         } catch (\Throwable $e) {
             report($e);
@@ -438,7 +602,12 @@ class AppraisalController extends Controller
 
         $signedPdfPath = data_get($doc, 'signature.signed_pdf_path');
         if (is_string($signedPdfPath) && $signedPdfPath !== '' && Storage::disk('public')->exists($signedPdfPath)) {
-            return Storage::disk('public')->download($signedPdfPath, "Penawaran-Tertandatangani-{$requestNumber}.pdf");
+            return $this->streamStoredPdfDownload($signedPdfPath, "Penawaran-Tertandatangani-{$requestNumber}.pdf");
+        }
+
+        $originalPdfPath = data_get($doc, 'signature.original_pdf_path');
+        if (is_string($originalPdfPath) && $originalPdfPath !== '' && Storage::disk('public')->exists($originalPdfPath)) {
+            return $this->streamStoredPdfDownload($originalPdfPath, $fileName);
         }
 
         return Pdf::loadView('pdfs.appraisal-contract-offer', [
@@ -490,5 +659,14 @@ class AppraisalController extends Controller
             $icon,
             $request->user()?->id,
         );
+    }
+
+    private function streamStoredPdfDownload(string $path, string $fileName)
+    {
+        return response()->streamDownload(function () use ($path): void {
+            echo Storage::disk('public')->get($path);
+        }, $fileName, [
+            'Content-Type' => 'application/pdf',
+        ]);
     }
 }

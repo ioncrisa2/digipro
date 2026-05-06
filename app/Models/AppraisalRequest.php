@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class AppraisalRequest extends Model
 {
@@ -92,6 +93,8 @@ class AppraisalRequest extends Model
         'report_reviewer_signer_id',
         'report_public_appraiser_signer_id',
         'report_signer_snapshot',
+        'contract_public_appraiser_signer_id',
+        'contract_signer_snapshot',
         'report_draft_generated_at',
         'report_draft_pdf_path',
         'report_draft_pdf_size',
@@ -155,6 +158,7 @@ class AppraisalRequest extends Model
         'report_generated_at'           => 'datetime',
         'report_signer_snapshot'        => 'array',
         'report_draft_generated_at'     => 'datetime',
+        'contract_signer_snapshot'      => 'array',
         'cancelled_at'                  => 'datetime',
         'physical_report_printed_at'    => 'datetime',
         'physical_report_shipped_at'    => 'datetime',
@@ -232,6 +236,11 @@ class AppraisalRequest extends Model
         return $this->belongsTo(ReportSigner::class, 'report_public_appraiser_signer_id');
     }
 
+    public function contractPublicAppraiserSigner(): BelongsTo
+    {
+        return $this->belongsTo(ReportSigner::class, 'contract_public_appraiser_signer_id');
+    }
+
     public function physicalReportPrintedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'physical_report_printed_by');
@@ -292,6 +301,11 @@ class AppraisalRequest extends Model
     public function fieldChangeLogs(): HasMany
     {
         return $this->hasMany(AppraisalFieldChangeLog::class);
+    }
+
+    public function signatureEnvelopes(): MorphMany
+    {
+        return $this->morphMany(SignatureEnvelope::class, 'subject');
     }
 
 }

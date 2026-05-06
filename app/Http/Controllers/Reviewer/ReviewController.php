@@ -28,6 +28,7 @@ class ReviewController extends Controller
     public function index(ReviewIndexRequest $request): Response
     {
         $filters = $request->filters();
+        $resolvedStatus = $this->workspace->resolveReviewStatusFilter($filters);
 
         $baseQuery = AppraisalRequest::query()
             ->with('user:id,name')
@@ -42,7 +43,7 @@ class ReviewController extends Controller
                         ->orWhereHas('user', fn (Builder $userQuery): Builder => $userQuery->where('name', 'like', "%{$q}%"));
                 });
             })
-            ->when($filters['status'] !== '' && $filters['status'] !== 'all', fn (Builder $query): Builder => $query->where('status', $filters['status']));
+            ->when($resolvedStatus !== '' && $resolvedStatus !== 'all', fn (Builder $query): Builder => $query->where('status', $resolvedStatus));
 
         $reviews = (clone $baseQuery)
             ->latest('requested_at')
@@ -52,18 +53,21 @@ class ReviewController extends Controller
 
         $summaryBase = AppraisalRequest::query()->whereIn('status', $this->workspace->reviewerStatuses());
 
+        $summary = [
+            'total' => (clone $summaryBase)->count(),
+            'siap_review' => (clone $summaryBase)->where('status', AppraisalStatusEnum::ContractSigned)->count(),
+            'sedang_review' => (clone $summaryBase)->where('status', AppraisalStatusEnum::ValuationOnProgress)->count(),
+            'siap_preview' => (clone $summaryBase)->where('status', AppraisalStatusEnum::ValuationCompleted)->count(),
+            'total_aset' => AppraisalAsset::query()
+                ->whereHas('request', fn (Builder $query): Builder => $query->whereIn('status', $this->workspace->reviewerStatuses()))
+                ->count(),
+        ];
+
         return Inertia::render('Reviewer/Reviews/Index', [
             'filters' => $filters,
             'statusOptions' => $this->workspace->reviewStatusOptions(),
-            'summary' => [
-                'total' => (clone $summaryBase)->count(),
-                'siap_review' => (clone $summaryBase)->where('status', AppraisalStatusEnum::ContractSigned)->count(),
-                'sedang_review' => (clone $summaryBase)->where('status', AppraisalStatusEnum::ValuationOnProgress)->count(),
-                'siap_preview' => (clone $summaryBase)->where('status', AppraisalStatusEnum::ValuationCompleted)->count(),
-                'total_aset' => AppraisalAsset::query()
-                    ->whereHas('request', fn (Builder $query): Builder => $query->whereIn('status', $this->workspace->reviewerStatuses()))
-                    ->count(),
-            ],
+            'queueOptions' => $this->workspace->reviewQueueOptions($summary),
+            'summary' => $summary,
             'records' => $this->paginatedRecordsPayload($reviews),
         ]);
     }

@@ -29,7 +29,7 @@ onBeforeUnmount(() => {
       <div class="p-3 bg-slate-900 text-white rounded-2xl mb-2 shadow-lg shadow-slate-200">
         <LogIn class="w-6 h-6" />
       </div>
-      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Masuk ke DigiPro by KJPP HJAR</h1>
+      <h1 class="text-2xl font-semibold text-slate-900">Masuk ke DigiPro by KJPP HJAR</h1>
       <p class="text-sm text-slate-500 max-w-[300px]">
         Gunakan email terdaftar untuk mengakses dashboard appraisal Anda.
       </p>
@@ -80,7 +80,8 @@ onBeforeUnmount(() => {
           <button
             type="button"
             @click="showPassword = !showPassword"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+            :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+            class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
           >
             <Eye v-if="!showPassword" class="w-4 h-4" />
             <EyeOff v-else class="w-4 h-4" />
@@ -101,11 +102,11 @@ onBeforeUnmount(() => {
 
       <Button
         type="submit"
-        class="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-md"
+        class="w-full h-11 bg-slate-900 text-white shadow-md transition-[background-color,box-shadow] duration-150 hover:bg-slate-800 motion-reduce:transition-none"
         :disabled="loginStore.isProcessing"
       >
         <Loader2 v-if="loginStore.isProcessing" class="mr-2 h-4 w-4 animate-spin" />
-        {{ loginStore.isProcessing ? 'Memproses...' : 'Masuk ke Dashboard' }}
+        {{ loginStore.isProcessing ? 'Memproses…' : 'Masuk ke Dashboard' }}
       </Button>
     </form>
 

@@ -2,7 +2,6 @@
 import { Link } from '@inertiajs/vue3'
 import { ArrowRight } from 'lucide-vue-next'
 import BrandLockup from '@/components/brand/BrandLockup.vue'
-import NotificationCenter from '@/components/ui/notification/NotificationCenter.vue'
 
 const currentYear = new Date().getFullYear()
 
@@ -21,9 +20,7 @@ const footerLinks = {
 
 <template>
   <div>
-    <NotificationCenter />
-
-    <footer class="border-t border-black/5 bg-[#f0ebe1]">
+    <footer class="border-t border-black/5 bg-slate-50">
       <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div class="grid gap-10 lg:grid-cols-[1.4fr_0.8fr_0.8fr]">
           <div class="max-w-xl space-y-5">
@@ -34,11 +31,11 @@ const footerLinks = {
               />
             </div>
 
-            <h3 class="font-['Space_Grotesk'] text-2xl font-semibold tracking-tight text-slate-950">
+            <h3 class="text-balance text-2xl font-semibold text-slate-950">
               Insight properti, regulasi, dan pembacaan pasar.
             </h3>
 
-            <p class="max-w-lg text-sm leading-7 text-slate-600">
+            <p class="max-w-lg text-pretty text-sm leading-7 text-slate-600">
               Kanal editorial DigiPro by KJPP HJAR untuk membahas valuasi properti, konteks pasar, dan hal-hal operasional yang
               relevan untuk pengguna platform.
             </p>
@@ -53,7 +50,7 @@ const footerLinks = {
           </div>
 
           <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+            <p class="text-[11px] font-semibold uppercase text-slate-500">
               Journal
             </p>
             <div class="mt-4 space-y-3">
@@ -69,7 +66,7 @@ const footerLinks = {
           </div>
 
           <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+            <p class="text-[11px] font-semibold uppercase text-slate-500">
               Platform
             </p>
             <div class="mt-4 space-y-3">

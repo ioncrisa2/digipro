@@ -14,6 +14,10 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  compact: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const cards = computed(() => {
@@ -65,7 +69,10 @@ const cards = computed(() => {
 
 <template>
   <section class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
-    <div class="grid divide-slate-200 sm:grid-cols-2 sm:divide-x xl:grid-cols-4">
+    <div
+      class="grid divide-slate-200 sm:grid-cols-2 sm:divide-x"
+      :class="props.compact ? 'xl:grid-cols-2 xl:divide-y-0' : 'xl:grid-cols-4'"
+    >
     <DashboardStatCard
       v-for="card in cards"
       :key="card.label"

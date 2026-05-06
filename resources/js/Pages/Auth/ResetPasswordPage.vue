@@ -46,7 +46,7 @@ const ruleItems = computed(() => [
   { key: 'upper', label: 'Minimal 1 huruf besar (A-Z)', ok: rules.value.upper },
   { key: 'lower', label: 'Minimal 1 huruf kecil (a-z)', ok: rules.value.lower },
   { key: 'number', label: 'Minimal 1 angka (0-9)', ok: rules.value.number },
-  { key: 'symbol', label: 'Minimal 1 karakter spesial (!@#...)', ok: rules.value.symbol },
+  { key: 'symbol', label: 'Minimal 1 karakter spesial (!@#…)', ok: rules.value.symbol },
 ])
 
 const submit = () => {
@@ -63,7 +63,7 @@ const submit = () => {
       <div class="p-3 bg-slate-900/10 text-slate-900 rounded-2xl mb-2">
         <LockKeyhole class="w-6 h-6" />
       </div>
-      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Setel Ulang Password</h1>
+      <h1 class="text-2xl font-semibold text-slate-900">Setel Ulang Password</h1>
       <p class="text-sm text-slate-500 max-w-[280px]">
         Gunakan password yang kuat agar akun tetap aman.
       </p>
@@ -71,7 +71,7 @@ const submit = () => {
 
     <form @submit.prevent="submit" class="space-y-5">
       <div class="p-3 rounded-lg border border-slate-100 bg-slate-50/70 flex items-center gap-3">
-        <div class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+        <div class="h-2 w-2 rounded-full bg-emerald-500" />
         <div class="text-xs">
           <span class="text-slate-500 block">Akun</span>
           <span class="font-medium text-slate-700">{{ form.email }}</span>
@@ -97,7 +97,8 @@ const submit = () => {
           <button
             type="button"
             @click="showPassword = !showPassword"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+            :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+            class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
           >
             <Eye v-if="!showPassword" class="w-4 h-4" />
             <EyeOff v-else class="w-4 h-4" />
@@ -142,7 +143,7 @@ const submit = () => {
       </div>
 
       <Button type="submit" class="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white" :disabled="!canSubmit">
-        <span v-if="form.processing">Memperbarui...</span>
+        <span v-if="form.processing">Memperbarui…</span>
         <span v-else>Simpan Password Baru</span>
       </Button>
 

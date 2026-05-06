@@ -98,7 +98,8 @@ defineProps({
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
         <button
-          class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 hover:bg-slate-50 transition-colors"
+          type="button"
+          class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
         >
           <Avatar class="h-8 w-8">
             <AvatarImage :src="avatarUrl" />

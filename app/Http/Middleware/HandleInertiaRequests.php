@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Support\SystemNavigation;
+use App\Services\Reviewer\PublicAppraiserContractWorkspaceService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Illuminate\Support\Facades\Storage;
@@ -39,6 +40,8 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $reviewerContractWorkspace = app(PublicAppraiserContractWorkspaceService::class);
+
         return [
             ...parent::share($request),
 
@@ -78,7 +81,11 @@ class HandleInertiaRequests extends Middleware
                 : null,
 
             'navigation.reviewer_nav' => fn () => $request->user()
-                ? SystemNavigation::navForUser($request->user(), 'reviewer')
+                ? $this->reviewerNavigation(
+                    $request,
+                    SystemNavigation::navForUser($request->user(), 'reviewer'),
+                    $reviewerContractWorkspace,
+                )
                 : [],
             'navigation.admin_nav' => fn () => $request->user()
                 ? SystemNavigation::navForUser($request->user(), 'admin')
@@ -89,6 +96,8 @@ class HandleInertiaRequests extends Middleware
                 'status' => fn() => $request->session()->get('status'),
                 'success' => fn() => $request->session()->get('success'),
                 'error' => fn() => $request->session()->get('error'),
+                'bulk_sign_result' => fn() => $request->session()->get('bulk_sign_result'),
+                'peruri_onboarding' => fn() => $request->session()->get('peruri_onboarding'),
                 'backup_restore_summary' => fn() => $request->session()->get('backup_restore_summary'),
             ],
 
@@ -143,5 +152,17 @@ class HandleInertiaRequests extends Middleware
                 report: false
             ),
         ];
+    }
+
+    private function reviewerNavigation(
+        Request $request,
+        array $items,
+        PublicAppraiserContractWorkspaceService $workspace,
+    ): array {
+        if (! $request->user() || $workspace->hasAssignedSigner($request->user())) {
+            return $items;
+        }
+
+        return array_values(array_filter($items, fn (array $item): bool => ($item['key'] ?? null) !== 'reviewer.contract-signatures'));
     }
 }

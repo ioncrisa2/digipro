@@ -1,16 +1,11 @@
 <script setup>
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Plus, List } from "lucide-vue-next";
+import { Link } from "@inertiajs/vue3";
 
 defineProps({
-  onNewRequest: {
-    type: Function,
-    required: true,
-  },
-  onRequestList: {
-    type: Function,
-    required: true,
-  },
+  newRequestHref: { type: String, required: true },
+  requestListHref: { type: String, required: true },
 });
 </script>
 
@@ -27,21 +22,21 @@ defineProps({
       </div>
     </CardHeader>
     <CardContent class="space-y-3 p-6">
-      <button
-        @click="onNewRequest"
-        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+      <Link
+        :href="newRequestHref"
+        class="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
       >
         <Plus class="w-4 h-4" />
         Ajukan Permohonan Baru
-      </button>
+      </Link>
 
-      <button
-        @click="onRequestList"
-        class="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+      <Link
+        :href="requestListHref"
+        class="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
       >
         <List class="w-4 h-4" />
         Lihat Semua Permohonan
-      </button>
+      </Link>
     </CardContent>
   </Card>
 </template>

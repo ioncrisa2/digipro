@@ -1,11 +1,9 @@
 <script setup>
 import { FileText, Plus } from "lucide-vue-next";
+import { Link } from "@inertiajs/vue3";
 
 defineProps({
-  onNewRequest: {
-    type: Function,
-    required: true,
-  },
+  newRequestHref: { type: String, required: true },
 });
 </script>
 
@@ -20,12 +18,12 @@ defineProps({
     <p class="text-sm text-slate-500 mb-6">
       Anda belum memiliki permohonan penilaian. Mulai dengan membuat permohonan baru.
     </p>
-    <button
-      @click="onNewRequest"
-      class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition"
+    <Link
+      :href="newRequestHref"
+      class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
     >
       <Plus class="w-4 h-4" />
       Buat Permohonan Baru
-    </button>
+    </Link>
   </div>
 </template>

@@ -77,7 +77,7 @@ const contentDocument = computed(() => {
       <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <Link
           href="/artikel"
-          class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-950"
+          class="inline-flex items-center gap-2 rounded-md text-sm font-medium text-slate-600 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 motion-reduce:transition-none"
         >
           <ArrowLeft class="h-4 w-4" />
           Kembali ke Artikel
@@ -96,14 +96,14 @@ const contentDocument = computed(() => {
               :views="article.views"
               :show-views="true"
               container-class="flex flex-wrap items-center gap-3 text-sm text-slate-500"
-              category-class="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700"
+              category-class="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase text-emerald-700"
             />
 
-            <h1 class="mt-6 max-w-4xl font-['Space_Grotesk'] text-4xl font-semibold leading-[1.02] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+            <h1 class="mt-6 max-w-4xl text-balance text-4xl font-semibold leading-[1.02] text-slate-950 sm:text-5xl lg:text-6xl">
               {{ article.title }}
             </h1>
 
-            <p v-if="article.excerpt" class="mt-6 max-w-3xl text-lg leading-8 text-slate-600 sm:text-xl">
+            <p v-if="article.excerpt" class="mt-6 max-w-3xl text-pretty text-lg leading-8 text-slate-600 sm:text-xl">
               {{ article.excerpt }}
             </p>
 
@@ -111,7 +111,7 @@ const contentDocument = computed(() => {
               <span
                 v-for="tag in article.tags"
                 :key="tag"
-                class="rounded-full bg-[#eef2ef] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700"
+                class="rounded-full bg-slate-100 px-3 py-2 text-[11px] font-semibold uppercase text-slate-700"
               >
                 #{{ tag }}
               </span>
@@ -122,9 +122,9 @@ const contentDocument = computed(() => {
             <ArticleCover
               :cover-path="article.cover_image_path"
               :alt="article.title"
-              wrapper-class="aspect-[4/3] overflow-hidden rounded-[2rem] border border-black/5 bg-[#d7ddd3] shadow-[0_24px_70px_rgba(15,23,42,0.10)]"
+              wrapper-class="aspect-[4/3] overflow-hidden rounded-[2rem] border border-black/5 bg-slate-200/70 shadow-[0_24px_70px_rgba(15,23,42,0.10)]"
               image-class="h-full w-full object-cover"
-              fallback-class="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#0f172a,#065f46)] text-sm font-semibold uppercase tracking-[0.24em] text-white/75"
+              fallback-class="flex h-full w-full items-center justify-center bg-slate-950 text-sm font-semibold uppercase text-white/75"
             />
           </div>
         </div>
@@ -136,9 +136,9 @@ const contentDocument = computed(() => {
             <div class="min-w-0 xl:max-w-3xl">
               <div
                 v-if="contentDocument.toc.length"
-                class="mb-10 rounded-[1.75rem] border border-black/5 bg-[#f5f2ea] p-5 xl:hidden"
+                class="mb-10 rounded-[1.75rem] border border-black/5 bg-slate-50 p-5 xl:hidden"
               >
-                <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Daftar Isi</p>
+                <p class="text-[11px] font-semibold uppercase text-slate-500">Daftar isi</p>
                 <nav class="mt-4">
                   <ul class="space-y-2.5">
                     <li
@@ -149,7 +149,10 @@ const contentDocument = computed(() => {
                         item.level === 'h3' ? 'pl-8' : '',
                       ]"
                     >
-                      <a :href="`#${item.id}`" class="text-sm leading-6 text-slate-700 transition hover:text-slate-950">
+                      <a
+                        :href="`#${item.id}`"
+                        class="rounded-md text-sm leading-6 text-slate-700 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 motion-reduce:transition-none"
+                      >
                         {{ item.text }}
                       </a>
                     </li>
@@ -161,8 +164,8 @@ const contentDocument = computed(() => {
             </div>
 
             <aside class="space-y-5 xl:sticky xl:top-28 xl:self-start">
-              <div v-if="contentDocument.toc.length" class="hidden rounded-[1.75rem] border border-black/5 bg-[#f5f2ea] p-5 xl:block">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Daftar Isi</p>
+              <div v-if="contentDocument.toc.length" class="hidden rounded-[1.75rem] border border-black/5 bg-slate-50 p-5 xl:block">
+                <p class="text-[11px] font-semibold uppercase text-slate-500">Daftar isi</p>
                 <nav class="mt-4">
                   <ul class="space-y-2.5">
                     <li
@@ -173,7 +176,10 @@ const contentDocument = computed(() => {
                         item.level === 'h3' ? 'pl-8' : '',
                       ]"
                     >
-                      <a :href="`#${item.id}`" class="block text-sm leading-6 text-slate-700 transition hover:text-slate-950">
+                      <a
+                        :href="`#${item.id}`"
+                        class="block rounded-md text-sm leading-6 text-slate-700 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 motion-reduce:transition-none"
+                      >
                         {{ item.text }}
                       </a>
                     </li>
@@ -182,12 +188,12 @@ const contentDocument = computed(() => {
               </div>
 
               <div class="rounded-[1.75rem] border border-black/5 bg-white/80 p-5 shadow-[0_16px_48px_rgba(15,23,42,0.06)]">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Tentang Artikel Ini</p>
-                <div class="mt-4 space-y-4 text-sm leading-7 text-slate-600">
+                <p class="text-[11px] font-semibold uppercase text-slate-500">Tentang artikel ini</p>
+                <div class="mt-4 space-y-4 text-pretty text-sm leading-7 text-slate-600">
                   <p>Ditulis untuk membantu pembacaan pasar, pemahaman alur penilaian, dan konteks kerja properti yang lebih presisi.</p>
                   <Link
                     href="/artikel"
-                    class="inline-flex items-center gap-2 font-semibold text-slate-950 transition hover:text-emerald-800"
+                    class="inline-flex items-center gap-2 font-semibold text-slate-950 transition hover:text-emerald-800 motion-reduce:transition-none"
                   >
                     Lihat artikel lainnya
                     <ArrowRight class="h-4 w-4" />
@@ -200,16 +206,16 @@ const contentDocument = computed(() => {
       </section>
     </article>
 
-    <section v-if="relatedArticles.length" class="border-t border-black/5 bg-[#f0ebe1]">
+    <section v-if="relatedArticles.length" class="border-t border-black/5 bg-slate-50">
       <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Artikel Terkait</p>
-            <h2 class="mt-2 font-['Space_Grotesk'] text-3xl font-semibold tracking-tight text-slate-950">
+            <p class="text-[11px] font-semibold uppercase text-slate-500">Artikel terkait</p>
+            <h2 class="mt-2 text-balance text-3xl font-semibold text-slate-950">
               Bacaan lanjutan
             </h2>
           </div>
-          <Link href="/artikel" class="text-sm font-semibold text-slate-700 transition hover:text-slate-950">
+          <Link href="/artikel" class="text-sm font-semibold text-slate-700 transition hover:text-slate-950 motion-reduce:transition-none">
             Kembali ke indeks artikel
           </Link>
         </div>
@@ -219,14 +225,14 @@ const contentDocument = computed(() => {
             v-for="related in relatedArticles"
             :key="related.slug"
             :href="route('articles.show', related.slug)"
-            class="group overflow-hidden rounded-[1.75rem] border border-black/5 bg-white/85 shadow-[0_16px_48px_rgba(15,23,42,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(15,23,42,0.10)]"
+            class="group overflow-hidden rounded-[1.75rem] border border-black/5 bg-white/85 shadow-[0_16px_48px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(15,23,42,0.10)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
           >
             <ArticleCover
               :cover-path="related.cover_image_path"
               :alt="related.title"
-              wrapper-class="aspect-[4/3] overflow-hidden bg-[#d8ddd5]"
-              image-class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-              fallback-class="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#0f172a,#1f2937)] text-xs font-semibold uppercase tracking-[0.24em] text-white/75"
+              wrapper-class="aspect-[4/3] overflow-hidden bg-slate-200/70"
+              image-class="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+              fallback-class="flex h-full w-full items-center justify-center bg-slate-950 text-xs font-semibold uppercase text-white/75"
             />
 
             <div class="p-6">
@@ -235,14 +241,14 @@ const contentDocument = computed(() => {
                 :read-source="related.excerpt"
                 :category="related.category"
                 container-class="flex flex-wrap items-center gap-3 text-sm text-slate-500"
-                category-class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-700"
+                category-class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase text-slate-700"
               />
 
-              <h3 class="mt-4 font-['Space_Grotesk'] text-2xl font-semibold leading-tight tracking-tight text-slate-950 transition group-hover:text-emerald-800">
+              <h3 class="mt-4 text-balance text-2xl font-semibold leading-tight text-slate-950 transition group-hover:text-emerald-800 motion-reduce:transition-none">
                 {{ related.title }}
               </h3>
 
-              <p v-if="related.excerpt" class="mt-3 line-clamp-3 text-sm leading-7 text-slate-600">
+              <p v-if="related.excerpt" class="mt-3 line-clamp-3 text-pretty text-sm leading-7 text-slate-600">
                 {{ related.excerpt }}
               </p>
             </div>
@@ -264,7 +270,6 @@ const contentDocument = computed(() => {
 .article-content :deep(h4) {
   font-family: 'Space Grotesk', sans-serif;
   color: #0f172a;
-  letter-spacing: -0.03em;
 }
 
 .article-content :deep(h1) {

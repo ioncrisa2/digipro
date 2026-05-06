@@ -5,15 +5,18 @@ namespace App\Services\Customer;
 use App\Enums\AppraisalStatusEnum;
 use App\Enums\ContractStatusEnum;
 use App\Models\AppraisalRequest;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Signatures\ContractSignatureService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 class CustomerAppraisalWorkflowService
 {
     private const MAX_NEGOTIATION_ROUNDS = 3;
+
+    public function __construct(
+        private readonly ContractSignatureService $contractSignatureService,
+    ) {
+    }
 
     public function resolveUserAppraisalRequest(Request $request, int $id): AppraisalRequest
     {
@@ -129,27 +132,35 @@ class CustomerAppraisalWorkflowService
             throw new RuntimeException('Status saat ini tidak dapat menandatangani kontrak.');
         }
 
-        $snapshot = $this->createSignedContractSnapshot($request, $record, $appraisalService);
+        $keylaToken = trim((string) $request->input('keyla_token'));
+        if ($keylaToken === '') {
+            throw new RuntimeException('Token KEYLA wajib diisi.');
+        }
+
+        $envelope = $this->contractSignatureService->customerSignContract(
+            $request->user(),
+            $record,
+            $appraisalService,
+            $keylaToken,
+        );
+
+        $customerParticipant = $envelope->participants
+            ->firstWhere('role', 'customer');
 
         $record->offerNegotiations()->create([
             'user_id' => $request->user()->id,
-            'action' => 'contract_sign_mock',
+            'action' => 'contract_sign_peruri_customer',
             'round' => $this->countNegotiationRounds($record),
             'offered_fee' => $record->fee_total,
             'selected_fee' => $record->fee_total,
-            'reason' => 'Mock digital signature (clickwrap).',
+            'reason' => 'Peruri SIGN-IT contract signing (KEYLA).',
             'meta' => [
-                'flow' => 'mock_contract_signature',
-                'provider' => 'mock',
-                'method' => 'clickwrap',
-                'signature_id' => $snapshot['signature_id'],
-                'signed_at' => $snapshot['signed_at'],
-                'signed_by_name' => $snapshot['signed_by_name'],
-                'signed_by_email' => $snapshot['signed_by_email'],
-                'ip' => $snapshot['ip'],
-                'user_agent' => $snapshot['user_agent'],
-                'document_hash' => $snapshot['document_hash'],
-                'signed_pdf_path' => $snapshot['signed_pdf_path'],
+                'flow' => 'peruri_contract_signature',
+                'provider' => 'peruri_signit',
+                'model' => 'tier',
+                'signature_envelope_id' => $envelope->id,
+                'external_envelope_id' => $envelope->external_envelope_id,
+                'external_order_id' => $customerParticipant?->external_order_id,
             ],
         ]);
 
@@ -187,63 +198,6 @@ class CustomerAppraisalWorkflowService
         if (empty($record->contract_number) || empty($record->fee_total)) {
             throw new RuntimeException('Data penawaran belum lengkap. Hubungi admin untuk pembaruan penawaran.');
         }
-    }
-
-    private function createSignedContractSnapshot(
-        Request $request,
-        AppraisalRequest $record,
-        AppraisalService $appraisalService,
-    ): array {
-        $signedAt = now();
-        $signatureId = (string) Str::uuid();
-        $signerName = (string) ($request->user()?->name ?? '-');
-        $signerEmail = (string) ($request->user()?->email ?? '-');
-        $userAgent = substr((string) $request->userAgent(), 0, 255);
-        $ipAddress = (string) $request->ip();
-
-        $doc = $appraisalService->buildContractDocumentPayload($record);
-        $doc['accepted_at'] = $signedAt->toDateTimeString();
-        $doc['signature'] = array_merge((array) ($doc['signature'] ?? []), [
-            'is_signed' => true,
-            'signed_at' => $signedAt->toDateTimeString(),
-            'signed_by_name' => $signerName,
-            'signed_by_email' => $signerEmail,
-            'signature_id' => $signatureId,
-            'method' => 'clickwrap',
-            'provider' => 'mock',
-        ]);
-
-        $pdfBinary = Pdf::loadView('pdfs.appraisal-contract-offer', [
-            'doc' => $doc,
-        ])
-            ->setPaper('a4', 'portrait')
-            ->output();
-
-        $documentHash = 'sha256:' . hash('sha256', $pdfBinary);
-        $requestNumber = preg_replace('/[^A-Za-z0-9\-_.]/', '-', (string) ($record->request_number ?? ('REQ-' . $record->id)));
-        $storedName = "signed-contract-{$requestNumber}-{$signedAt->format('YmdHis')}.pdf";
-        $storedPath = "appraisal-requests/{$record->id}/contracts/{$storedName}";
-
-        Storage::disk('public')->put($storedPath, $pdfBinary);
-
-        $record->files()->create([
-            'type' => 'contract_signed_pdf',
-            'path' => $storedPath,
-            'original_name' => "Penawaran-Tertandatangani-{$requestNumber}.pdf",
-            'mime' => 'application/pdf',
-            'size' => strlen($pdfBinary),
-        ]);
-
-        return [
-            'signature_id' => $signatureId,
-            'signed_at' => $signedAt->toIso8601String(),
-            'signed_by_name' => $signerName,
-            'signed_by_email' => $signerEmail,
-            'ip' => $ipAddress,
-            'user_agent' => $userAgent,
-            'document_hash' => $documentHash,
-            'signed_pdf_path' => $storedPath,
-        ];
     }
 
     private function countNegotiationRounds(AppraisalRequest $record): int

@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import { Link } from "@inertiajs/vue3";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,18 +16,9 @@ const props = defineProps({
     type: Object,
     default: null,
   },
-  onNewRequest: {
-    type: Function,
-    required: true,
-  },
-  onOpenDetail: {
-    type: Function,
-    required: true,
-  },
-  onOpenTracking: {
-    type: Function,
-    required: true,
-  },
+  newRequestHref: { type: String, required: true },
+  detailHref: { type: String, default: null },
+  trackingHref: { type: String, default: null },
   onRunPrimaryAction: {
     type: Function,
     required: true,
@@ -58,24 +50,24 @@ const badgeVariant = computed(() => {
     <div class="grid gap-8 xl:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)] xl:items-start">
       <div class="space-y-6">
         <div class="space-y-4">
-          <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+          <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase text-slate-500">
             <Sparkles class="h-3.5 w-3.5" />
             Permohonan Prioritas
           </div>
 
           <div v-if="hasRequest" class="space-y-3">
             <div class="flex flex-wrap items-center gap-2">
-              <h2 class="text-3xl font-semibold tracking-tight text-slate-950">Permohonan yang perlu Anda pantau sekarang</h2>
+              <h2 class="text-balance text-3xl font-semibold text-slate-950">Permohonan yang perlu Anda pantau sekarang</h2>
               <Badge :variant="badgeVariant">{{ featuredRequest.status }}</Badge>
             </div>
-            <p class="max-w-2xl text-sm leading-6 text-slate-600">
+            <p class="max-w-2xl text-pretty text-sm leading-6 text-slate-600">
               Status aktif dan tindakan berikutnya ditampilkan di sini agar Anda bisa langsung melanjutkan proses tanpa membuka detail request lebih dulu.
             </p>
           </div>
 
           <div v-else class="space-y-3">
-            <h2 class="text-3xl font-semibold tracking-tight text-slate-950">Mulai permohonan pertama Anda</h2>
-            <p class="max-w-2xl text-sm leading-6 text-slate-600">
+            <h2 class="text-balance text-3xl font-semibold text-slate-950">Mulai permohonan pertama Anda</h2>
+            <p class="max-w-2xl text-pretty text-sm leading-6 text-slate-600">
               Dashboard akan menampilkan progres, tindakan berikutnya, dan dokumen penting setelah Anda memiliki permohonan penilaian aktif.
             </p>
           </div>
@@ -121,20 +113,26 @@ const badgeVariant = computed(() => {
               <ArrowRight class="mr-2 h-4 w-4" />
               {{ primaryAction.label }}
             </Button>
-            <Button variant="outline" @click="onOpenTracking(featuredRequest)">
-              <FileSearch class="mr-2 h-4 w-4" />
-              Lihat Tracking
+            <Button v-if="trackingHref" variant="outline" as-child>
+              <Link :href="trackingHref">
+                <FileSearch class="mr-2 h-4 w-4" />
+                Lihat Tracking
+              </Link>
             </Button>
-            <Button variant="ghost" @click="onOpenDetail(featuredRequest)">
-              Detail Permohonan
+            <Button v-if="detailHref" variant="ghost" as-child>
+              <Link :href="detailHref">
+                Detail Permohonan
+              </Link>
             </Button>
           </div>
         </div>
 
         <div v-else class="flex flex-wrap gap-2">
-          <Button @click="onNewRequest">
-            <ArrowRight class="mr-2 h-4 w-4" />
-            Buat Permohonan Baru
+          <Button as-child>
+            <Link :href="newRequestHref">
+              <ArrowRight class="mr-2 h-4 w-4" />
+              Buat Permohonan Baru
+            </Link>
           </Button>
         </div>
       </div>
@@ -142,7 +140,7 @@ const badgeVariant = computed(() => {
       <div class="border-t border-slate-200 pt-6 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
         <div v-if="hasRequest" class="space-y-5">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Status Saat Ini</p>
+            <p class="text-xs font-semibold uppercase text-slate-500">Status Saat Ini</p>
             <p class="mt-2 text-lg font-semibold text-slate-950">{{ featuredRequest.progress_summary?.status_label }}</p>
             <p v-if="featuredRequest.progress_summary?.substatus?.label" class="mt-2 text-sm text-slate-600">
               {{ featuredRequest.progress_summary?.substatus?.label }}
@@ -151,22 +149,22 @@ const badgeVariant = computed(() => {
 
           <dl class="divide-y divide-slate-200 rounded-[1.5rem] border border-slate-200 bg-slate-50/70">
             <div class="px-4 py-4">
-              <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Alamat Ringkas</dt>
+              <dt class="text-xs font-semibold uppercase text-slate-500">Alamat Ringkas</dt>
               <dd class="mt-2 text-sm leading-6 text-slate-700">{{ featuredRequest.property }}</dd>
             </div>
             <div class="px-4 py-4">
-              <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Jumlah Aset</dt>
-              <dd class="mt-2 text-2xl font-semibold text-slate-950">{{ featuredRequest.asset_count || 0 }}</dd>
+              <dt class="text-xs font-semibold uppercase text-slate-500">Jumlah Aset</dt>
+              <dd class="mt-2 text-2xl font-semibold tabular-nums text-slate-950">{{ featuredRequest.asset_count || 0 }}</dd>
             </div>
             <div class="px-4 py-4">
-              <dt class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Pembaruan Terakhir</dt>
+              <dt class="text-xs font-semibold uppercase text-slate-500">Pembaruan Terakhir</dt>
               <dd class="mt-2 text-sm text-slate-700">{{ featuredRequest.updated_diff || featuredRequest.updated_at }}</dd>
             </div>
           </dl>
         </div>
 
         <div v-else class="space-y-4">
-          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Belum Ada Aktivitas</p>
+          <p class="text-xs font-semibold uppercase text-slate-500">Belum Ada Aktivitas</p>
           <div class="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
             Setelah permohonan pertama dibuat, area ini akan menunjukkan milestone aktif, tindakan berikutnya, dan akses cepat ke tracking.
           </div>

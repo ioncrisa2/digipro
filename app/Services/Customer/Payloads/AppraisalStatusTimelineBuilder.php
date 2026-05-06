@@ -169,11 +169,22 @@ class AppraisalStatusTimelineBuilder
                     return;
                 }
 
-                if ($action === 'contract_sign_mock') {
+                if ($action === 'contract_sign_peruri_customer') {
                     $append(
-                        "contract_signed_{$item->id}",
+                        "contract_signed_customer_{$item->id}",
                         'Kontrak Ditandatangani',
-                        'Kontrak telah ditandatangani secara digital.',
+                        'Anda menandatangani kontrak secara digital melalui Peruri SIGN-IT. Menunggu tanda tangan Penilai Publik.',
+                        $item->created_at,
+                        'success'
+                    );
+                    return;
+                }
+
+                if ($action === 'contract_sign_peruri_public_appraiser') {
+                    $append(
+                        "contract_signed_public_appraiser_{$item->id}",
+                        'Kontrak Disahkan Penilai Publik',
+                        'Kontrak telah ditandatangani Penilai Publik. PDF final siap diunduh.',
                         $item->created_at,
                         'success'
                     );

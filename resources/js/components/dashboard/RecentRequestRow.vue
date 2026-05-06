@@ -1,4 +1,5 @@
 <script setup>
+import { Link } from "@inertiajs/vue3";
 import { FileText, Calendar, MapPin, Clock, ArrowRight } from "lucide-vue-next";
 
 defineProps({
@@ -10,15 +11,17 @@ defineProps({
     type: Object,
     required: true,
   },
+  href: {
+    type: String,
+    required: true,
+  },
 });
-
-const emit = defineEmits(["view"]);
 </script>
 
 <template>
-  <div
-    @click="emit('view', request)"
-    class="cursor-pointer px-6 py-5 transition-colors hover:bg-slate-50 group sm:px-8"
+  <Link
+    :href="href"
+    class="group block px-6 py-5 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:px-8"
   >
     <div class="flex items-start justify-between gap-4">
       <div class="flex-1 min-w-0">
@@ -62,8 +65,8 @@ const emit = defineEmits(["view"]);
       </div>
 
       <ArrowRight
-        class="w-5 h-5 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-1 transition-all shrink-0"
+        class="w-5 h-5 shrink-0 text-slate-400 transition-transform duration-150 group-hover:translate-x-1 group-hover:text-slate-600 motion-reduce:transform-none motion-reduce:transition-none"
       />
     </div>
-  </div>
+  </Link>
 </template>

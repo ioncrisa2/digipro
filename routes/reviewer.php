@@ -6,6 +6,7 @@ use App\Http\Controllers\Reviewer\AssetController;
 use App\Http\Controllers\Reviewer\BtbController;
 use App\Http\Controllers\Reviewer\ComparableController;
 use App\Http\Controllers\Reviewer\DashboardController;
+use App\Http\Controllers\Reviewer\PublicAppraiserContractController;
 use App\Http\Controllers\Reviewer\ReviewController;
 use App\Support\SystemNavigation;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +32,10 @@ Route::middleware(['auth', 'verified', 'reviewer.role'])
             ->group(function (): void {
                 Route::get('/reviews', [ReviewController::class, 'index'])->name('reviews.index');
                 Route::get('/reviews/{review}', [ReviewController::class, 'show'])->name('reviews.show');
+                Route::get('/contract-signatures', [PublicAppraiserContractController::class, 'index'])->name('contract-signatures.index');
+                Route::get('/contract-signatures/{appraisalRequest}', [PublicAppraiserContractController::class, 'show'])->name('contract-signatures.show');
+                Route::post('/contract-signatures/{appraisalRequest}/sign', [PublicAppraiserContractController::class, 'sign'])->name('contract-signatures.sign');
+                Route::post('/contract-signatures/bulk-sign', [PublicAppraiserContractController::class, 'bulkSign'])->name('contract-signatures.bulk-sign');
 
                 Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
                 Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');

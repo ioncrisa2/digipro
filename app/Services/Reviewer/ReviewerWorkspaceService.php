@@ -40,6 +40,55 @@ class ReviewerWorkspaceService
         ];
     }
 
+    public function reviewQueueOptions(array $summary = []): array
+    {
+        return [
+            [
+                'value' => 'all',
+                'label' => 'Semua Queue',
+                'description' => 'Lihat seluruh permohonan aktif reviewer.',
+                'count' => (int) ($summary['total'] ?? 0),
+                'status' => 'all',
+            ],
+            [
+                'value' => 'ready_review',
+                'label' => 'Siap Review',
+                'description' => 'Kontrak selesai dan review bisa dimulai.',
+                'count' => (int) ($summary['siap_review'] ?? 0),
+                'status' => AppraisalStatusEnum::ContractSigned->value,
+            ],
+            [
+                'value' => 'in_progress',
+                'label' => 'Sedang Review',
+                'description' => 'Valuasi sedang berjalan dan perlu dilanjutkan.',
+                'count' => (int) ($summary['sedang_review'] ?? 0),
+                'status' => AppraisalStatusEnum::ValuationOnProgress->value,
+            ],
+            [
+                'value' => 'ready_preview',
+                'label' => 'Siap Preview',
+                'description' => 'Hasil review siap dikirim ke customer.',
+                'count' => (int) ($summary['siap_preview'] ?? 0),
+                'status' => AppraisalStatusEnum::ValuationCompleted->value,
+            ],
+        ];
+    }
+
+    public function resolveReviewStatusFilter(array $filters): string
+    {
+        $status = (string) ($filters['status'] ?? 'all');
+        if ($status !== '' && $status !== 'all') {
+            return $status;
+        }
+
+        return match ((string) ($filters['queue'] ?? 'all')) {
+            'ready_review' => AppraisalStatusEnum::ContractSigned->value,
+            'in_progress' => AppraisalStatusEnum::ValuationOnProgress->value,
+            'ready_preview' => AppraisalStatusEnum::ValuationCompleted->value,
+            default => 'all',
+        };
+    }
+
     public function statusPayload(mixed $status): array
     {
         $value = $this->enumValue($status) ?? '-';
@@ -53,6 +102,8 @@ class ReviewerWorkspaceService
 
     public function serializeReviewListItem(AppraisalRequest $record): array
     {
+        $statusValue = $this->enumValue($record->status);
+
         return [
             'id' => $record->id,
             'request_number' => $record->request_number ?? ('REQ-' . $record->id),
@@ -62,6 +113,7 @@ class ReviewerWorkspaceService
             'contract_number' => $record->contract_number,
             'requested_at' => optional($record->requested_at)?->toDateTimeString(),
             'detail_url' => route('reviewer.reviews.show', $record),
+            'next_action' => $this->nextReviewAction($statusValue, $record),
         ];
     }
 
@@ -293,5 +345,34 @@ class ReviewerWorkspaceService
         }
 
         return preg_replace('/^http:\/\//i', 'https://', $url) ?: $url;
+    }
+
+    /**
+     * @return array{label:string,description:string,url:string}
+     */
+    private function nextReviewAction(?string $status, AppraisalRequest $record): array
+    {
+        return match ($status) {
+            AppraisalStatusEnum::ContractSigned->value => [
+                'label' => 'Mulai Review',
+                'description' => 'Buka detail request lalu mulai proses valuasi.',
+                'url' => route('reviewer.reviews.show', $record),
+            ],
+            AppraisalStatusEnum::ValuationOnProgress->value => [
+                'label' => 'Lanjutkan Review',
+                'description' => 'Teruskan adjustment dan finalisasi nilai aset.',
+                'url' => route('reviewer.reviews.show', $record),
+            ],
+            AppraisalStatusEnum::ValuationCompleted->value => [
+                'label' => 'Kirim Preview',
+                'description' => 'Cek detail akhir sebelum preview dikirim ke customer.',
+                'url' => route('reviewer.reviews.show', $record),
+            ],
+            default => [
+                'label' => 'Buka Detail',
+                'description' => 'Lihat detail request.',
+                'url' => route('reviewer.reviews.show', $record),
+            ],
+        };
     }
 }

@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import ReviewerLayout from '@/layouts/ReviewerLayout.vue';
 import StatusBadge from '@/components/reviewer/StatusBadge.vue';
@@ -10,16 +11,18 @@ const props = defineProps({
   stats: { type: Object, default: () => ({}) },
   featuredReview: { type: Object, default: null },
   focusSummary: { type: Object, default: () => ({}) },
+  reviewWorkQueues: { type: Array, default: () => [] },
   queuePreview: { type: Array, default: () => [] },
   assetPreview: { type: Array, default: () => [] },
   activityPreview: { type: Array, default: () => [] },
+  signingWorkspace: { type: Object, default: null },
 });
 
 const workloadItems = [
-  { key: 'total_queue', label: 'Total queue aktif' },
+  { key: 'total_queue', label: 'Queue aktif' },
   { key: 'ready_review', label: 'Siap dimulai' },
   { key: 'in_progress', label: 'Sedang dikerjakan' },
-  { key: 'assets_need_adjustment', label: 'Aset perlu penyesuaian' },
+  { key: 'assets_need_adjustment', label: 'Perlu penyesuaian' },
 ];
 
 const analyticsItems = [
@@ -28,6 +31,33 @@ const analyticsItems = [
   { key: 'aset_sudah_nilai_final', label: 'Sudah nilai final' },
   { key: 'selected_comparables', label: 'Comparable dipakai' },
 ];
+
+const reviewerSummary = computed(() => [
+  {
+    key: 'total-queue',
+    label: 'Queue aktif',
+    value: props.stats.total_queue ?? 0,
+    helper: 'Permohonan di workspace reviewer',
+  },
+  {
+    key: 'ready-review',
+    label: 'Siap dimulai',
+    value: props.stats.ready_review ?? 0,
+    helper: 'Bisa langsung dibuka',
+  },
+  {
+    key: 'adjustment',
+    label: 'Butuh penyesuaian',
+    value: props.stats.assets_need_adjustment ?? 0,
+    helper: 'Aset menunggu tindak lanjut',
+  },
+  {
+    key: 'activity',
+    label: 'Aktivitas hari ini',
+    value: props.stats.comparables_touched_today ?? 0,
+    helper: 'Comparable disentuh hari ini',
+  },
+]);
 </script>
 
 <template>
@@ -35,109 +65,132 @@ const analyticsItems = [
 
   <ReviewerLayout title="Dashboard Reviewer">
     <div class="space-y-6">
-      <section>
-        <h1 class="text-3xl font-semibold tracking-tight text-slate-950">Dashboard Reviewer</h1>
-        <p class="mt-2 text-sm text-slate-600">
-          Buka antrean paling penting, lihat aset yang masih tertahan, dan pantau aktivitas penyesuaian tanpa berpindah-pindah modul.
-        </p>
-      </section>
+      <section class="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.95fr)]">
+        <div class="space-y-6">
+          <section>
+            <h1 class="text-balance text-3xl font-semibold text-slate-950">Dashboard Reviewer</h1>
+            <p class="mt-2 text-pretty text-sm text-slate-600">
+              Buka antrean paling penting, lihat aset yang masih tertahan, dan pantau aktivitas penyesuaian tanpa berpindah-pindah modul.
+            </p>
+          </section>
 
-      <section class="grid gap-6 xl:grid-cols-[1.35fr_0.9fr]">
-        <div class="overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-sm">
-          <div class="grid gap-0 xl:grid-cols-[1.2fr_0.8fr]">
-            <div class="border-b border-slate-200/80 p-6 xl:border-r xl:border-b-0 xl:p-8">
-              <div class="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" class="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-slate-600">
-                  Fokus Reviewer
-                </Badge>
-                <StatusBadge v-if="featuredReview?.status" :status="featuredReview.status" />
-              </div>
-
-              <div class="mt-5 space-y-3">
-                <h2 class="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-slate-950">
-                  {{ featuredReview?.request_number ? `Permohonan ${featuredReview.request_number} paling relevan untuk dibuka sekarang` : 'Belum ada permohonan aktif di area reviewer' }}
-                </h2>
-                <p class="max-w-2xl text-sm leading-7 text-slate-600">
-                  {{
-                    featuredReview
-                      ? 'Prioritaskan permohonan ini untuk menjaga alur review tetap bergerak. Gunakan detail request untuk membuka aset utama dan lanjut ke adjustment.'
-                      : 'Queue reviewer sedang kosong. Saat permohonan baru masuk, sistem akan menempatkannya di area ini.'
-                  }}
-                </p>
-              </div>
-
-              <div v-if="featuredReview" class="mt-6 flex flex-wrap gap-6 text-sm text-slate-600">
-                <div>
-                  <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Klien</div>
-                  <div class="mt-1 font-medium text-slate-950">{{ featuredReview.client_name }}</div>
+          <section class="overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-sm">
+            <div class="grid gap-0 xl:grid-cols-[1.2fr_0.8fr]">
+              <div class="border-b border-slate-200/80 p-6 xl:border-r xl:border-b-0 xl:p-8">
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" class="rounded-full px-3 py-1 text-[11px] uppercase text-slate-600">
+                    Fokus Reviewer
+                  </Badge>
+                  <StatusBadge v-if="featuredReview?.status" :status="featuredReview.status" />
                 </div>
-                <div>
-                  <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Jumlah Aset</div>
-                  <div class="mt-1 font-medium text-slate-950">{{ featuredReview.assets_count }}</div>
+
+                <div class="mt-5 space-y-3">
+                  <h2 class="text-balance max-w-3xl text-3xl font-semibold leading-tight text-slate-950">
+                    {{ featuredReview?.request_number ? `Permohonan ${featuredReview.request_number} paling relevan untuk dibuka sekarang` : 'Belum ada permohonan aktif di area reviewer' }}
+                  </h2>
+                  <p class="max-w-2xl text-pretty text-sm leading-7 text-slate-600">
+                    {{
+                      featuredReview
+                        ? 'Prioritaskan permohonan ini untuk menjaga alur review tetap bergerak. Gunakan detail request untuk membuka aset utama dan lanjut ke adjustment.'
+                        : 'Queue reviewer sedang kosong. Saat permohonan baru masuk, sistem akan menempatkannya di area ini.'
+                    }}
+                  </p>
                 </div>
-                <div>
-                  <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Masuk Queue</div>
-                  <div class="mt-1 font-medium text-slate-950">{{ formatDateTime(featuredReview.requested_at) }}</div>
+
+                <div v-if="featuredReview" class="mt-6 flex flex-wrap gap-6 text-sm text-slate-600">
+                  <div>
+                    <div class="text-[11px] font-semibold uppercase text-slate-500">Klien</div>
+                    <div class="mt-1 font-medium text-slate-950">{{ featuredReview.client_name }}</div>
+                  </div>
+                  <div>
+                    <div class="text-[11px] font-semibold uppercase text-slate-500">Jumlah aset</div>
+                    <div class="mt-1 font-medium tabular-nums text-slate-950">{{ featuredReview.assets_count }}</div>
+                  </div>
+                  <div>
+                    <div class="text-[11px] font-semibold uppercase text-slate-500">Masuk queue</div>
+                    <div class="mt-1 font-medium text-slate-950">{{ formatDateTime(featuredReview.requested_at) }}</div>
+                  </div>
+                </div>
+
+                <div class="mt-8 flex flex-wrap gap-3">
+                  <Button v-if="featuredReview?.detail_url" as-child>
+                    <Link :href="featuredReview.detail_url">Buka Detail Review</Link>
+                  </Button>
+                  <Button variant="outline" as-child>
+                    <Link :href="route('reviewer.reviews.index')">Lihat Semua Queue</Link>
+                  </Button>
+                  <Button variant="ghost" class="text-slate-700" as-child>
+                    <Link :href="route('reviewer.assets.index')">Buka Aset</Link>
+                  </Button>
                 </div>
               </div>
 
-              <div class="mt-8 flex flex-wrap gap-3">
-                <Button v-if="featuredReview?.detail_url" as-child>
-                  <Link :href="featuredReview.detail_url">Buka Detail Review</Link>
-                </Button>
-                <Button variant="outline" as-child>
-                  <Link :href="route('reviewer.reviews.index')">Lihat Semua Queue</Link>
-                </Button>
-                <Button variant="ghost" class="text-slate-700" as-child>
-                  <Link :href="route('reviewer.assets.index')">Buka Aset</Link>
-                </Button>
-              </div>
-            </div>
+              <div class="p-6 xl:p-8">
+                <div class="space-y-6">
+                  <div>
+                    <p class="text-[11px] font-semibold uppercase text-slate-500">Beban kerja saat ini</p>
+                    <div class="mt-4 space-y-4">
+                      <div v-for="item in workloadItems" :key="item.key" class="flex items-end justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+                        <div class="text-sm text-slate-600">{{ item.label }}</div>
+                        <div class="text-2xl font-semibold tabular-nums text-slate-950">{{ stats[item.key] ?? 0 }}</div>
+                      </div>
+                    </div>
+                  </div>
 
-            <div class="p-6 xl:p-8">
-              <div class="space-y-6">
-                <div>
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Beban Kerja Saat Ini</p>
-                  <div class="mt-4 space-y-4">
-                    <div v-for="item in workloadItems" :key="item.key" class="flex items-end justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
-                      <div class="text-sm text-slate-600">{{ item.label }}</div>
-                      <div class="text-2xl font-semibold tracking-tight text-slate-950">{{ stats[item.key] ?? 0 }}</div>
+                  <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
+                    <p class="text-[11px] font-semibold uppercase text-slate-500">Aktivitas hari ini</p>
+                    <div class="mt-3 flex items-end justify-between gap-4">
+                      <div class="text-sm text-slate-600">Comparable terpilih yang disentuh hari ini</div>
+                      <div class="text-3xl font-semibold tabular-nums text-slate-950">{{ stats.comparables_touched_today ?? 0 }}</div>
                     </div>
                   </div>
                 </div>
-
-                <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Aktivitas Hari Ini</p>
-                  <div class="mt-3 flex items-end justify-between gap-4">
-                    <div class="text-sm text-slate-600">Comparable terpilih yang disentuh hari ini</div>
-                    <div class="text-3xl font-semibold tracking-tight text-slate-950">{{ stats.comparables_touched_today ?? 0 }}</div>
-                  </div>
-                </div>
               </div>
             </div>
-          </div>
+          </section>
         </div>
 
-        <div class="overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-sm">
-          <div class="border-b border-slate-200/80 px-6 py-5">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Analitik Portofolio</p>
-            <p class="mt-2 text-sm text-slate-600">Ringkasan progres aset aktif yang sedang berada di workspace reviewer.</p>
-          </div>
-          <div class="px-6 py-5">
-            <div class="space-y-4">
-              <div v-for="item in analyticsItems" :key="item.key" class="flex items-end justify-between gap-4 border-b border-slate-100 pb-4 last:border-b-0 last:pb-0">
-                <div>
+        <div class="space-y-6">
+          <section class="rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div class="space-y-2">
+              <p class="text-xs font-semibold uppercase text-slate-500">Ringkasan Reviewer</p>
+              <h2 class="text-lg font-semibold text-slate-950">Angka yang perlu dipantau sekarang</h2>
+              <p class="text-pretty text-sm text-slate-600">
+                Queue, kesiapan review, dan beban penyesuaian diringkas di sini supaya prioritas kerja langsung terbaca.
+              </p>
+            </div>
+            <dl class="mt-5 grid gap-3 sm:grid-cols-2">
+              <div
+                v-for="item in reviewerSummary"
+                :key="item.key"
+                class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
+              >
+                <dt class="text-[11px] font-semibold uppercase text-slate-500">{{ item.label }}</dt>
+                <dd class="mt-2 text-3xl font-semibold tabular-nums text-slate-950">{{ item.value }}</dd>
+                <p class="mt-2 text-sm text-slate-600">{{ item.helper }}</p>
+              </div>
+            </dl>
+          </section>
+
+          <section class="overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-sm">
+            <div class="border-b border-slate-200/80 px-6 py-5">
+              <p class="text-[11px] font-semibold uppercase text-slate-500">Analitik Portofolio</p>
+              <p class="mt-2 text-sm text-slate-600">Ringkasan progres aset aktif yang sedang berada di workspace reviewer.</p>
+            </div>
+            <div class="px-6 py-5">
+              <div class="space-y-4">
+                <div v-for="item in analyticsItems" :key="item.key" class="flex items-end justify-between gap-4 border-b border-slate-100 pb-4 last:border-b-0 last:pb-0">
                   <div class="text-sm text-slate-700">{{ item.label }}</div>
+                  <div class="text-3xl font-semibold tabular-nums text-slate-950">{{ focusSummary[item.key] ?? 0 }}</div>
                 </div>
-                <div class="text-3xl font-semibold tracking-tight text-slate-950">{{ focusSummary[item.key] ?? 0 }}</div>
               </div>
             </div>
-          </div>
+          </section>
         </div>
       </section>
 
       <section class="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <div class="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-sm">
+        <section class="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-sm">
           <div class="flex items-center justify-between gap-4 border-b border-slate-200/80 px-6 py-5">
             <div>
               <h2 class="text-lg font-semibold text-slate-950">Queue Permohonan</h2>
@@ -164,9 +217,9 @@ const analyticsItems = [
               Belum ada permohonan aktif di queue reviewer.
             </div>
           </div>
-        </div>
+        </section>
 
-        <div class="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-sm">
+        <section class="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-sm">
           <div class="flex items-center justify-between gap-4 border-b border-slate-200/80 px-6 py-5">
             <div>
               <h2 class="text-lg font-semibold text-slate-950">Aset Perlu Perhatian</h2>
@@ -208,6 +261,64 @@ const analyticsItems = [
               Belum ada aset yang perlu perhatian khusus.
             </div>
           </div>
+        </section>
+
+        <section
+          v-if="signingWorkspace"
+          class="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-sm"
+        >
+          <div class="flex items-center justify-between gap-4 border-b border-slate-200/80 px-6 py-5">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-950">Queue Tanda Tangan Kontrak</h2>
+              <p class="mt-1 text-sm text-slate-600">Antrean kontrak yang menunggu token KEYLA dari akun penilai publik Anda.</p>
+            </div>
+            <Button variant="outline" size="sm" as-child>
+              <Link :href="signingWorkspace.queue_url">Buka Queue Sign</Link>
+            </Button>
+          </div>
+
+          <div class="grid gap-4 px-6 py-5 sm:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <div class="text-[11px] font-semibold uppercase text-slate-500">Siap Sign</div>
+              <div class="mt-2 text-3xl font-semibold tabular-nums text-slate-950">{{ signingWorkspace.ready_count ?? 0 }}</div>
+              <p class="mt-2 text-sm text-slate-600">Kontrak yang customer-nya sudah sign dan siap Anda otorisasi.</p>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <div class="text-[11px] font-semibold uppercase text-slate-500">Perlu Diulang</div>
+              <div class="mt-2 text-3xl font-semibold tabular-nums text-slate-950">{{ signingWorkspace.failed_count ?? 0 }}</div>
+              <p class="mt-2 text-sm text-slate-600">Flow gagal yang perlu dicek ulang dari detail request sebelum sign ulang.</p>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-sm">
+        <div class="flex items-center justify-between gap-4 border-b border-slate-200/80 px-6 py-5">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-950">Antrean Kerja Reviewer</h2>
+            <p class="mt-1 text-sm text-slate-600">Masuk ke queue yang sesuai tahap kerja tanpa perlu mulai dari daftar lengkap.</p>
+          </div>
+          <Button variant="outline" size="sm" as-child>
+            <Link :href="route('reviewer.reviews.index')">Buka Queue Lengkap</Link>
+          </Button>
+        </div>
+
+        <div class="grid gap-4 px-6 py-5 md:grid-cols-2 xl:grid-cols-4">
+          <Link
+            v-for="queue in reviewWorkQueues"
+            :key="queue.value"
+            :href="queue.url"
+            class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 transition hover:border-slate-300 hover:bg-white"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="text-[11px] font-semibold uppercase text-slate-500">Antrean</div>
+                <div class="mt-2 text-lg font-semibold text-slate-950">{{ queue.label }}</div>
+              </div>
+              <div class="text-3xl font-semibold tabular-nums text-slate-950">{{ queue.count ?? 0 }}</div>
+            </div>
+            <p class="mt-3 text-sm text-slate-600">{{ queue.description }}</p>
+          </Link>
         </div>
       </section>
 
@@ -231,12 +342,12 @@ const analyticsItems = [
               <p class="mt-1 text-sm text-slate-700">{{ activity.request_number }} • {{ activity.asset_address }}</p>
             </div>
             <div>
-              <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Penyesuaian</div>
+              <div class="text-xs font-semibold uppercase text-slate-500">Penyesuaian</div>
               <div class="mt-1 text-sm text-slate-950">{{ formatPercent(activity.total_adjustment_percent ?? 0) }}</div>
               <div class="mt-1 text-xs text-slate-500">{{ activity.adjustment_factors }} faktor</div>
             </div>
             <div>
-              <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nilai / m2</div>
+              <div class="text-xs font-semibold uppercase text-slate-500">Nilai / m2</div>
               <div class="mt-1 text-sm text-slate-950">{{ formatCurrency(activity.adjusted_unit_value) }}</div>
               <div class="mt-1 text-xs text-slate-500">{{ formatDateTime(activity.updated_at) }}</div>
             </div>

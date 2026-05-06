@@ -35,7 +35,7 @@ const errorMessage = computed(() => {
       <div class="p-3 bg-slate-900 text-white rounded-2xl mb-2 shadow-lg shadow-slate-200">
         <ShieldCheck class="w-6 h-6" />
       </div>
-      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Verifikasi 2FA</h1>
+      <h1 class="text-2xl font-semibold text-slate-900">Verifikasi 2FA</h1>
       <p class="text-sm text-slate-500">Masukkan kode dari aplikasi autentikator Anda.</p>
       <p v-if="email" class="text-xs text-slate-400">Akun: {{ email }}</p>
     </div>
@@ -82,7 +82,7 @@ const errorMessage = computed(() => {
 
       <Button
         type="submit"
-        class="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-md"
+        class="w-full h-11 bg-slate-900 text-white shadow-md transition-[background-color,box-shadow] duration-150 hover:bg-slate-800 motion-reduce:transition-none"
         :disabled="form.processing"
       >
         <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />

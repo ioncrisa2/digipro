@@ -92,6 +92,33 @@ class AppraisalRequestAdminWorkflowService
         $this->reportPdfService->generateDraft($record->fresh());
     }
 
+    public function saveContractSignerConfiguration(AppraisalRequest $record, int $actorId, array $validated): void
+    {
+        $status = $record->status?->value ?? (string) $record->status;
+        if ($status !== AppraisalStatusEnum::WaitingSignature->value) {
+            throw new RuntimeException('Penandatangan kontrak hanya bisa diatur saat status menunggu tanda tangan.');
+        }
+
+        $publicAppraiserSigner = ReportSigner::query()->findOrFail($validated['contract_public_appraiser_signer_id']);
+
+        if ($publicAppraiserSigner->role !== 'public_appraiser' || ! $publicAppraiserSigner->is_active) {
+            throw new RuntimeException('Penilai publik yang dipilih tidak valid.');
+        }
+
+        if (blank($publicAppraiserSigner->email) || blank($publicAppraiserSigner->user_id)) {
+            throw new RuntimeException('Profil penilai publik belum lengkap (email Peruri / user login).');
+        }
+
+        $record->update([
+            'contract_public_appraiser_signer_id' => $publicAppraiserSigner->id,
+            'contract_signer_snapshot' => [
+                'public_appraiser' => $this->contractSignerSnapshot($publicAppraiserSigner),
+                'configured_at' => now()->toDateTimeString(),
+                'configured_by' => $actorId,
+            ],
+        ]);
+    }
+
     public function uploadFinalReport(AppraisalRequest $record, UploadedFile $file, int $actorId): void
     {
         $oldStatus = $record->status?->label() ?? AppraisalStatusEnum::ReportPreparation->label();
@@ -114,6 +141,14 @@ class AppraisalRequestAdminWorkflowService
             'title_suffix' => $signer->title_suffix,
             'certification_number' => $signer->certification_number,
         ];
+    }
+
+    private function contractSignerSnapshot(ReportSigner $signer): array
+    {
+        return array_merge($this->signerSnapshot($signer), [
+            'email' => $signer->email,
+            'user_id' => $signer->user_id,
+        ]);
     }
 
     private function ensureReportPreparation(AppraisalRequest $record, string $message): void

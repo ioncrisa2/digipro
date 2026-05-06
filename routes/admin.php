@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\BuildingEconomicLifeController;
 use App\Http\Controllers\Admin\CommunicationController;
 use App\Http\Controllers\Admin\ContentController;
 use App\Http\Controllers\Admin\ContentLegalController;
+use App\Http\Controllers\Admin\ContractSignatureController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\IkkByProvinceController;
@@ -25,6 +26,14 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
     ->name('admin.')
     ->group(function (): void {
         Route::get('/', [AdminDashboardController::class, 'entry'])->name('dashboard');
+
+        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_APPRAISAL_REQUESTS)
+            ->prefix('signatures')
+            ->name('signatures.')
+            ->group(function (): void {
+                Route::get('/contracts', [ContractSignatureController::class, 'index'])->name('contracts.index');
+                Route::post('/contracts/{appraisalRequest}/sign', [ContractSignatureController::class, 'sign'])->name('contracts.sign');
+            });
 
         Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_APPRAISAL_REQUESTS)
             ->prefix('permohonan-penilaian')
@@ -47,6 +56,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::post('/{appraisalRequest}/revision-items/{revisionItem}/approve', [AppraisalRequestWorkflowController::class, 'approveRevisionItem'])->name('revision-items.approve');
                 Route::post('/{appraisalRequest}/revision-items/{revisionItem}/reject', [AppraisalRequestWorkflowController::class, 'rejectRevisionItem'])->name('revision-items.reject');
                 Route::post('/{appraisalRequest}/contract-signed', [AppraisalRequestWorkflowController::class, 'markContractSigned'])->name('actions.contract-signed');
+                Route::post('/{appraisalRequest}/contract-signer', [AppraisalRequestWorkflowController::class, 'saveContractSigner'])->name('actions.contract-signer');
                 Route::post('/{appraisalRequest}/verify-payment', [AppraisalRequestWorkflowController::class, 'verifyPayment'])->name('actions.verify-payment');
                 Route::post('/{appraisalRequest}/physical-report', [AppraisalRequestWorkflowController::class, 'updatePhysicalReport'])->name('actions.physical-report.update');
                 Route::post('/{appraisalRequest}/send-offer', [AppraisalRequestWorkflowController::class, 'sendOffer'])->name('actions.send-offer');
@@ -177,6 +187,11 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::post('/penandatangan-report', [ReportSignerController::class, 'store'])->name('report-signers.store');
                 Route::get('/penandatangan-report/{reportSigner}/edit', [ReportSignerController::class, 'edit'])->name('report-signers.edit');
                 Route::put('/penandatangan-report/{reportSigner}', [ReportSignerController::class, 'update'])->name('report-signers.update');
+                Route::post('/penandatangan-report/{reportSigner}/refresh-readiness', [ReportSignerController::class, 'refreshReadiness'])->name('report-signers.refresh-readiness');
+                Route::post('/penandatangan-report/{reportSigner}/peruri/register-user', [ReportSignerController::class, 'registerPeruriUser'])->name('report-signers.peruri.register-user');
+                Route::post('/penandatangan-report/{reportSigner}/peruri/submit-kyc', [ReportSignerController::class, 'submitPeruriKyc'])->name('report-signers.peruri.submit-kyc');
+                Route::post('/penandatangan-report/{reportSigner}/peruri/set-specimen', [ReportSignerController::class, 'setPeruriSpecimen'])->name('report-signers.peruri.set-specimen');
+                Route::post('/penandatangan-report/{reportSigner}/peruri/register-keyla', [ReportSignerController::class, 'registerPeruriKeyla'])->name('report-signers.peruri.register-keyla');
                 Route::delete('/penandatangan-report/{reportSigner}', [ReportSignerController::class, 'destroy'])->name('report-signers.destroy');
 
                 Route::get('/provinsi', [MasterDataController::class, 'provincesIndex'])->name('provinces.index');

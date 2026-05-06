@@ -43,7 +43,8 @@ class AppraisalRequestAdminPresenter
             'counter_request' => 'Pengajuan negosiasi',
             'selected' => 'Fee dipilih',
             'accept_offer', 'accepted' => 'Penawaran diterima',
-            'contract_sign_mock' => 'Tanda tangan kontrak',
+            'contract_sign_peruri_customer' => 'Tanda tangan kontrak (Customer)',
+            'contract_sign_peruri_public_appraiser' => 'Tanda tangan kontrak (Penilai Publik)',
             'cancel_request' => 'Permohonan dibatalkan',
             'cancelled' => 'Permohonan dibatalkan sistem',
             default => Str::headline((string) $action),
@@ -54,7 +55,7 @@ class AppraisalRequestAdminPresenter
     {
         return match ((string) $action) {
             'counter_request' => 'warning',
-            'accept_offer', 'accepted', 'contract_sign_mock' => 'success',
+            'accept_offer', 'accepted', 'contract_sign_peruri_customer', 'contract_sign_peruri_public_appraiser' => 'success',
             'cancel_request', 'cancelled' => 'danger',
             'offer_sent', 'offer_revised' => 'info',
             default => 'default',

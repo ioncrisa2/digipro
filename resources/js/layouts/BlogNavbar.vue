@@ -5,6 +5,7 @@ import { ArrowRight, Menu, Search } from 'lucide-vue-next'
 import BrandLockup from '@/components/brand/BrandLockup.vue'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import NotificationCenter from '@/components/ui/notification/NotificationCenter.vue'
 
 const page = usePage()
 const isScrolled = ref(false)
@@ -61,11 +62,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <NotificationCenter />
+
   <nav
-    class="sticky top-0 z-50 transition-all duration-300"
+    class="sticky top-0 z-50 transition-[background-color,border-color,box-shadow,opacity,transform] duration-200 motion-reduce:transition-none"
     :class="
       isScrolled
-        ? 'border-b border-white/70 bg-[#f7f4ed]/92 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl'
+        ? 'border-b border-slate-200/80 bg-white/95 shadow-[0_8px_30px_rgba(15,23,42,0.08)]'
         : 'bg-transparent'
     "
   >
@@ -78,7 +81,7 @@ onBeforeUnmount(() => {
       </Link>
 
       <div class="hidden flex-1 items-center justify-center lg:flex">
-        <div class="flex items-center gap-1 rounded-full border border-white/70 bg-white/75 p-1 shadow-sm backdrop-blur">
+        <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-white/90 p-1 shadow-sm">
           <Link
             :href="route('articles.index')"
             class="rounded-full px-4 py-2 text-sm font-medium transition"
@@ -103,19 +106,19 @@ onBeforeUnmount(() => {
       </div>
 
       <form
-        class="hidden items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-2 shadow-sm backdrop-blur xl:flex"
+        class="hidden items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-slate-900/20 focus-within:ring-offset-2 focus-within:ring-offset-white xl:flex"
         @submit.prevent="submitSearch"
       >
         <Search class="h-4 w-4 text-slate-400" />
         <input
           v-model="searchQuery"
           type="search"
-          placeholder="Cari insight penilaian..."
-          class="w-44 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+          placeholder="Cari insight penilaian…"
+          class="w-44 bg-transparent text-base text-slate-700 outline-none placeholder:text-slate-400 md:text-sm"
         />
         <select
           v-model="searchScope"
-          class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 outline-none"
+          class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
         >
           <option v-for="option in searchOptions" :key="option.value" :value="option.value">
             {{ option.label }}
@@ -138,13 +141,16 @@ onBeforeUnmount(() => {
       <div class="ml-auto lg:hidden">
         <Sheet>
           <SheetTrigger as-child>
-            <Button variant="ghost" size="icon" class="h-11 w-11 rounded-full border border-white/70 bg-white/80 shadow-sm">
+            <Button aria-label="Buka menu" variant="ghost" size="icon" class="h-11 w-11 rounded-full border border-slate-200 bg-white/80 shadow-sm">
               <Menu class="h-5 w-5 text-slate-900" />
             </Button>
           </SheetTrigger>
 
-          <SheetContent side="right" class="w-[22rem] border-l-white/60 bg-[#f7f4ed]">
-            <SheetHeader>
+          <SheetContent
+            side="right"
+            class="border-l border-slate-200 bg-white px-6 pt-[calc(env(safe-area-inset-top)+1.75rem)] pb-[calc(env(safe-area-inset-bottom)+1.75rem)] overflow-y-auto overscroll-contain sm:px-7"
+          >
+            <SheetHeader class="pr-12">
               <SheetTitle class="text-left">
                 <BrandLockup
                   wrapper-class="border border-black/5 bg-white"
@@ -153,22 +159,23 @@ onBeforeUnmount(() => {
               </SheetTitle>
             </SheetHeader>
 
-            <div class="mt-8 space-y-8">
+            <div class="mt-6 space-y-6">
               <form class="space-y-3" @submit.prevent="submitSearch">
-                <label class="block text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+                <label class="block text-[11px] font-semibold uppercase text-slate-500">
                   Cari Artikel
                 </label>
-                <div class="rounded-3xl border border-white/70 bg-white/85 p-3 shadow-sm">
+                <div class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm focus-within:ring-2 focus-within:ring-slate-900/20 focus-within:ring-offset-2 focus-within:ring-offset-white">
                   <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
                     <Search class="h-4 w-4 text-slate-400" />
                     <input
                       v-model="searchQuery"
                       type="search"
                       placeholder="Masukkan topik, kategori, atau tag"
-                      class="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                      class="w-full bg-transparent text-base text-slate-700 outline-none placeholder:text-slate-400"
                     />
                   </div>
-                  <div class="mt-3 grid grid-cols-3 gap-2">
+                  <div class="mt-3 rounded-2xl bg-slate-100 p-1">
+                    <div class="grid grid-cols-3 gap-1" role="radiogroup" aria-label="Cakupan pencarian">
                     <label
                       v-for="option in searchOptions"
                       :key="option.value"
@@ -176,29 +183,31 @@ onBeforeUnmount(() => {
                     >
                       <input v-model="searchScope" type="radio" class="sr-only" :value="option.value" />
                       <span
-                        class="block rounded-full px-3 py-2 text-center text-xs font-medium transition"
+                        class="block min-h-11 rounded-xl px-3 py-2 text-center text-xs font-semibold transition motion-reduce:transition-none"
                         :class="
                           searchScope === option.value
-                            ? 'bg-slate-950 text-white'
-                            : 'bg-slate-100 text-slate-600'
+                            ? 'bg-white text-slate-950 shadow-sm'
+                            : 'text-slate-600 hover:text-slate-950'
                         "
                       >
                         {{ option.label }}
                       </span>
                     </label>
+                    </div>
                   </div>
                 </div>
               </form>
 
               <div class="space-y-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+                <p class="text-[11px] font-semibold uppercase text-slate-500">
                   Navigasi
                 </p>
-                <div class="space-y-2">
+                <nav class="space-y-2" aria-label="Navigasi artikel">
                   <Link
                     :href="route('articles.index')"
-                    class="block rounded-2xl px-4 py-3 text-sm font-medium transition"
-                    :class="!activeCategory ? 'bg-slate-950 text-white' : 'bg-white/80 text-slate-700'"
+                    class="flex min-h-11 items-center rounded-xl px-4 py-3 text-sm font-semibold transition motion-reduce:transition-none"
+                    :class="!activeCategory ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'"
+                    :aria-current="!activeCategory ? 'page' : undefined"
                   >
                     Semua Artikel
                   </Link>
@@ -206,16 +215,17 @@ onBeforeUnmount(() => {
                     v-for="category in categories"
                     :key="category.slug"
                     :href="route('articles.index', { category: category.slug })"
-                    class="block rounded-2xl px-4 py-3 text-sm font-medium transition"
+                    class="flex min-h-11 items-center rounded-xl px-4 py-3 text-sm font-semibold transition motion-reduce:transition-none"
                     :class="
                       activeCategory === category.slug
                         ? 'bg-slate-950 text-white'
-                        : 'bg-white/80 text-slate-700'
+                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
                     "
+                    :aria-current="activeCategory === category.slug ? 'page' : undefined"
                   >
                     {{ category.label }}
                   </Link>
-                </div>
+                </nav>
               </div>
 
               <Button class="w-full rounded-full bg-slate-950 text-white hover:bg-slate-800" as-child>

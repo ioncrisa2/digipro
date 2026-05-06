@@ -11,7 +11,7 @@ return [
             static fn (string $item): string => trim($item),
             explode(',', (string) env(
                 'MIDTRANS_ENABLED_PAYMENTS',
-                'bca_va,bni_va,bri_va,permata_va,echannel,gopay,shopeepay,qris'
+                'bca_va,bni_va,bri_va,permata_va,echannel,gopay,shopeepay,qris,indomaret,alfamart,credit_card'
             ))
         ))),
     ],

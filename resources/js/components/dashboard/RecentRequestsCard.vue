@@ -1,4 +1,5 @@
 <script setup>
+import { Link } from "@inertiajs/vue3";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ArrowRight, FileText, Clock, CheckCircle2, AlertCircle } from "lucide-vue-next";
 import RecentRequestsEmptyState from "@/components/dashboard/RecentRequestsEmptyState.vue";
@@ -9,18 +10,8 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  onRequestList: {
-    type: Function,
-    required: true,
-  },
-  onNewRequest: {
-    type: Function,
-    required: true,
-  },
-  onViewDetail: {
-    type: Function,
-    required: true,
-  },
+  requestListHref: { type: String, required: true },
+  newRequestHref: { type: String, required: true },
 });
 
 const statusConfig = {
@@ -66,19 +57,19 @@ const getStatusConfig = (color) => statusConfig[color] || statusConfig.secondary
             5 permohonan penilaian terakhir
           </p>
         </div>
-        <button
-          @click="onRequestList"
-          class="text-sm text-slate-600 hover:text-slate-900 font-medium flex items-center gap-1 transition-colors"
+        <Link
+          :href="requestListHref"
+          class="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
         >
           Lihat Semua
           <ArrowRight class="w-4 h-4" />
-        </button>
+        </Link>
       </div>
     </CardHeader>
     <CardContent class="p-0">
       <RecentRequestsEmptyState
         v-if="props.recentRequests.length === 0"
-        :on-new-request="onNewRequest"
+        :new-request-href="newRequestHref"
       />
 
       <div v-else class="divide-y divide-slate-200">
@@ -87,7 +78,7 @@ const getStatusConfig = (color) => statusConfig[color] || statusConfig.secondary
           :key="req.id"
           :request="req"
           :status-config="getStatusConfig(req.status_color)"
-          @view="onViewDetail"
+          :href="req.detail_url || `/permohonan-penilaian/${req.id}`"
         />
       </div>
     </CardContent>

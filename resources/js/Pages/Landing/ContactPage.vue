@@ -39,10 +39,10 @@ const submitForm = () => {
 </script>
 
 <template>
-  <div class="landing-shell text-slate-900 bg-[#f7f4ef] min-h-screen flex flex-col selection:bg-slate-900 selection:text-white">
+  <div class="landing-shell text-slate-900 min-h-dvh flex flex-col selection:bg-slate-900 selection:text-white">
     <LandingNavbar />
 
-    <main class="flex-1 py-12 px-6">
+    <main id="content" class="flex-1 py-12 px-6">
       <div class="max-w-6xl mx-auto space-y-12">
 
         <section class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -103,19 +103,47 @@ const submitForm = () => {
                       <Label for="name">
                         Nama <span class="text-red-500">*</span>
                       </Label>
-                      <Input id="name" v-model="form.name" placeholder="Nama Anda" />
+                      <Input
+                        id="name"
+                        v-model="form.name"
+                        placeholder="Nama Anda"
+                        :aria-invalid="form.errors.name ? 'true' : undefined"
+                        :aria-describedby="form.errors.name ? 'name-error' : undefined"
+                      />
+                      <p v-if="form.errors.name" id="name-error" class="text-sm text-red-600">
+                        {{ form.errors.name }}
+                      </p>
                     </div>
                     <div class="space-y-2">
                       <Label for="email">
                         Email <span class="text-red-500">*</span>
                       </Label>
-                      <Input id="email" type="email" v-model="form.email" placeholder="nama@email.com" />
+                      <Input
+                        id="email"
+                        type="email"
+                        v-model="form.email"
+                        placeholder="nama@email.com"
+                        :aria-invalid="form.errors.email ? 'true' : undefined"
+                        :aria-describedby="form.errors.email ? 'email-error' : undefined"
+                      />
+                      <p v-if="form.errors.email" id="email-error" class="text-sm text-red-600">
+                        {{ form.errors.email }}
+                      </p>
                     </div>
                   </div>
 
                   <div class="space-y-2">
                     <Label for="subject">Subjek</Label>
-                    <Input id="subject" v-model="form.subject" placeholder="Contoh: Pertanyaan tentang laporan" />
+                    <Input
+                      id="subject"
+                      v-model="form.subject"
+                      placeholder="Contoh: Pertanyaan tentang laporan"
+                      :aria-invalid="form.errors.subject ? 'true' : undefined"
+                      :aria-describedby="form.errors.subject ? 'subject-error' : undefined"
+                    />
+                    <p v-if="form.errors.subject" id="subject-error" class="text-sm text-red-600">
+                      {{ form.errors.subject }}
+                    </p>
                   </div>
 
                   <div class="space-y-2">
@@ -128,12 +156,17 @@ const submitForm = () => {
                       placeholder="Tuliskan kebutuhan Anda di sini."
                       rows="5"
                       class="resize-none"
+                      :aria-invalid="form.errors.message ? 'true' : undefined"
+                      :aria-describedby="form.errors.message ? 'message-error' : undefined"
                     />
+                    <p v-if="form.errors.message" id="message-error" class="text-sm text-red-600">
+                      {{ form.errors.message }}
+                    </p>
                   </div>
 
                   <div class="flex justify-end">
                     <Button type="submit" class="bg-slate-900 hover:bg-slate-800" :disabled="form.processing">
-                      <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />
                       <Send v-else class="mr-2 h-4 w-4" />
                       Kirim Pesan
                     </Button>

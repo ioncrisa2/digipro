@@ -9,6 +9,7 @@ use Illuminate\Notifications\Notifiable;
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -70,6 +71,34 @@ class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saved(function (self $user): void {
+            if (! $user->wasChanged(['email', 'phone_number', 'billing_nik'])) {
+                return;
+            }
+
+            $profile = $user->signatureProfile;
+            if (! $profile) {
+                return;
+            }
+
+            $profile->forceFill([
+                'peruri_email' => $user->email,
+                'peruri_phone' => $user->phone_number,
+                'nik' => $user->billing_nik,
+                'registration_status' => null,
+                'kyc_status' => null,
+                'specimen_status' => null,
+                'certificate_status' => null,
+                'keyla_status' => null,
+                'keyla_qr_image' => null,
+                'last_checked_at' => null,
+                'last_error' => 'Profil customer berubah. Silakan lakukan onboarding PDS kembali.',
+            ])->save();
+        });
+    }
+
     public function hasAdminAccess(): bool
     {
         $roles = array_values(array_filter([
@@ -109,6 +138,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function cancellationRequests(): HasMany
     {
         return $this->hasMany(AppraisalRequestCancellation::class);
+    }
+
+    public function signatureProfile(): HasOne
+    {
+        return $this->hasOne(UserSignatureProfile::class);
     }
 
     public function sendPasswordResetNotification($token): void

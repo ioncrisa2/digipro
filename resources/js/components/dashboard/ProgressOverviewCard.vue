@@ -37,7 +37,7 @@ const completionWidth = computed(() => `${completionRate.value}%`);
           </div>
           <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
             <div
-              class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
+              class="bg-emerald-500 h-2.5 rounded-full"
               :style="{ width: completionWidth }"
             ></div>
           </div>

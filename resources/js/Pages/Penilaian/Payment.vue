@@ -69,6 +69,31 @@ const paymentStatusVariant = computed(() => {
 const checkout = computed(() => paymentState.value?.checkout ?? {});
 const gatewayDetails = computed(() => paymentState.value?.gateway_details ?? {});
 const billingSummary = computed(() => paymentState.value?.billing_summary ?? props.request?.billing_summary ?? {});
+const enabledPayments = computed(() => {
+    const methods = Array.isArray(props.midtrans?.enabled_payments) ? props.midtrans.enabled_payments : [];
+    return methods.map((value) => String(value).toLowerCase());
+});
+const availableMethodLabels = computed(() => {
+    const labels = [];
+
+    if (enabledPayments.value.some((value) => value.endsWith("_va") || value === "echannel" || value === "bank_transfer")) {
+        labels.push("Virtual Account");
+    }
+    if (enabledPayments.value.includes("qris")) {
+        labels.push("QRIS");
+    }
+    if (enabledPayments.value.some((value) => ["gopay", "shopeepay"].includes(value))) {
+        labels.push("E-Wallet");
+    }
+    if (enabledPayments.value.some((value) => ["indomaret", "alfamart", "cstore", "store", "minimarket"].includes(value))) {
+        labels.push("Minimarket");
+    }
+    if (enabledPayments.value.includes("credit_card")) {
+        labels.push("Kartu Kredit");
+    }
+
+    return [...new Set(labels)];
+});
 
 const canPayNow = computed(() => {
     return Boolean(
@@ -245,7 +270,9 @@ const startCheckout = async ({ forceNewAttempt = false } = {}) => {
             <Card>
                 <CardHeader class="pb-3">
                     <CardTitle class="text-base">Midtrans Checkout</CardTitle>
-                    <CardDescription>VA, QRIS, dan e-wallet ditampilkan sesuai channel yang aktif</CardDescription>
+                    <CardDescription>
+                        {{ availableMethodLabels.length ? `${availableMethodLabels.join(", ")} ditampilkan sesuai channel yang aktif` : "Metode pembayaran ditampilkan sesuai channel yang aktif" }}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">

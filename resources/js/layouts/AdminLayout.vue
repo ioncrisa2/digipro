@@ -296,9 +296,17 @@ watch(
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-100 flex">
+  <div class="min-h-dvh bg-slate-100 flex">
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-slate-950 focus:shadow"
+    >
+      Lewati ke konten
+    </a>
+
     <button
       v-if="sidebarOpen"
+      type="button"
       class="fixed inset-0 z-30 bg-slate-950/40 lg:hidden"
       aria-label="Tutup menu"
       @click="closeSidebar"
@@ -338,7 +346,7 @@ watch(
         </template>
       </UserDashboardTopbar>
 
-      <main class="flex-1 p-4 lg:p-6">
+      <main id="main-content" tabindex="-1" class="flex-1 p-4 lg:p-6">
         <slot />
       </main>
 

@@ -41,7 +41,7 @@ const ruleItems = computed(() => [
   { key: 'upper', label: 'Minimal 1 huruf besar (A-Z)', ok: passwordRules.value.upper },
   { key: 'lower', label: 'Minimal 1 huruf kecil (a-z)', ok: passwordRules.value.lower },
   { key: 'number', label: 'Minimal 1 angka (0-9)', ok: passwordRules.value.number },
-  { key: 'symbol', label: 'Minimal 1 karakter spesial (!@#...)', ok: passwordRules.value.symbol },
+  { key: 'symbol', label: 'Minimal 1 karakter spesial (!@#…)', ok: passwordRules.value.symbol },
 ])
 
 const canSubmit = computed(() => {
@@ -64,7 +64,7 @@ const canSubmit = computed(() => {
       <div class="p-3 bg-slate-900/10 text-slate-900 rounded-2xl mb-2">
         <UserPlus class="w-6 h-6" />
       </div>
-      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Buat Akun Baru</h1>
+      <h1 class="text-2xl font-semibold text-slate-900">Buat Akun Baru</h1>
       <p class="text-sm text-slate-500 max-w-[300px]">
         Daftar untuk mulai mengajukan penilaian properti secara profesional.
       </p>
@@ -109,7 +109,8 @@ const canSubmit = computed(() => {
             <button
               type="button"
               @click="showPassword = !showPassword"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+              class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             >
               <Eye v-if="!showPassword" class="w-4 h-4" />
               <EyeOff v-else class="w-4 h-4" />
@@ -171,7 +172,7 @@ const canSubmit = computed(() => {
 
       <Button type="submit" class="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white" :disabled="!canSubmit">
         <Loader2 v-if="register.form.processing" class="mr-2 h-4 w-4 animate-spin" />
-        {{ register.form.processing ? 'Mendaftarkan...' : 'Daftar Sekarang' }}
+        {{ register.form.processing ? 'Mendaftarkan…' : 'Daftar Sekarang' }}
         <ArrowRight v-if="!register.form.processing" class="ml-2 w-4 h-4" />
       </Button>
     </form>

@@ -50,6 +50,32 @@ class AppraisalFinalDocumentService
 
     private function signatureMeta(AppraisalRequest $record): array
     {
+        $envelope = $record->signatureEnvelopes()
+            ->where('document_type', 'contract')
+            ->where('provider', 'peruri_signit')
+            ->with('participants')
+            ->first();
+
+        if ($envelope) {
+            $customer = $envelope->participants
+                ->first(fn ($p) => $p->role === 'customer' && $p->status === 'signed');
+
+            if ($customer) {
+                return [
+                    'flow' => 'peruri_contract_signature',
+                    'provider' => 'peruri_signit',
+                    'model' => $envelope->model,
+                    'external_envelope_id' => $envelope->external_envelope_id,
+                    'external_order_id' => $customer->external_order_id,
+                    'signed_at' => optional($customer->signed_at)->toIso8601String(),
+                    'signed_by_name' => $customer->name,
+                    'signed_by_email' => $customer->email,
+                    'document_hash' => $envelope->document_hash,
+                    'signed_pdf_path' => $envelope->signed_pdf_path,
+                ];
+            }
+        }
+
         $signatureLog = $record->offerNegotiations
             ->where('action', 'contract_sign_mock')
             ->sortByDesc('id')

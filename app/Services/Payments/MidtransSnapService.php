@@ -44,7 +44,27 @@ class MidtransSnapService
 
     public function enabledPayments(): array
     {
-        return array_values(array_filter((array) config('payment.midtrans.enabled_payments', [])));
+        $configured = array_values(array_filter((array) config('payment.midtrans.enabled_payments', [])));
+        $normalized = [];
+
+        foreach ($configured as $method) {
+            $value = strtolower(trim((string) $method));
+
+            if ($value === '') {
+                continue;
+            }
+
+            if (in_array($value, ['cstore', 'store', 'minimarket'], true)) {
+                $normalized[] = 'indomaret';
+                $normalized[] = 'alfamart';
+
+                continue;
+            }
+
+            $normalized[] = $value;
+        }
+
+        return array_values(array_unique($normalized));
     }
 
     public function snapScriptUrl(): string
@@ -124,6 +144,12 @@ class MidtransSnapService
                 'error' => route('appraisal.payment.page', ['id' => $request->id]),
             ],
         ];
+
+        if (in_array('credit_card', $params['enabled_payments'], true)) {
+            $params['credit_card'] = [
+                'secure' => true,
+            ];
+        }
 
         $transaction = Snap::createTransaction($params);
 
@@ -228,10 +254,13 @@ class MidtransSnapService
         $paymentCode = data_get($metadata, 'gateway_details.payment_code', data_get($metadata, 'notification.payment_code'));
         $store = data_get($metadata, 'gateway_details.store', data_get($metadata, 'notification.store'));
         $acquirer = data_get($metadata, 'gateway_details.acquirer', data_get($metadata, 'notification.acquirer'));
+        $bank = data_get($metadata, 'gateway_details.bank', data_get($metadata, 'notification.bank'));
+        $maskedCard = data_get($metadata, 'gateway_details.masked_card', data_get($metadata, 'notification.masked_card'));
+        $approvalCode = data_get($metadata, 'gateway_details.approval_code', data_get($metadata, 'notification.approval_code'));
+        $cardType = data_get($metadata, 'gateway_details.card_type', data_get($metadata, 'notification.card_type'));
         $transactionId = data_get($metadata, 'gateway_details.transaction_id', data_get($metadata, 'notification.transaction_id'));
         $transactionStatus = data_get($metadata, 'gateway_details.transaction_status', data_get($metadata, 'notification.transaction_status'));
         $expiryTime = data_get($metadata, 'gateway_details.expiry_time', data_get($metadata, 'notification.expiry_time', data_get($metadata, 'checkout.expires_at')));
-        $bank = null;
         $reference = null;
         $accountHolder = null;
 
@@ -244,6 +273,10 @@ class MidtransSnapService
         } elseif ($paymentType === 'echannel') {
             $bank = 'mandiri';
             $reference = filled($billKey) ? trim($billKey . ' / ' . $billerCode) : $billerCode;
+        } elseif (in_array($paymentType, ['cstore', 'indomaret', 'alfamart'], true)) {
+            $reference = $paymentCode;
+        } elseif ($paymentType === 'credit_card') {
+            $reference = $maskedCard ?: $approvalCode;
         } elseif (filled($paymentCode)) {
             $reference = $paymentCode;
         }
@@ -254,6 +287,10 @@ class MidtransSnapService
             'gopay' => 'GoPay',
             'shopeepay' => 'ShopeePay',
             'qris' => 'QRIS',
+            'credit_card' => 'Kartu Kredit',
+            'indomaret' => 'Indomaret',
+            'alfamart' => 'Alfamart',
+            'cstore' => filled($store) ? strtoupper((string) $store) : 'Minimarket',
             default => 'Midtrans Snap',
         };
 
@@ -273,6 +310,9 @@ class MidtransSnapService
             'account_holder' => $accountHolder,
             'store' => $store,
             'acquirer' => $acquirer,
+            'masked_card' => $maskedCard,
+            'approval_code' => $approvalCode,
+            'card_type' => $cardType,
             'transaction_id' => $transactionId,
             'transaction_status' => $transactionStatus,
             'expiry_time' => $expiryTime,
@@ -301,6 +341,10 @@ class MidtransSnapService
             'expiry_time' => data_get($payload, 'expiry_time'),
             'currency' => data_get($payload, 'currency'),
             'merchant_id' => data_get($payload, 'merchant_id'),
+            'bank' => data_get($payload, 'bank'),
+            'masked_card' => data_get($payload, 'masked_card'),
+            'approval_code' => data_get($payload, 'approval_code'),
+            'card_type' => data_get($payload, 'card_type'),
             'acquirer' => data_get($payload, 'acquirer'),
             'store' => data_get($payload, 'store'),
             'va_numbers' => data_get($payload, 'va_numbers', []),

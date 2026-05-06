@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import AdminDataTable from '@/components/admin/AdminDataTable.vue';
@@ -13,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDateTime } from '@/utils/reviewer';
 
-defineProps({
+const props = defineProps({
   stats: {
     type: Array,
     default: () => [],
@@ -35,6 +36,53 @@ defineProps({
     default: null,
   },
 });
+
+const superAdminSummary = computed(() => {
+  if (!props.superAdminWidgets) return [];
+
+  const permissionSummary = props.superAdminWidgets.permission_overview?.summary ?? {};
+  const guideline = props.superAdminWidgets.reference_completeness?.active_guideline ?? null;
+  const exceptionQueue = props.superAdminWidgets.exception_queue ?? [];
+
+  return [
+    {
+      key: 'roles-sensitive',
+      label: 'Role sensitif',
+      value: permissionSummary.roles_with_sensitive_access ?? 0,
+      helper: 'Perlu pengawasan akses',
+      tone: 'warning',
+    },
+    {
+      key: 'total-roles',
+      label: 'Total role',
+      value: permissionSummary.total_roles ?? 0,
+      helper: 'Struktur izin aktif',
+      tone: 'info',
+    },
+    {
+      key: 'active-guideline',
+      label: 'Pedoman aktif',
+      value: guideline?.year || '-',
+      helper: guideline?.name || 'Belum ada pedoman aktif',
+      tone: 'primary',
+    },
+    {
+      key: 'exception-count',
+      label: 'Exception queue',
+      value: exceptionQueue.length,
+      helper: 'Titik perlu respons cepat',
+      tone: 'danger',
+    },
+  ];
+});
+
+const exceptionQueue = computed(() => props.superAdminWidgets?.exception_queue ?? []);
+const systemHealth = computed(() => props.superAdminWidgets?.system_health ?? []);
+const roleSummary = computed(() => props.superAdminWidgets?.role_summary ?? []);
+const referenceItems = computed(() => props.superAdminWidgets?.reference_completeness?.items ?? []);
+const permissionRows = computed(() => props.superAdminWidgets?.permission_overview?.rows ?? []);
+const permissionSummary = computed(() => props.superAdminWidgets?.permission_overview?.summary ?? {});
+const sensitiveChanges = computed(() => props.superAdminWidgets?.sensitive_changes ?? []);
 
 const statTone = (tone) => {
   switch (tone) {
@@ -115,6 +163,23 @@ const changeTone = (group) => {
       return 'bg-slate-100 text-slate-800 border-slate-200';
   }
 };
+
+const summaryTone = (tone) => {
+  switch (tone) {
+    case 'success':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-950';
+    case 'warning':
+      return 'border-amber-200 bg-amber-50 text-amber-950';
+    case 'primary':
+      return 'border-indigo-200 bg-indigo-50 text-indigo-950';
+    case 'info':
+      return 'border-sky-200 bg-sky-50 text-sky-950';
+    case 'danger':
+      return 'border-rose-200 bg-rose-50 text-rose-950';
+    default:
+      return 'border-slate-200 bg-slate-50 text-slate-950';
+  }
+};
 </script>
 
 <template>
@@ -122,152 +187,165 @@ const changeTone = (group) => {
 
   <AdminLayout title="Admin Dashboard">
     <div class="space-y-6">
-      <template v-if="isSuperAdmin && superAdminWidgets">
-        <section class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <template v-if="isSuperAdmin && props.superAdminWidgets">
+        <section class="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]">
           <Card class="border-slate-900 bg-slate-950 text-white">
-            <CardContent class="flex h-full flex-col justify-between gap-6 p-6">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-300">Super Admin Mode</p>
-                <h2 class="mt-3 text-3xl font-semibold tracking-tight">Kontrol sistem, bukan sekadar operasional harian.</h2>
-                <p class="mt-3 max-w-2xl text-sm text-slate-300">
-                  Dashboard ini menyorot kesehatan sistem, akses sensitif, kelengkapan referensi, dan perubahan yang layak diawasi langsung.
-                </p>
-              </div>
-              <div class="grid gap-3 sm:grid-cols-2">
-                <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Role Sensitif</p>
-                  <p class="mt-3 text-3xl font-semibold">
-                    {{ superAdminWidgets.permission_overview?.summary?.roles_with_sensitive_access ?? 0 }}
-                  </p>
-                  <p class="mt-2 text-sm text-slate-300">Role yang memegang akses seperti keuangan, user, hak akses, atau konten.</p>
+            <CardContent class="space-y-6 p-6">
+              <div class="space-y-3">
+                <p class="text-xs font-semibold uppercase text-slate-300">Super Admin Mode</p>
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div class="space-y-2">
+                    <h2 class="text-balance text-3xl font-semibold">Kontrol sistem dalam satu bidang pandang.</h2>
+                    <p class="max-w-3xl text-pretty text-sm text-slate-300">
+                      Semua indikator tetap ditampilkan, tetapi dipadatkan agar akses sensitif, kesehatan sistem, referensi, dan exception queue bisa discan lebih cepat.
+                    </p>
+                  </div>
+                  <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+                    <div>Total role: {{ permissionSummary.total_roles ?? 0 }}</div>
+                    <div>Akses sensitif: {{ permissionSummary.roles_with_sensitive_access ?? 0 }}</div>
+                  </div>
                 </div>
-                <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Pedoman Aktif</p>
-                  <p class="mt-3 text-lg font-semibold">
-                    {{ superAdminWidgets.reference_completeness?.active_guideline?.name || 'Belum ada pedoman aktif' }}
-                  </p>
-                  <p class="mt-2 text-sm text-slate-300">
-                    {{ superAdminWidgets.reference_completeness?.active_guideline?.year || '-' }}
-                  </p>
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div
+                  v-for="item in superAdminSummary"
+                  :key="item.key"
+                  class="rounded-2xl border px-4 py-4"
+                  :class="summaryTone(item.tone)"
+                >
+                  <p class="text-[11px] font-semibold uppercase opacity-80">{{ item.label }}</p>
+                  <p class="mt-2 text-3xl font-semibold tabular-nums">{{ item.value }}</p>
+                  <p class="mt-2 text-sm opacity-90">{{ item.helper }}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader class="pb-4">
               <CardTitle>Exception Queue</CardTitle>
               <CardDescription>Titik yang perlu diawasi lebih dulu sebelum menjadi bottleneck sistem.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-3">
               <div
-                v-for="item in superAdminWidgets.exception_queue"
+                v-for="item in exceptionQueue"
                 :key="item.key"
-                class="rounded-2xl border p-4"
+                class="rounded-2xl border px-4 py-4"
                 :class="widgetTone(item.tone)"
               >
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em]">{{ item.label }}</p>
-                    <p class="mt-2 text-3xl font-semibold">{{ item.value }}</p>
-                    <p class="mt-2 text-sm opacity-90">{{ item.description }}</p>
+                <div class="flex items-start justify-between gap-4">
+                  <div class="min-w-0">
+                    <p class="text-xs font-semibold uppercase">{{ item.label }}</p>
+                    <div class="mt-2 flex items-baseline gap-3">
+                      <p class="text-3xl font-semibold tabular-nums">{{ item.value }}</p>
+                      <p class="text-sm opacity-90">{{ item.description }}</p>
+                    </div>
                   </div>
                   <Button variant="outline" size="sm" as-child>
                     <Link :href="item.url">Buka</Link>
                   </Button>
                 </div>
               </div>
+              <div
+                v-if="!exceptionQueue.length"
+                class="rounded-2xl border border-dashed p-4 text-sm text-slate-500"
+              >
+                Tidak ada exception queue yang aktif.
+              </div>
             </CardContent>
           </Card>
         </section>
 
-        <section>
-          <div class="mb-4 flex items-end justify-between gap-3">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">System Health Snapshot</p>
-              <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Ringkasan kesehatan sistem</h2>
-            </div>
-          </div>
-          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Card v-for="item in superAdminWidgets.system_health" :key="item.key">
-              <CardContent class="p-5">
-                <div class="flex items-start justify-between gap-4">
+        <section class="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.95fr)]">
+          <Card>
+            <CardHeader class="pb-4">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase text-slate-500">System Health Snapshot</p>
+                  <CardTitle class="mt-2">Ringkasan kesehatan sistem</CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div
+                v-for="item in systemHealth"
+                :key="item.key"
+                class="rounded-2xl border p-4"
+              >
+                <div class="flex items-start justify-between gap-3">
                   <div>
-                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">{{ item.label }}</p>
-                    <p class="mt-3 text-4xl font-semibold text-slate-950">{{ item.value }}</p>
-                    <p class="mt-2 text-sm text-slate-600">{{ item.description }}</p>
+                    <p class="text-[11px] font-semibold uppercase text-slate-500">{{ item.label }}</p>
+                    <p class="mt-2 text-3xl font-semibold tabular-nums text-slate-950">{{ item.value }}</p>
                   </div>
-                  <div class="rounded-2xl border px-3 py-1 text-xs font-semibold" :class="widgetTone(item.tone)">
+                  <div class="rounded-full border px-3 py-1 text-[11px] font-semibold" :class="widgetTone(item.tone)">
                     Live
                   </div>
                 </div>
-                <div class="mt-4">
-                  <Button variant="link" class="h-auto px-0" as-child>
-                    <Link :href="item.url">Lihat detail</Link>
+                <p class="mt-3 text-pretty text-sm text-slate-600">{{ item.description }}</p>
+                <Button variant="link" class="mt-2 h-auto px-0" as-child>
+                  <Link :href="item.url">Lihat detail</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div class="space-y-4">
+            <Card>
+              <CardHeader class="pb-4">
+                <CardTitle>Ringkasan Role & User</CardTitle>
+                <CardDescription>Gambaran cepat struktur akses di sistem saat ini.</CardDescription>
+              </CardHeader>
+              <CardContent class="grid gap-3 sm:grid-cols-2">
+                <div
+                  v-for="item in roleSummary"
+                  :key="item.key"
+                  class="rounded-2xl border px-4 py-4"
+                  :class="widgetTone(item.tone)"
+                >
+                  <p class="text-[11px] font-semibold uppercase opacity-80">{{ item.label }}</p>
+                  <p class="mt-2 text-3xl font-semibold tabular-nums">{{ item.value }}</p>
+                  <p class="mt-2 text-sm opacity-90">{{ item.description }}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader class="pb-4">
+                <CardTitle>Reference Completeness</CardTitle>
+                <CardDescription>
+                  Status kesiapan referensi untuk pedoman aktif
+                  <span v-if="props.superAdminWidgets.reference_completeness?.active_guideline">
+                    : {{ props.superAdminWidgets.reference_completeness.active_guideline.name }}
+                  </span>
+                </CardDescription>
+              </CardHeader>
+              <CardContent class="space-y-3">
+                <div
+                  v-for="item in referenceItems"
+                  :key="item.key"
+                  class="rounded-2xl border px-4 py-4"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <p class="font-medium text-slate-950">{{ item.label }}</p>
+                        <Badge variant="outline" :class="widgetTone(item.tone)">{{ item.status_label }}</Badge>
+                      </div>
+                      <p class="mt-1 text-sm text-slate-600">{{ item.description }}</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-2xl font-semibold tabular-nums text-slate-950">{{ item.value }}</p>
+                      <p class="mt-1 text-xs text-slate-500">{{ formatDateTime(item.updated_at) }}</p>
+                    </div>
+                  </div>
+                  <Button variant="link" class="mt-2 h-auto px-0" as-child>
+                    <Link :href="item.url">Kelola data</Link>
                   </Button>
                 </div>
               </CardContent>
             </Card>
           </div>
-        </section>
-
-        <section class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ringkasan Role & User</CardTitle>
-              <CardDescription>Gambaran cepat struktur akses di sistem saat ini.</CardDescription>
-            </CardHeader>
-            <CardContent class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <div
-                v-for="item in superAdminWidgets.role_summary"
-                :key="item.key"
-                class="rounded-2xl border p-4"
-                :class="widgetTone(item.tone)"
-              >
-                <p class="text-xs font-semibold uppercase tracking-[0.18em]">{{ item.label }}</p>
-                <p class="mt-3 text-3xl font-semibold">{{ item.value }}</p>
-                <p class="mt-2 text-sm opacity-90">{{ item.description }}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Reference Completeness</CardTitle>
-              <CardDescription>
-                Status kesiapan referensi untuk pedoman aktif
-                <span v-if="superAdminWidgets.reference_completeness?.active_guideline">
-                  : {{ superAdminWidgets.reference_completeness.active_guideline.name }}
-                </span>
-              </CardDescription>
-            </CardHeader>
-            <CardContent class="space-y-3">
-              <div
-                v-for="item in superAdminWidgets.reference_completeness?.items ?? []"
-                :key="item.key"
-                class="rounded-2xl border p-4"
-              >
-                <div class="flex items-start justify-between gap-4">
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <p class="font-medium text-slate-950">{{ item.label }}</p>
-                      <Badge variant="outline" :class="widgetTone(item.tone)">{{ item.status_label }}</Badge>
-                    </div>
-                    <p class="mt-1 text-sm text-slate-600">{{ item.description }}</p>
-                  </div>
-                  <div class="text-right">
-                    <p class="text-2xl font-semibold text-slate-950">{{ item.value }}</p>
-                    <p class="mt-1 text-xs text-slate-500">{{ formatDateTime(item.updated_at) }}</p>
-                  </div>
-                </div>
-                <div class="mt-3">
-                  <Button variant="link" class="h-auto px-0" as-child>
-                    <Link :href="item.url">Kelola data</Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </section>
 
         <section class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -287,7 +365,7 @@ const changeTone = (group) => {
             <CardContent>
               <AdminDataTable
                 :columns="permissionColumns"
-                :rows="superAdminWidgets.permission_overview?.rows ?? []"
+                :rows="permissionRows"
                 empty-text="Belum ada role yang perlu diawasi."
                 :default-per-page="8"
               >
@@ -325,7 +403,7 @@ const changeTone = (group) => {
             </CardHeader>
             <CardContent class="space-y-3">
               <div
-                v-for="item in superAdminWidgets.sensitive_changes"
+                v-for="item in sensitiveChanges"
                 :key="item.key"
                 class="rounded-2xl border p-4"
               >
@@ -344,7 +422,7 @@ const changeTone = (group) => {
                 </div>
               </div>
               <div
-                v-if="!(superAdminWidgets.sensitive_changes?.length ?? 0)"
+                v-if="!sensitiveChanges.length"
                 class="rounded-2xl border border-dashed p-4 text-sm text-slate-500"
               >
                 Belum ada perubahan sensitif yang tercatat.
@@ -354,24 +432,68 @@ const changeTone = (group) => {
         </section>
       </template>
 
-      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card v-for="item in stats" :key="item.key">
-          <CardContent class="p-5">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">{{ item.label }}</p>
-                <p class="mt-3 text-4xl font-semibold text-slate-950">{{ item.value }}</p>
-                <p class="mt-2 text-sm text-slate-600">{{ item.description }}</p>
+      <section class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.9fr)]">
+        <Card class="border-slate-900 bg-slate-950 text-white">
+          <CardContent class="space-y-6 p-6">
+            <div class="space-y-3">
+              <p class="text-xs font-semibold uppercase text-slate-300">Admin Workspace</p>
+              <h2 class="text-balance text-3xl font-semibold">Ringkasan operasional admin dalam satu tampilan.</h2>
+              <p class="max-w-3xl text-pretty text-sm text-slate-300">
+                Fokus utamanya ada pada permohonan yang perlu tindakan, antrean pembayaran, dan indikator live yang paling relevan untuk admin harian.
+              </p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div
+                v-for="item in stats"
+                :key="item.key"
+                class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-[11px] font-semibold uppercase text-slate-300">{{ item.label }}</p>
+                    <p class="mt-2 text-3xl font-semibold tabular-nums text-white">{{ item.value }}</p>
+                  </div>
+                  <div class="rounded-full px-3 py-1 text-[11px] font-semibold" :class="statTone(item.tone)">
+                    Live
+                  </div>
+                </div>
+                <p class="mt-3 text-sm text-slate-300">{{ item.description }}</p>
               </div>
-              <div class="rounded-2xl px-3 py-1 text-xs font-semibold" :class="statTone(item.tone)">
-                Live
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader class="pb-4">
+            <CardTitle>Menunggu Pembayaran</CardTitle>
+            <CardDescription>Antrean kontrak yang sudah ditandatangani tetapi belum diproses lebih lanjut.</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-3">
+            <div v-for="item in paymentQueue" :key="item.id" class="rounded-2xl border p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <Button variant="link" class="h-auto px-0 font-medium" as-child>
+                    <Link :href="item.show_url">{{ item.request_number }}</Link>
+                  </Button>
+                  <p class="mt-1 text-xs text-slate-500">{{ item.requester_name }}</p>
+                </div>
+                <Badge variant="outline" class="border-amber-200 bg-amber-100 text-amber-900">
+                  {{ item.offer_validity_days ? `${item.offer_validity_days} hari` : 'Belum diisi' }}
+                </Badge>
               </div>
+              <div class="mt-3 flex items-center justify-between gap-3 text-sm text-slate-600">
+                <span class="tabular-nums">{{ formatCurrency(item.fee_total) }}</span>
+                <span>{{ formatDateTime(item.updated_at) }}</span>
+              </div>
+            </div>
+            <div v-if="!paymentQueue.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
+              Tidak ada antrean pembayaran.
             </div>
           </CardContent>
         </Card>
       </section>
 
-      <section class="grid gap-6 xl:grid-cols-[1.25fr_1fr]">
+      <section class="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.9fr)]">
         <Card>
           <CardHeader class="pb-4">
             <div class="flex items-center justify-between gap-3">
@@ -411,31 +533,28 @@ const changeTone = (group) => {
         <div class="space-y-6">
           <Card>
             <CardHeader class="pb-4">
-              <CardTitle>Menunggu Pembayaran</CardTitle>
-              <CardDescription>Antrean kontrak yang sudah ditandatangani tetapi belum diproses lebih lanjut.</CardDescription>
+              <CardTitle>Ringkasan Tindak Lanjut</CardTitle>
+              <CardDescription>Panel cepat untuk melihat beban kerja admin tanpa membuka modul satu per satu.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-3">
-              <div v-for="item in paymentQueue" :key="item.id" class="rounded-2xl border p-4">
+              <div
+                v-for="item in stats"
+                :key="`regular-${item.key}`"
+                class="rounded-2xl border p-4"
+              >
                 <div class="flex items-start justify-between gap-3">
                   <div>
-                    <Button variant="link" class="h-auto px-0 font-medium" as-child>
-                      <Link :href="item.show_url">{{ item.request_number }}</Link>
-                    </Button>
-
-
-                    <p class="mt-1 text-xs text-slate-500">{{ item.requester_name }}</p>
+                    <p class="text-[11px] font-semibold uppercase text-slate-500">{{ item.label }}</p>
+                    <p class="mt-2 text-3xl font-semibold tabular-nums text-slate-950">{{ item.value }}</p>
+                    <p class="mt-2 text-sm text-slate-600">{{ item.description }}</p>
                   </div>
-                  <Badge variant="outline" class="bg-amber-100 text-amber-900 border-amber-200">
-                    {{ item.offer_validity_days ? `${item.offer_validity_days} hari` : 'Belum diisi' }}
-                  </Badge>
-                </div>
-                <div class="mt-3 flex items-center justify-between gap-3 text-sm text-slate-600">
-                  <span>{{ formatCurrency(item.fee_total) }}</span>
-                  <span>{{ formatDateTime(item.updated_at) }}</span>
+                  <div class="rounded-full px-3 py-1 text-[11px] font-semibold" :class="statTone(item.tone)">
+                    Live
+                  </div>
                 </div>
               </div>
-              <div v-if="!paymentQueue.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
-                Tidak ada antrean pembayaran.
+              <div v-if="!stats.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
+                Belum ada ringkasan operasional untuk ditampilkan.
               </div>
             </CardContent>
           </Card>
