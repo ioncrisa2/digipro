@@ -9,8 +9,7 @@ class PeruriSignItProvider implements DigitalSignatureProvider
 {
     public function __construct(
         private readonly PeruriClient $client,
-    ) {
-    }
+    ) {}
 
     public function startTierEnvelope(
         string $uploaderEmail,
@@ -67,8 +66,7 @@ class PeruriSignItProvider implements DigitalSignatureProvider
 
         return $this->client->post("/registration/{$version}/{$corporateId}/kyc", array_merge($payload, [
             'email' => $email,
-            'fileName' => $fileName,
-            'base64Video' => base64_encode($videoBinary),
+            'videoStream' => base64_encode($videoBinary),
         ]));
     }
 
@@ -79,8 +77,7 @@ class PeruriSignItProvider implements DigitalSignatureProvider
 
         return $this->client->put("/specimen/{$version}/{$corporateId}/set/signature", array_merge($payload, [
             'email' => $email,
-            'fileName' => $fileName,
-            'base64Image' => base64_encode($imageBinary),
+            'specimen' => base64_encode($imageBinary),
         ]));
     }
 

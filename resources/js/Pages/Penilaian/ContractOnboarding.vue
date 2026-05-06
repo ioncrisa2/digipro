@@ -31,12 +31,17 @@ const stepLabels = ["Data Diri", "Video Verifikasi", "Tanda Tangan", "Aplikasi K
 const currentStep = ref(1);
 
 const identityForm = useForm({
+    is_wna: props.profile?.is_wna ? "1" : "0",
     peruri_email: props.profile?.peruri_email ?? "",
     peruri_phone: props.profile?.peruri_phone ?? "",
     nik: props.profile?.nik ?? "",
     reference_province_id: props.profile?.reference_province_id ?? "",
     reference_city_id: props.profile?.reference_city_id ?? "",
+    gender: props.profile?.gender ?? "",
+    place_of_birth: props.profile?.place_of_birth ?? "",
+    date_of_birth: props.profile?.date_of_birth ?? "",
     address: props.profile?.address ?? "",
+    ktp_photo: null,
 });
 
 const kycForm = useForm({ kyc_video: null });
@@ -105,11 +110,22 @@ watch(activeStepIndex, (value) => {
     }
 }, { immediate: true });
 
+const isWna = computed(() => identityForm.is_wna === "1" || identityForm.is_wna === true);
+const identityPhotoLabel = computed(() => props.profile?.has_ktp_photo ? "Foto identitas sudah tersimpan" : "Foto identitas belum diunggah");
+
 watch(() => identityForm.nik, (value) => {
+    if (isWna.value) return;
+
     const normalized = String(value ?? "").replace(/\D/g, "").slice(0, 16);
     if (normalized !== value) {
         identityForm.nik = normalized;
     }
+});
+
+watch(() => identityForm.is_wna, () => {
+    if (isWna.value) return;
+
+    identityForm.nik = String(identityForm.nik ?? "").replace(/\D/g, "").slice(0, 16);
 });
 
 watch(() => identityForm.reference_province_id, (next, prev) => {
@@ -123,7 +139,10 @@ watch(() => identityForm.reference_province_id, (next, prev) => {
     });
 });
 
-const saveIdentity = () => identityForm.post(props.actions.save_identity_url, { preserveScroll: true });
+const saveIdentity = () => identityForm.post(props.actions.save_identity_url, {
+    preserveScroll: true,
+    forceFormData: true,
+});
 const refreshReadiness = () => router.post(props.actions.refresh_url, {}, { preserveScroll: true });
 const registerUser = () => router.post(props.actions.register_user_url, {}, { preserveScroll: true });
 const registerKeyla = () => router.post(props.actions.register_keyla_url, {}, { preserveScroll: true });
@@ -370,6 +389,38 @@ onBeforeUnmount(() => {
                         </div>
 
                         <form class="grid gap-4" @submit.prevent="saveIdentity">
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <div class="space-y-2">
+                                    <Label for="is_wna">Kewarganegaraan</Label>
+                                    <Select v-model="identityForm.is_wna">
+                                        <SelectTrigger id="is_wna" class="text-base">
+                                            <SelectValue placeholder="Pilih kewarganegaraan" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="0">WNI</SelectItem>
+                                            <SelectItem value="1">WNA</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p class="text-xs text-slate-500">Pilih sesuai identitas yang akan dikirim ke PDS.</p>
+                                    <p v-if="identityForm.errors.is_wna" class="text-sm text-rose-600">{{ identityForm.errors.is_wna }}</p>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <Label for="gender">Jenis kelamin</Label>
+                                    <Select v-model="identityForm.gender">
+                                        <SelectTrigger id="gender" class="text-base">
+                                            <SelectValue placeholder="Pilih jenis kelamin" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="M">Laki-laki</SelectItem>
+                                            <SelectItem value="F">Perempuan</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p class="text-xs text-slate-500">Data ini wajib untuk registrasi Form User SIGN-IT.</p>
+                                    <p v-if="identityForm.errors.gender" class="text-sm text-rose-600">{{ identityForm.errors.gender }}</p>
+                                </div>
+                            </div>
+
                             <div class="space-y-2">
                                 <Label for="peruri_email">Email aktif</Label>
                                 <Input id="peruri_email" v-model="identityForm.peruri_email" type="email" class="text-base" />
@@ -385,10 +436,39 @@ onBeforeUnmount(() => {
                             </div>
 
                             <div class="space-y-2">
-                                <Label for="nik">NIK</Label>
-                                <Input id="nik" v-model="identityForm.nik" inputmode="numeric" maxlength="16" class="text-base" />
-                                <p class="text-xs text-slate-500">Masukkan 16 digit NIK sesuai KTP tanpa spasi atau tanda baca.</p>
+                                <Label for="nik">{{ isWna ? "Nomor KITAS/KITAP" : "NIK" }}</Label>
+                                <Input id="nik" v-model="identityForm.nik" :inputmode="isWna ? 'text' : 'numeric'" :maxlength="isWna ? 32 : 16" class="text-base" />
+                                <p class="text-xs text-slate-500">{{ isWna ? "Masukkan nomor KITAS/KITAP tanpa spasi atau tanda baca." : "Masukkan 16 digit NIK sesuai KTP tanpa spasi atau tanda baca." }}</p>
                                 <p v-if="identityForm.errors.nik" class="text-sm text-rose-600">{{ identityForm.errors.nik }}</p>
+                            </div>
+
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <div class="space-y-2">
+                                    <Label for="place_of_birth">Tempat lahir</Label>
+                                    <Input id="place_of_birth" v-model="identityForm.place_of_birth" class="text-base" />
+                                    <p class="text-xs text-slate-500">Isi sesuai identitas resmi.</p>
+                                    <p v-if="identityForm.errors.place_of_birth" class="text-sm text-rose-600">{{ identityForm.errors.place_of_birth }}</p>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <Label for="date_of_birth">Tanggal lahir</Label>
+                                    <Input id="date_of_birth" v-model="identityForm.date_of_birth" type="date" class="text-base" />
+                                    <p class="text-xs text-slate-500">Akan dikirim ke PDS dalam format dd/MM/yyyy.</p>
+                                    <p v-if="identityForm.errors.date_of_birth" class="text-sm text-rose-600">{{ identityForm.errors.date_of_birth }}</p>
+                                </div>
+                            </div>
+
+                            <div class="space-y-2">
+                                <Label for="ktp_photo">Foto {{ isWna ? "KITAS/KITAP" : "KTP" }}</Label>
+                                <Input
+                                    id="ktp_photo"
+                                    type="file"
+                                    accept="image/png,image/jpeg"
+                                    class="text-base"
+                                    @input="identityForm.ktp_photo = $event.target.files?.[0] ?? null"
+                                />
+                                <p class="text-xs text-slate-500">{{ identityPhotoLabel }}. Unggah foto asli yang jelas dan terbaca.</p>
+                                <p v-if="identityForm.errors.ktp_photo" class="text-sm text-rose-600">{{ identityForm.errors.ktp_photo }}</p>
                             </div>
 
                             <div class="grid gap-4 md:grid-cols-2">

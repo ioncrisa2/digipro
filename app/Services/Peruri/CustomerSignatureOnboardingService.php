@@ -9,6 +9,7 @@ use App\Models\Regency;
 use App\Models\User;
 use App\Models\UserSignatureProfile;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class CustomerSignatureOnboardingService
@@ -16,8 +17,7 @@ class CustomerSignatureOnboardingService
     public function __construct(
         private readonly DigitalSignatureProvider $provider,
         private readonly PeruriSignerReadinessService $readinessService,
-    ) {
-    }
+    ) {}
 
     public function profileFor(User $user): UserSignatureProfile
     {
@@ -26,6 +26,7 @@ class CustomerSignatureOnboardingService
             'peruri_email' => $user->email,
             'peruri_phone' => $user->phone_number,
             'nik' => $user->billing_nik,
+            'is_wna' => false,
             'identity_payload' => [],
             'meta' => [],
         ]);
@@ -39,18 +40,40 @@ class CustomerSignatureOnboardingService
             'peruri_email' => $profile->peruri_email,
             'peruri_phone' => $profile->peruri_phone,
             'nik' => $profile->nik,
+            'is_wna' => (bool) $profile->is_wna,
             'reference_province_id' => $profile->reference_province_id,
             'reference_city_id' => $profile->reference_city_id,
+            'gender' => $profile->gender,
+            'place_of_birth' => $profile->place_of_birth,
+            'date_of_birth' => optional($profile->date_of_birth)->toDateString(),
             'address' => data_get($profile->identity_payload, 'address'),
+            'ktp_photo_path' => $profile->ktp_photo_path,
         ];
 
+        $ktpPhotoPath = $profile->ktp_photo_path;
+        if (($validated['ktp_photo'] ?? null) instanceof UploadedFile) {
+            if ($ktpPhotoPath && Storage::disk('local')->exists($ktpPhotoPath)) {
+                Storage::disk('local')->delete($ktpPhotoPath);
+            }
+
+            $ktpPhotoPath = $validated['ktp_photo']->store("signature-profiles/{$user->id}/identity", 'local');
+            if ($ktpPhotoPath === false) {
+                throw new RuntimeException('Foto identitas tidak dapat disimpan.');
+            }
+        }
+
         $nextIdentity = [
+            'is_wna' => filter_var($validated['is_wna'], FILTER_VALIDATE_BOOLEAN),
             'peruri_email' => (string) $validated['peruri_email'],
             'peruri_phone' => (string) $validated['peruri_phone'],
             'nik' => (string) $validated['nik'],
             'reference_province_id' => (int) $validated['reference_province_id'],
             'reference_city_id' => (int) $validated['reference_city_id'],
+            'gender' => (string) $validated['gender'],
+            'place_of_birth' => (string) $validated['place_of_birth'],
+            'date_of_birth' => (string) $validated['date_of_birth'],
             'address' => (string) $validated['address'],
+            'ktp_photo_path' => $ktpPhotoPath,
         ];
 
         $identityChanged = $currentIdentity !== $nextIdentity;
@@ -60,13 +83,22 @@ class CustomerSignatureOnboardingService
             'peruri_email' => $nextIdentity['peruri_email'],
             'peruri_phone' => $nextIdentity['peruri_phone'],
             'nik' => $nextIdentity['nik'],
+            'is_wna' => $nextIdentity['is_wna'],
             'reference_province_id' => $nextIdentity['reference_province_id'],
             'reference_city_id' => $nextIdentity['reference_city_id'],
+            'gender' => $nextIdentity['gender'],
+            'place_of_birth' => $nextIdentity['place_of_birth'],
+            'date_of_birth' => $nextIdentity['date_of_birth'],
+            'ktp_photo_path' => $nextIdentity['ktp_photo_path'],
             'identity_payload' => array_merge((array) ($profile->identity_payload ?? []), [
                 'name' => $user->name,
                 'email' => $nextIdentity['peruri_email'],
                 'phone' => $nextIdentity['peruri_phone'],
                 'nik' => $nextIdentity['nik'],
+                'is_wna' => $nextIdentity['is_wna'],
+                'gender' => $nextIdentity['gender'],
+                'place_of_birth' => $nextIdentity['place_of_birth'],
+                'date_of_birth' => $nextIdentity['date_of_birth'],
                 'address' => $nextIdentity['address'],
                 'province_id' => $nextIdentity['reference_province_id'],
                 'city_id' => $nextIdentity['reference_city_id'],
@@ -109,7 +141,7 @@ class CustomerSignatureOnboardingService
 
         $response = $this->provider->submitKycVideo(
             email: (string) $profile->peruri_email,
-            fileName: $video->getClientOriginalName() ?: ('kyc-' . $user->id . '.mp4'),
+            fileName: $video->getClientOriginalName() ?: ('kyc-'.$user->id.'.mp4'),
             videoBinary: $binary,
             payload: [],
         );
@@ -136,7 +168,7 @@ class CustomerSignatureOnboardingService
 
         $response = $this->provider->setSignatureSpecimen(
             email: (string) $profile->peruri_email,
-            fileName: $image->getClientOriginalName() ?: ('specimen-' . $user->id . '.png'),
+            fileName: $image->getClientOriginalName() ?: ('specimen-'.$user->id.'.png'),
             imageBinary: $binary,
             payload: [],
         );
@@ -181,7 +213,7 @@ class CustomerSignatureOnboardingService
         return [
             'request' => [
                 'id' => $record->id,
-                'request_number' => $record->request_number ?? ('REQ-' . $record->id),
+                'request_number' => $record->request_number ?? ('REQ-'.$record->id),
                 'contract_number' => $record->contract_number,
                 'contract_date' => optional($record->contract_date)->toDateString(),
             ],
@@ -191,9 +223,14 @@ class CustomerSignatureOnboardingService
                 'peruri_email' => $profile->peruri_email,
                 'peruri_phone' => $profile->peruri_phone,
                 'nik' => $profile->nik,
+                'is_wna' => (bool) $profile->is_wna,
                 'reference_province_id' => $profile->reference_province_id ? (string) $profile->reference_province_id : '',
                 'reference_city_id' => $profile->reference_city_id ? (string) $profile->reference_city_id : '',
+                'gender' => $profile->gender,
+                'place_of_birth' => $profile->place_of_birth,
+                'date_of_birth' => optional($profile->date_of_birth)->toDateString(),
                 'address' => (string) data_get($profile->identity_payload, 'address', $user->address ?? ''),
+                'has_ktp_photo' => filled($profile->ktp_photo_path),
                 'registration_status' => $profile->registration_status,
                 'kyc_status' => $profile->kyc_status,
                 'specimen_status' => $profile->specimen_status,
@@ -229,7 +266,7 @@ class CustomerSignatureOnboardingService
             'profile_id' => $profile?->id,
             'email' => $profile?->peruri_email,
             'phone' => $profile?->peruri_phone,
-            'nik' => $profile?->nik ? str_repeat('*', max(strlen($profile->nik) - 4, 0)) . substr((string) $profile->nik, -4) : null,
+            'nik' => $profile?->nik ? str_repeat('*', max(strlen($profile->nik) - 4, 0)).substr((string) $profile->nik, -4) : null,
             'overall' => data_get($readiness, 'overall'),
             'certificate' => data_get($readiness, 'certificate'),
             'keyla' => data_get($readiness, 'keyla'),
@@ -400,20 +437,32 @@ class CustomerSignatureOnboardingService
         $fallbackAvailable = $this->fallbackProvinceRows() !== [];
 
         return $fallbackAvailable
-            ? 'Referensi wilayah PDS sedang bermasalah. Daftar wilayah sementara memakai master data internal. ' . $message
+            ? 'Referensi wilayah PDS sedang bermasalah. Daftar wilayah sementara memakai master data internal. '.$message
             : $message;
     }
 
     private function registrationPayload(User $user, UserSignatureProfile $profile): array
     {
+        $ktpPhotoPath = (string) $profile->ktp_photo_path;
+        $ktpPhotoBinary = Storage::disk('local')->get($ktpPhotoPath);
+        if ($ktpPhotoBinary === null) {
+            throw new RuntimeException('Foto identitas tidak dapat dibaca.');
+        }
+
         return array_filter([
+            'isWNA' => (bool) $profile->is_wna,
             'name' => $user->name,
             'email' => $profile->peruri_email,
             'phone' => $profile->peruri_phone,
-            'nik' => $profile->nik,
-            'provinceId' => $profile->reference_province_id,
-            'cityId' => $profile->reference_city_id,
+            'type' => 'INDIVIDUAL',
+            'ktp' => $profile->nik,
+            'ktpPhoto' => base64_encode($ktpPhotoBinary),
+            'province' => (string) $profile->reference_province_id,
+            'city' => (string) $profile->reference_city_id,
             'address' => data_get($profile->identity_payload, 'address'),
+            'gender' => $profile->gender,
+            'placeOfBirth' => $profile->place_of_birth,
+            'dateOfBirth' => optional($profile->date_of_birth)->format('d/m/Y'),
         ], fn ($value) => $value !== null && $value !== '');
     }
 
@@ -427,8 +476,16 @@ class CustomerSignatureOnboardingService
             throw new RuntimeException('Pilih provinsi dan kota sesuai referensi PDS.');
         }
 
+        if (! filled($profile->gender) || ! filled($profile->place_of_birth) || ! $profile->date_of_birth) {
+            throw new RuntimeException('Lengkapi jenis kelamin, tempat lahir, dan tanggal lahir untuk onboarding PDS.');
+        }
+
         if (! filled(data_get($profile->identity_payload, 'address'))) {
             throw new RuntimeException('Alamat customer wajib diisi untuk onboarding PDS.');
+        }
+
+        if (! filled($profile->ktp_photo_path) || ! Storage::disk('local')->exists((string) $profile->ktp_photo_path)) {
+            throw new RuntimeException('Foto identitas wajib diunggah untuk onboarding PDS.');
         }
 
         return $profile;

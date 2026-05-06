@@ -60,6 +60,8 @@ it('redirects waiting-signature customer to onboarding when pds readiness is not
 });
 
 it('stores customer onboarding identity on signature profile and request snapshot', function (): void {
+    Storage::fake('local');
+
     $customer = User::factory()->create([
         'email' => 'portal@example.test',
         'phone_number' => '081200000001',
@@ -72,9 +74,14 @@ it('stores customer onboarding identity on signature profile and request snapsho
             'peruri_email' => 'signature@example.test',
             'peruri_phone' => '081255566677',
             'nik' => '3173000000000002',
+            'is_wna' => false,
             'reference_province_id' => 31,
             'reference_city_id' => 3171,
+            'gender' => 'M',
+            'place_of_birth' => 'Jakarta',
+            'date_of_birth' => '1990-01-15',
             'address' => 'Jakarta Selatan',
+            'ktp_photo' => UploadedFile::fake()->image('ktp.jpg'),
         ])
         ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]));
 
@@ -84,9 +91,15 @@ it('stores customer onboarding identity on signature profile and request snapsho
     expect($profile->peruri_email)->toBe('signature@example.test');
     expect($profile->peruri_phone)->toBe('081255566677');
     expect($profile->nik)->toBe('3173000000000002');
+    expect($profile->is_wna)->toBeFalse();
     expect($profile->reference_province_id)->toBe(31);
     expect($profile->reference_city_id)->toBe(3171);
+    expect($profile->gender)->toBe('M');
+    expect($profile->place_of_birth)->toBe('Jakarta');
+    expect($profile->date_of_birth?->toDateString())->toBe('1990-01-15');
+    expect($profile->ktp_photo_path)->not->toBeNull();
     expect(data_get($profile->identity_payload, 'address'))->toBe('Jakarta Selatan');
+    Storage::disk('local')->assertExists((string) $profile->ktp_photo_path);
 
     $snapshot = $request->fresh()->contract_signer_snapshot;
     expect(data_get($snapshot, 'customer.profile_id'))->toBe($profile->id);
@@ -94,6 +107,8 @@ it('stores customer onboarding identity on signature profile and request snapsho
 });
 
 it('does not probe peruri readiness when customer only saves onboarding identity', function (): void {
+    Storage::fake('local');
+
     $customer = User::factory()->create([
         'email' => 'portal@example.test',
         'phone_number' => '081200000001',
@@ -116,9 +131,14 @@ it('does not probe peruri readiness when customer only saves onboarding identity
             'peruri_email' => 'signature@example.test',
             'peruri_phone' => '081255566677',
             'nik' => '3173000000000002',
+            'is_wna' => false,
             'reference_province_id' => 31,
             'reference_city_id' => 3171,
+            'gender' => 'F',
+            'place_of_birth' => 'Bandung',
+            'date_of_birth' => '1992-02-20',
             'address' => 'Jakarta Selatan',
+            'ktp_photo' => UploadedFile::fake()->image('ktp.jpg'),
         ])
         ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]));
 
@@ -139,9 +159,14 @@ it('rejects invalid nik when saving customer onboarding identity', function (): 
             'peruri_email' => 'signature@example.test',
             'peruri_phone' => '081255566677',
             'nik' => 'NIK-TIDAK-VALID',
+            'is_wna' => false,
             'reference_province_id' => 31,
             'reference_city_id' => 3171,
+            'gender' => 'M',
+            'place_of_birth' => 'Jakarta',
+            'date_of_birth' => '1990-01-15',
             'address' => 'Jakarta Selatan',
+            'ktp_photo' => UploadedFile::fake()->image('ktp.jpg'),
         ])
         ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
         ->assertSessionHasErrors(['nik']);
@@ -149,7 +174,32 @@ it('rejects invalid nik when saving customer onboarding identity', function (): 
     expect($customer->fresh()->signatureProfile)->toBeNull();
 });
 
+it('requires ktp photo when saving customer onboarding identity for the first time', function (): void {
+    $customer = User::factory()->create();
+    $request = createWaitingSignatureAppraisalRequest($customer);
+
+    $this->from(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
+        ->actingAs($customer)
+        ->post(route('appraisal.contract.onboarding.identity', ['id' => $request->id]), [
+            'peruri_email' => 'signature@example.test',
+            'peruri_phone' => '081255566677',
+            'nik' => '3173000000000002',
+            'is_wna' => false,
+            'reference_province_id' => 31,
+            'reference_city_id' => 3171,
+            'gender' => 'M',
+            'place_of_birth' => 'Jakarta',
+            'date_of_birth' => '1990-01-15',
+            'address' => 'Jakarta Selatan',
+        ])
+        ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
+        ->assertSessionHasErrors(['ktp_photo']);
+});
+
 it('sends structured register-user payload for customer onboarding', function (): void {
+    Storage::fake('local');
+    Storage::disk('local')->put('signature-profiles/1/identity/ktp.jpg', 'ktp-binary');
+
     $customer = User::factory()->create([
         'name' => 'Customer Test',
     ]);
@@ -160,8 +210,13 @@ it('sends structured register-user payload for customer onboarding', function ()
         'peruri_email' => 'customer-sign@example.test',
         'peruri_phone' => '081211122233',
         'nik' => '3173000000000010',
+        'is_wna' => false,
         'reference_province_id' => 31,
         'reference_city_id' => 3171,
+        'gender' => 'M',
+        'place_of_birth' => 'Jakarta',
+        'date_of_birth' => '1990-01-15',
+        'ktp_photo_path' => 'signature-profiles/1/identity/ktp.jpg',
         'identity_payload' => [
             'address' => 'Jl. Testing',
         ],
@@ -179,18 +234,27 @@ it('sends structured register-user payload for customer onboarding', function ()
         ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]));
 
     expect($capturedPayload)->toMatchArray([
+        'isWNA' => false,
         'name' => 'Customer Test',
         'email' => 'customer-sign@example.test',
         'phone' => '081211122233',
-        'nik' => '3173000000000010',
-        'provinceId' => 31,
-        'cityId' => 3171,
+        'type' => 'INDIVIDUAL',
+        'ktp' => '3173000000000010',
+        'province' => '31',
+        'city' => '3171',
+        'gender' => 'M',
+        'placeOfBirth' => 'Jakarta',
+        'dateOfBirth' => '15/01/1990',
         'address' => 'Jl. Testing',
     ]);
+    expect(base64_decode((string) ($capturedPayload['ktpPhoto'] ?? ''), true))->toBe('ktp-binary');
+    expect((string) ($capturedPayload['ktpPhoto'] ?? ''))->not->toContain('data:image');
 });
 
 it('uploads kyc and specimen as base64 and stores keyla qr image', function (): void {
     Storage::fake('public');
+    Storage::fake('local');
+    Storage::disk('local')->put('signature-profiles/1/identity/ktp.jpg', 'ktp-binary');
 
     $customer = User::factory()->create();
     $request = createWaitingSignatureAppraisalRequest($customer);
@@ -200,8 +264,13 @@ it('uploads kyc and specimen as base64 and stores keyla qr image', function (): 
         'peruri_email' => 'customer-sign@example.test',
         'peruri_phone' => '081211122233',
         'nik' => '3173000000000010',
+        'is_wna' => false,
         'reference_province_id' => 31,
         'reference_city_id' => 3171,
+        'gender' => 'M',
+        'place_of_birth' => 'Jakarta',
+        'date_of_birth' => '1990-01-15',
+        'ktp_photo_path' => 'signature-profiles/1/identity/ktp.jpg',
         'identity_payload' => [
             'address' => 'Jl. Testing',
         ],
@@ -238,8 +307,8 @@ it('uploads kyc and specimen as base64 and stores keyla qr image', function (): 
         ->post(route('appraisal.contract.onboarding.register-keyla', ['id' => $request->id]))
         ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]));
 
-    expect(base64_decode((string) ($capturedKyc['base64Video'] ?? ''), true))->toBe($kycBinary);
-    expect(base64_decode((string) ($capturedSpecimen['base64Image'] ?? ''), true))->toBe($specimenBinary);
+    expect(base64_decode((string) ($capturedKyc['videoStream'] ?? ''), true))->toBe($kycBinary);
+    expect(base64_decode((string) ($capturedSpecimen['specimen'] ?? ''), true))->toBe($specimenBinary);
     expect($customer->fresh()->signatureProfile?->keyla_qr_image)->toBe('data:image/png;base64,AAAABBBB');
 });
 
@@ -524,12 +593,12 @@ function createWaitingSignatureAppraisalRequest(User $customer): AppraisalReques
 
     return AppraisalRequest::query()->create([
         'user_id' => $customer->id,
-        'request_number' => 'REQ-' . Str::upper(Str::random(8)),
+        'request_number' => 'REQ-'.Str::upper(Str::random(8)),
         'purpose' => 'jual_beli',
         'status' => AppraisalStatusEnum::WaitingSignature,
         'requested_at' => now(),
         'client_name' => 'PT Test DigiPro',
-        'contract_number' => '00015/AGR/DP/04/2026-' . Str::upper(Str::random(4)),
+        'contract_number' => '00015/AGR/DP/04/2026-'.Str::upper(Str::random(4)),
         'contract_date' => now()->toDateString(),
         'contract_status' => ContractStatusEnum::WaitingSignature,
         'fee_total' => 1400000,

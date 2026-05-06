@@ -135,7 +135,8 @@ it('sends signature specimen to peruri in base64 format through the adapter', fu
     expect($capturedPayload)->not->toBeNull();
     expect($capturedPayload['email'] ?? null)->toBe('public@appraiser.test');
     expect($capturedPayload['note'] ?? null)->toBe('specimen-test');
-    expect(base64_decode((string) ($capturedPayload['base64Image'] ?? ''), true))->toBe($pngBinary);
+    expect(base64_decode((string) ($capturedPayload['specimen'] ?? ''), true))->toBe($pngBinary);
+    expect((string) ($capturedPayload['specimen'] ?? ''))->not->toContain('data:image');
 });
 
 it('stores keyla qr image in session after registration', function (): void {
