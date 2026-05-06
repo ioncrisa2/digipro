@@ -170,7 +170,7 @@ it('generates final legal documents only after payment is verified', function ()
 
     $record = AppraisalRequest::create([
         'user_id' => $user->id,
-        'request_number' => 'REQ-REP-' . Str::upper(Str::random(6)),
+        'request_number' => 'REQ-REP-'.Str::upper(Str::random(6)),
         'purpose' => 'jual_beli',
         'client_name' => 'PT Uji Representatif',
         'status' => AppraisalStatusEnum::WaitingSignature,
@@ -213,7 +213,10 @@ it('generates final legal documents only after payment is verified', function ()
             ],
         ], 200)
         ->push(['status' => '00', 'message' => 'OK', 'data' => ['isExpired' => false]], 200) // customer cert
+        ->push(['status' => '00', 'message' => 'OK', 'data' => ['registered' => true, 'active' => true]], 200) // customer keyla check
         ->push(['status' => '00', 'message' => 'OK', 'data' => ['isExpired' => false]], 200) // internal cert
+        ->push(['status' => '00', 'message' => 'OK', 'data' => ['registered' => true, 'active' => true]], 200) // internal keyla check
+        ->push(['status' => '00', 'message' => 'OK', 'data' => ['verified' => true]], 200) // customer keyla verify
         ->push(['status' => '00', 'message' => 'OK', 'data' => ['orderIdTier' => 'TIER-123', 'orderId' => 'ORDER-CUST-1']], 200)
         ->push(['status' => '00', 'message' => 'OK', 'data' => []], 200) // coordinate
         ->push(['status' => '00', 'message' => 'OK', 'data' => []], 200); // signing
@@ -241,7 +244,7 @@ it('generates final legal documents only after payment is verified', function ()
         'amount' => 1800000,
         'method' => 'gateway',
         'gateway' => 'midtrans',
-        'external_payment_id' => 'DIGIPRO-LEGAL-' . Str::upper(Str::random(6)),
+        'external_payment_id' => 'DIGIPRO-LEGAL-'.Str::upper(Str::random(6)),
         'status' => 'pending',
         'proof_type' => 'gateway_id',
         'metadata' => [
@@ -250,7 +253,7 @@ it('generates final legal documents only after payment is verified', function ()
     ]);
 
     $grossAmount = '1800000.00';
-    $signature = hash('sha512', $payment->external_payment_id . '200' . $grossAmount . config('payment.midtrans.server_key'));
+    $signature = hash('sha512', $payment->external_payment_id.'200'.$grossAmount.config('payment.midtrans.server_key'));
 
     $this->postJson(route('payments.midtrans.notification'), [
         'order_id' => $payment->external_payment_id,
