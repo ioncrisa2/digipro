@@ -67,8 +67,8 @@ class CustomerSignatureOnboardingService
             'peruri_email' => (string) $validated['peruri_email'],
             'peruri_phone' => (string) $validated['peruri_phone'],
             'nik' => (string) $validated['nik'],
-            'reference_province_id' => (int) $validated['reference_province_id'],
-            'reference_city_id' => (int) $validated['reference_city_id'],
+            'reference_province_id' => (string) $validated['reference_province_id'],
+            'reference_city_id' => (string) $validated['reference_city_id'],
             'gender' => (string) $validated['gender'],
             'place_of_birth' => (string) $validated['place_of_birth'],
             'date_of_birth' => (string) $validated['date_of_birth'],
@@ -139,12 +139,23 @@ class CustomerSignatureOnboardingService
 
         $path = $video->store("signature-profiles/{$user->id}/kyc", 'public');
 
-        $response = $this->provider->submitKycVideo(
-            email: (string) $profile->peruri_email,
-            fileName: $video->getClientOriginalName() ?: ('kyc-'.$user->id.'.mp4'),
-            videoBinary: $binary,
-            payload: [],
-        );
+        try {
+            $response = $this->provider->submitKycVideo(
+                email: (string) $profile->peruri_email,
+                fileName: $video->getClientOriginalName() ?: ('kyc-'.$user->id.'.mp4'),
+                videoBinary: $binary,
+                payload: [],
+            );
+        } catch (RuntimeException $exception) {
+            if (! str_contains($exception->getMessage(), 'Sudah melakukan')) {
+                throw $exception;
+            }
+
+            $response = [
+                'status' => '28',
+                'message' => $exception->getMessage(),
+            ];
+        }
 
         $profile->forceFill([
             'kyc_status' => 'submitted',
@@ -185,6 +196,15 @@ class CustomerSignatureOnboardingService
     public function registerKeyla(User $user): array
     {
         $profile = $this->ensureIdentityComplete($this->profileFor($user));
+        $certificate = $this->readinessService->syncCustomerCertificate($profile);
+
+        if (! ($certificate['is_ready'] ?? false)) {
+            $message = (string) ($certificate['message'] ?? 'status belum siap.');
+
+            throw new RuntimeException(($certificate['code'] ?? null) === 'pending'
+                ? $message.' QR KEYLA baru bisa dibuat setelah sertifikat aktif.'
+                : 'Sertifikat Peruri belum aktif untuk KEYLA: '.$message);
+        }
 
         $response = $this->provider->registerKeyla((string) $profile->peruri_email);
 
@@ -204,11 +224,13 @@ class CustomerSignatureOnboardingService
         return $this->readinessService->syncCustomerProfile($profile);
     }
 
-    public function onboardingPayload(AppraisalRequest $record, User $user, ?int $selectedProvinceId = null): array
+    public function onboardingPayload(AppraisalRequest $record, User $user, int|string|null $selectedProvinceId = null): array
     {
         $profile = $this->profileFor($user)->fresh();
         $readiness = $this->readinessService->forCustomerProfile($profile);
-        $references = $this->referencePayload($selectedProvinceId ?: $profile->reference_province_id);
+        $normalizedProvinceId = $this->pdsProvinceId($profile->reference_province_id);
+        $normalizedCityId = $this->pdsCityId($normalizedProvinceId, $profile->reference_city_id);
+        $references = $this->referencePayload($selectedProvinceId ?: $normalizedProvinceId);
 
         return [
             'request' => [
@@ -224,8 +246,8 @@ class CustomerSignatureOnboardingService
                 'peruri_phone' => $profile->peruri_phone,
                 'nik' => $profile->nik,
                 'is_wna' => (bool) $profile->is_wna,
-                'reference_province_id' => $profile->reference_province_id ? (string) $profile->reference_province_id : '',
-                'reference_city_id' => $profile->reference_city_id ? (string) $profile->reference_city_id : '',
+                'reference_province_id' => $normalizedProvinceId ?: '',
+                'reference_city_id' => $normalizedCityId ?: '',
                 'gender' => $profile->gender,
                 'place_of_birth' => $profile->place_of_birth,
                 'date_of_birth' => optional($profile->date_of_birth)->toDateString(),
@@ -311,7 +333,7 @@ class CustomerSignatureOnboardingService
         ];
     }
 
-    private function referencePayload(?int $selectedProvinceId): array
+    private function referencePayload(int|string|null $selectedProvinceId): array
     {
         try {
             $provinceData = $this->normalizeReferenceRows($this->provider->referenceProvinces());
@@ -321,13 +343,13 @@ class CustomerSignatureOnboardingService
 
             return [
                 'provinces' => $provinceData !== [] ? $provinceData : $this->fallbackProvinceRows(),
-                'cities' => $cityData !== [] ? $cityData : $this->fallbackCityRows($selectedProvinceId),
+                'cities' => $cityData !== [] ? $cityData : $this->fallbackCityRows($this->localProvinceId($selectedProvinceId)),
                 'error' => $provinceData !== [] ? null : 'Referensi wilayah PDS belum tersedia. Daftar wilayah sementara memakai master data internal.',
             ];
         } catch (RuntimeException $exception) {
             return [
                 'provinces' => $this->fallbackProvinceRows(),
-                'cities' => $this->fallbackCityRows($selectedProvinceId),
+                'cities' => $this->fallbackCityRows($this->localProvinceId($selectedProvinceId)),
                 'error' => $this->fallbackReferenceError($exception->getMessage()),
             ];
         }
@@ -432,6 +454,17 @@ class CustomerSignatureOnboardingService
             ->all();
     }
 
+    private function localProvinceId(int|string|null $selectedProvinceId): ?int
+    {
+        if ($selectedProvinceId === null || $selectedProvinceId === '') {
+            return null;
+        }
+
+        $normalized = preg_replace('/^R-/', '', (string) $selectedProvinceId);
+
+        return is_numeric($normalized) ? (int) $normalized : null;
+    }
+
     private function fallbackReferenceError(string $message): string
     {
         $fallbackAvailable = $this->fallbackProvinceRows() !== [];
@@ -457,8 +490,8 @@ class CustomerSignatureOnboardingService
             'type' => 'INDIVIDUAL',
             'ktp' => $profile->nik,
             'ktpPhoto' => base64_encode($ktpPhotoBinary),
-            'province' => (string) $profile->reference_province_id,
-            'city' => (string) $profile->reference_city_id,
+            'province' => $this->pdsProvinceId($profile->reference_province_id),
+            'city' => $this->pdsCityId($this->pdsProvinceId($profile->reference_province_id), $profile->reference_city_id),
             'address' => data_get($profile->identity_payload, 'address'),
             'gender' => $profile->gender,
             'placeOfBirth' => $profile->place_of_birth,
@@ -489,6 +522,57 @@ class CustomerSignatureOnboardingService
         }
 
         return $profile;
+    }
+
+    private function pdsProvinceId(int|string|null $provinceId): ?string
+    {
+        if ($provinceId === null || $provinceId === '') {
+            return null;
+        }
+
+        $provinceId = (string) $provinceId;
+
+        if (str_starts_with($provinceId, 'R-')) {
+            return $provinceId;
+        }
+
+        return is_numeric($provinceId) ? 'R-'.$provinceId : $provinceId;
+    }
+
+    private function pdsCityId(?string $pdsProvinceId, int|string|null $cityId): ?string
+    {
+        if ($cityId === null || $cityId === '') {
+            return null;
+        }
+
+        $cityId = (string) $cityId;
+        if (str_starts_with($cityId, 'R-')) {
+            return $cityId;
+        }
+
+        $localCityName = Regency::query()->whereKey($cityId)->value('name');
+        if ($pdsProvinceId && filled($localCityName)) {
+            try {
+                $city = collect($this->normalizeReferenceRows($this->provider->referenceCities($pdsProvinceId)))
+                    ->first(fn (array $row): bool => $this->normalizeLocationName($row['label']) === $this->normalizeLocationName((string) $localCityName));
+
+                if (is_array($city) && filled($city['value'] ?? null)) {
+                    return (string) $city['value'];
+                }
+            } catch (RuntimeException) {
+            }
+        }
+
+        if ($pdsProvinceId && is_numeric($cityId) && strlen($cityId) >= 4) {
+            return $pdsProvinceId.'.'.substr($cityId, -2);
+        }
+
+        return $cityId;
+    }
+
+    private function normalizeLocationName(string $name): string
+    {
+        return preg_replace('/\s+/', ' ', strtoupper(trim($name))) ?: '';
     }
 
     private function resetReadiness(UserSignatureProfile $profile, string $message): void

@@ -62,9 +62,14 @@ const hasSignatureStroke = ref(false);
 const registrationDone = computed(() => props.readiness?.registration?.is_ready === true);
 const kycDone = computed(() => props.readiness?.kyc?.is_ready === true);
 const specimenDone = computed(() => props.readiness?.specimen?.is_ready === true);
+const certificateState = computed(() => props.readiness?.certificate ?? {});
+const certificateReady = computed(() => certificateState.value?.is_ready === true);
+const certificateMessage = computed(() => certificateState.value?.message ?? "Cek status sertifikat Peruri sebelum membuat QR KEYLA.");
 const keylaDone = computed(() => props.readiness?.keyla?.is_ready === true);
 const overallReady = computed(() => props.readiness?.overall?.is_ready === true);
 const currentStepTitle = computed(() => stepLabels[currentStep.value - 1] ?? "");
+const canRegisterKeyla = computed(() => registrationDone.value && kycDone.value && specimenDone.value && certificateReady.value && !keylaDone.value);
+const keylaRefreshLabel = computed(() => keylaQr.value ? "Saya Sudah Scan, Cek Lagi" : "Cek Status Peruri");
 
 const statusClass = (tone) => ({
     success: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -110,6 +115,12 @@ watch(activeStepIndex, (value) => {
     }
 }, { immediate: true });
 
+watch(() => flash.value?.error, (message) => {
+    if (message) {
+        console.error("PDS onboarding error:", message);
+    }
+}, { immediate: true });
+
 const isWna = computed(() => identityForm.is_wna === "1" || identityForm.is_wna === true);
 const identityPhotoLabel = computed(() => props.profile?.has_ktp_photo ? "Foto identitas sudah tersimpan" : "Foto identitas belum diunggah");
 
@@ -145,7 +156,11 @@ const saveIdentity = () => identityForm.post(props.actions.save_identity_url, {
 });
 const refreshReadiness = () => router.post(props.actions.refresh_url, {}, { preserveScroll: true });
 const registerUser = () => router.post(props.actions.register_user_url, {}, { preserveScroll: true });
-const registerKeyla = () => router.post(props.actions.register_keyla_url, {}, { preserveScroll: true });
+const registerKeyla = () => {
+    if (!canRegisterKeyla.value) return;
+
+    router.post(props.actions.register_keyla_url, {}, { preserveScroll: true });
+};
 const goToContract = () => router.visit(props.actions.contract_url);
 const goBackStep = () => { currentStep.value = Math.max(1, currentStep.value - 1); };
 const goNextStep = () => { currentStep.value = Math.min(4, currentStep.value + 1); };
@@ -578,9 +593,16 @@ onBeforeUnmount(() => {
                         </Alert>
                         <p class="text-xs text-slate-500">Setelah QR dibuat, buka aplikasi KEYLA di ponsel Anda lalu scan QR tersebut untuk menghubungkan akun.</p>
 
+                        <Alert :class="certificateReady ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : 'border-amber-200 bg-amber-50 text-amber-950'">
+                            <ShieldCheck v-if="certificateReady" class="h-4 w-4" />
+                            <CircleAlert v-else class="h-4 w-4" />
+                            <AlertTitle>Status sertifikat Peruri</AlertTitle>
+                            <AlertDescription>{{ certificateMessage }}</AlertDescription>
+                        </Alert>
+
                         <div class="flex flex-wrap gap-2">
-                            <Button type="button" variant="outline" @click="registerKeyla">Buat QR KEYLA</Button>
-                            <Button type="button" @click="refreshReadiness">Saya Sudah Scan, Cek Lagi</Button>
+                            <Button type="button" variant="outline" :disabled="!canRegisterKeyla" @click="registerKeyla">Buat QR KEYLA</Button>
+                            <Button type="button" @click="refreshReadiness">{{ keylaRefreshLabel }}</Button>
                         </div>
 
                         <div v-if="keylaQr" class="rounded-2xl border border-slate-200 p-4">

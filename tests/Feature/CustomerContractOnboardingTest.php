@@ -75,8 +75,8 @@ it('stores customer onboarding identity on signature profile and request snapsho
             'peruri_phone' => '081255566677',
             'nik' => '3173000000000002',
             'is_wna' => false,
-            'reference_province_id' => 31,
-            'reference_city_id' => 3171,
+            'reference_province_id' => 'R-31',
+            'reference_city_id' => 'R-31.74',
             'gender' => 'M',
             'place_of_birth' => 'Jakarta',
             'date_of_birth' => '1990-01-15',
@@ -92,8 +92,8 @@ it('stores customer onboarding identity on signature profile and request snapsho
     expect($profile->peruri_phone)->toBe('081255566677');
     expect($profile->nik)->toBe('3173000000000002');
     expect($profile->is_wna)->toBeFalse();
-    expect($profile->reference_province_id)->toBe(31);
-    expect($profile->reference_city_id)->toBe(3171);
+    expect($profile->reference_province_id)->toBe('R-31');
+    expect($profile->reference_city_id)->toBe('R-31.74');
     expect($profile->gender)->toBe('M');
     expect($profile->place_of_birth)->toBe('Jakarta');
     expect($profile->date_of_birth?->toDateString())->toBe('1990-01-15');
@@ -132,8 +132,8 @@ it('does not probe peruri readiness when customer only saves onboarding identity
             'peruri_phone' => '081255566677',
             'nik' => '3173000000000002',
             'is_wna' => false,
-            'reference_province_id' => 31,
-            'reference_city_id' => 3171,
+            'reference_province_id' => 'R-31',
+            'reference_city_id' => 'R-31.74',
             'gender' => 'F',
             'place_of_birth' => 'Bandung',
             'date_of_birth' => '1992-02-20',
@@ -160,8 +160,8 @@ it('rejects invalid nik when saving customer onboarding identity', function (): 
             'peruri_phone' => '081255566677',
             'nik' => 'NIK-TIDAK-VALID',
             'is_wna' => false,
-            'reference_province_id' => 31,
-            'reference_city_id' => 3171,
+            'reference_province_id' => 'R-31',
+            'reference_city_id' => 'R-31.74',
             'gender' => 'M',
             'place_of_birth' => 'Jakarta',
             'date_of_birth' => '1990-01-15',
@@ -185,8 +185,8 @@ it('requires ktp photo when saving customer onboarding identity for the first ti
             'peruri_phone' => '081255566677',
             'nik' => '3173000000000002',
             'is_wna' => false,
-            'reference_province_id' => 31,
-            'reference_city_id' => 3171,
+            'reference_province_id' => 'R-31',
+            'reference_city_id' => 'R-31.74',
             'gender' => 'M',
             'place_of_birth' => 'Jakarta',
             'date_of_birth' => '1990-01-15',
@@ -211,8 +211,8 @@ it('sends structured register-user payload for customer onboarding', function ()
         'peruri_phone' => '081211122233',
         'nik' => '3173000000000010',
         'is_wna' => false,
-        'reference_province_id' => 31,
-        'reference_city_id' => 3171,
+        'reference_province_id' => 'R-31',
+        'reference_city_id' => 'R-31.74',
         'gender' => 'M',
         'place_of_birth' => 'Jakarta',
         'date_of_birth' => '1990-01-15',
@@ -240,8 +240,8 @@ it('sends structured register-user payload for customer onboarding', function ()
         'phone' => '081211122233',
         'type' => 'INDIVIDUAL',
         'ktp' => '3173000000000010',
-        'province' => '31',
-        'city' => '3171',
+        'province' => 'R-31',
+        'city' => 'R-31.74',
         'gender' => 'M',
         'placeOfBirth' => 'Jakarta',
         'dateOfBirth' => '15/01/1990',
@@ -251,7 +251,79 @@ it('sends structured register-user payload for customer onboarding', function ()
     expect((string) ($capturedPayload['ktpPhoto'] ?? ''))->not->toContain('data:image');
 });
 
-it('uploads kyc and specimen as base64 and stores keyla qr image', function (): void {
+it('maps legacy local province and city ids to pds reference ids before registering customer', function (): void {
+    Storage::fake('local');
+    Storage::disk('local')->put('signature-profiles/1/identity/ktp.jpg', 'ktp-binary');
+
+    Province::query()->create(['id' => '31', 'name' => 'DKI JAKARTA']);
+    Regency::query()->create(['id' => '3171', 'province_id' => '31', 'name' => 'KOTA ADM. JAKARTA SELATAN']);
+
+    $customer = User::factory()->create([
+        'name' => 'Customer Legacy',
+    ]);
+    $request = createWaitingSignatureAppraisalRequest($customer);
+    UserSignatureProfile::query()->create([
+        'user_id' => $customer->id,
+        'provider' => 'peruri_signit',
+        'peruri_email' => 'legacy-sign@example.test',
+        'peruri_phone' => '081211122233',
+        'nik' => '3173000000000011',
+        'is_wna' => false,
+        'reference_province_id' => '31',
+        'reference_city_id' => '3171',
+        'gender' => 'M',
+        'place_of_birth' => 'Jakarta',
+        'date_of_birth' => '1990-01-15',
+        'ktp_photo_path' => 'signature-profiles/1/identity/ktp.jpg',
+        'identity_payload' => [
+            'address' => 'Jl. Legacy',
+        ],
+    ]);
+
+    $capturedPayload = null;
+
+    Http::fake(function (ClientRequest $request) use (&$capturedPayload) {
+        if (str_contains($request->url(), '/auth/v1/token/generate')) {
+            return Http::response([
+                'status' => '00',
+                'message' => 'OK',
+                'data' => [
+                    'accessToken' => 'access-token-test',
+                    'expiredDate' => now()->endOfDay()->toIso8601String(),
+                ],
+            ], 200);
+        }
+
+        if (str_contains($request->url(), '/registration/v1/CORP-TEST/reference/city')) {
+            expect($request->data()['idProvince'] ?? null)->toBe('R-31');
+
+            return Http::response([
+                'status' => '00',
+                'message' => 'OK',
+                'data' => [
+                    ['idCity' => 'R-31.74', 'city' => 'KOTA ADM. JAKARTA SELATAN'],
+                ],
+            ], 200);
+        }
+
+        if (str_contains($request->url(), '/registration/v1/CORP-TEST/user')) {
+            $capturedPayload = $request->data();
+        }
+
+        return Http::response(['status' => '00', 'message' => 'OK', 'data' => []], 200);
+    });
+
+    $this->actingAs($customer)
+        ->post(route('appraisal.contract.onboarding.register-user', ['id' => $request->id]))
+        ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]));
+
+    expect($capturedPayload)->toMatchArray([
+        'province' => 'R-31',
+        'city' => 'R-31.74',
+    ]);
+});
+
+it('uploads kyc and specimen as base64 then checks certificate before storing keyla qr image', function (): void {
     Storage::fake('public');
     Storage::fake('local');
     Storage::disk('local')->put('signature-profiles/1/identity/ktp.jpg', 'ktp-binary');
@@ -265,8 +337,8 @@ it('uploads kyc and specimen as base64 and stores keyla qr image', function (): 
         'peruri_phone' => '081211122233',
         'nik' => '3173000000000010',
         'is_wna' => false,
-        'reference_province_id' => 31,
-        'reference_city_id' => 3171,
+        'reference_province_id' => 'R-31',
+        'reference_city_id' => 'R-31.74',
         'gender' => 'M',
         'place_of_birth' => 'Jakarta',
         'date_of_birth' => '1990-01-15',
@@ -278,13 +350,23 @@ it('uploads kyc and specimen as base64 and stores keyla qr image', function (): 
 
     $capturedKyc = null;
     $capturedSpecimen = null;
-    fakePeruri(function (ClientRequest $request) use (&$capturedKyc, &$capturedSpecimen) {
+    $certificateChecked = false;
+    $keylaRegistered = false;
+    fakePeruri(function (ClientRequest $request) use (&$capturedKyc, &$capturedSpecimen, &$certificateChecked, &$keylaRegistered) {
         if (str_contains($request->url(), '/registration/v1/CORP-TEST/kyc')) {
             $capturedKyc = $request->data();
         }
 
         if (str_contains($request->url(), '/specimen/v1/CORP-TEST/set/signature')) {
             $capturedSpecimen = $request->data();
+        }
+
+        if (str_contains($request->url(), '/certificate/v1/CORP-TEST/check')) {
+            $certificateChecked = true;
+        }
+
+        if (str_contains($request->url(), '/keyla/v1/CORP-TEST/sign/register')) {
+            $keylaRegistered = true;
         }
     });
 
@@ -309,7 +391,139 @@ it('uploads kyc and specimen as base64 and stores keyla qr image', function (): 
 
     expect(base64_decode((string) ($capturedKyc['videoStream'] ?? ''), true))->toBe($kycBinary);
     expect(base64_decode((string) ($capturedSpecimen['specimen'] ?? ''), true))->toBe($specimenBinary);
+    expect($certificateChecked)->toBeTrue();
+    expect($keylaRegistered)->toBeTrue();
     expect($customer->fresh()->signatureProfile?->keyla_qr_image)->toBe('data:image/png;base64,AAAABBBB');
+});
+
+it('does not register keyla while the certificate is still waiting for verification', function (): void {
+    Storage::fake('local');
+    Storage::disk('local')->put('signature-profiles/1/identity/ktp.jpg', 'ktp-binary');
+
+    $customer = User::factory()->create();
+    $request = createWaitingSignatureAppraisalRequest($customer);
+    UserSignatureProfile::query()->create([
+        'user_id' => $customer->id,
+        'provider' => 'peruri_signit',
+        'peruri_email' => 'customer-sign@example.test',
+        'peruri_phone' => '081211122233',
+        'nik' => '3173000000000010',
+        'is_wna' => false,
+        'reference_province_id' => 'R-31',
+        'reference_city_id' => 'R-31.74',
+        'gender' => 'M',
+        'place_of_birth' => 'Jakarta',
+        'date_of_birth' => '1990-01-15',
+        'registration_status' => 'submitted',
+        'kyc_status' => 'submitted',
+        'specimen_status' => 'submitted',
+        'ktp_photo_path' => 'signature-profiles/1/identity/ktp.jpg',
+        'identity_payload' => [
+            'address' => 'Jl. Testing',
+        ],
+    ]);
+
+    $keylaRegistered = false;
+
+    Http::fake(function (ClientRequest $request) use (&$keylaRegistered) {
+        if (str_contains($request->url(), '/auth/v1/token/generate')) {
+            return Http::response([
+                'status' => '00',
+                'message' => 'OK',
+                'data' => [
+                    'accessToken' => 'access-token-test',
+                    'expiredDate' => now()->endOfDay()->toIso8601String(),
+                ],
+            ], 200);
+        }
+
+        if (str_contains($request->url(), '/certificate/v1/CORP-TEST/check')) {
+            return Http::response([
+                'status' => '10',
+                'message' => 'Waiting for Verification',
+                'data' => null,
+            ], 200);
+        }
+
+        if (str_contains($request->url(), '/keyla/v1/CORP-TEST/sign/register')) {
+            $keylaRegistered = true;
+        }
+
+        return Http::response(['status' => '00', 'message' => 'OK', 'data' => []], 200);
+    });
+
+    $this->actingAs($customer)
+        ->post(route('appraisal.contract.onboarding.register-keyla', ['id' => $request->id]))
+        ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
+        ->assertSessionHas('error', 'Kode 10: Sertifikat Peruri sedang menunggu verifikasi. QR KEYLA baru bisa dibuat setelah sertifikat aktif.');
+
+    $profile = $customer->fresh()->signatureProfile;
+
+    expect($keylaRegistered)->toBeFalse();
+    expect($profile?->certificate_status)->toBe('pending');
+    expect($profile?->keyla_qr_image)->toBeNull();
+    expect($profile?->last_error)->toBeNull();
+});
+
+it('marks kyc as submitted when pds says the customer already performed e-kyc', function (): void {
+    Storage::fake('public');
+    Storage::fake('local');
+    Storage::disk('local')->put('signature-profiles/1/identity/ktp.jpg', 'ktp-binary');
+
+    $customer = User::factory()->create();
+    $request = createWaitingSignatureAppraisalRequest($customer);
+    UserSignatureProfile::query()->create([
+        'user_id' => $customer->id,
+        'provider' => 'peruri_signit',
+        'peruri_email' => 'customer-sign@example.test',
+        'peruri_phone' => '081211122233',
+        'nik' => '3173000000000010',
+        'is_wna' => false,
+        'reference_province_id' => 'R-31',
+        'reference_city_id' => 'R-31.74',
+        'gender' => 'M',
+        'place_of_birth' => 'Jakarta',
+        'date_of_birth' => '1990-01-15',
+        'ktp_photo_path' => 'signature-profiles/1/identity/ktp.jpg',
+        'identity_payload' => [
+            'address' => 'Jl. Testing',
+        ],
+    ]);
+
+    Http::fake(function (ClientRequest $request) {
+        if (str_contains($request->url(), '/auth/v1/token/generate')) {
+            return Http::response([
+                'status' => '00',
+                'message' => 'OK',
+                'data' => [
+                    'accessToken' => 'access-token-test',
+                    'expiredDate' => now()->endOfDay()->toIso8601String(),
+                ],
+            ], 200);
+        }
+
+        if (str_contains($request->url(), '/registration/v1/CORP-TEST/kyc')) {
+            return Http::response([
+                'status' => '28',
+                'message' => 'Sudah melakukan KYC',
+            ], 409);
+        }
+
+        return Http::response(['status' => '00', 'message' => 'OK', 'data' => []], 200);
+    });
+
+    $this->actingAs($customer)
+        ->post(route('appraisal.contract.onboarding.submit-kyc', ['id' => $request->id]), [
+            'kyc_video' => UploadedFile::fake()->createWithContent('kyc.mp4', 'video-binary'),
+        ])
+        ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
+        ->assertSessionHas('success', 'Video E-KYC berhasil dikirim ke PDS.');
+
+    $profile = $customer->fresh()->signatureProfile;
+
+    expect($profile?->kyc_status)->toBe('submitted');
+    expect($profile?->kyc_video_path)->not->toBeNull();
+    expect($profile?->last_error)->toBeNull();
 });
 
 it('refreshes readiness and reuses customer profile across requests', function (): void {
@@ -323,8 +537,8 @@ it('refreshes readiness and reuses customer profile across requests', function (
         'peruri_email' => 'customer-sign@example.test',
         'peruri_phone' => '081211122233',
         'nik' => '3173000000000010',
-        'reference_province_id' => 31,
-        'reference_city_id' => 3171,
+        'reference_province_id' => 'R-31',
+        'reference_city_id' => 'R-31.74',
         'registration_status' => 'submitted',
         'kyc_status' => 'submitted',
         'specimen_status' => 'submitted',
@@ -357,8 +571,8 @@ it('surfaces specific peruri token error during readiness refresh', function ():
         'peruri_email' => 'customer-sign@example.test',
         'peruri_phone' => '081211122233',
         'nik' => '3173000000000010',
-        'reference_province_id' => 31,
-        'reference_city_id' => 3171,
+        'reference_province_id' => 'R-31',
+        'reference_city_id' => 'R-31.74',
         'registration_status' => 'submitted',
         'kyc_status' => 'submitted',
         'specimen_status' => 'submitted',
@@ -397,8 +611,8 @@ it('uses customer peruri email from signature profile when signing contract', fu
         'peruri_email' => 'signature@example.test',
         'peruri_phone' => '081211122233',
         'nik' => '3173000000000010',
-        'reference_province_id' => 31,
-        'reference_city_id' => 3171,
+        'reference_province_id' => 'R-31',
+        'reference_city_id' => 'R-31.74',
         'registration_status' => 'submitted',
         'kyc_status' => 'submitted',
         'specimen_status' => 'submitted',
@@ -493,7 +707,7 @@ it('loads province and city references from nested pds payloads on onboarding pa
                 'message' => 'OK',
                 'data' => [
                     'province' => [
-                        ['idProvince' => 31, 'provinceName' => 'DKI Jakarta'],
+                        ['idProvince' => 'R-31', 'province' => 'DKI JAKARTA'],
                     ],
                 ],
             ], 200);
@@ -505,7 +719,7 @@ it('loads province and city references from nested pds payloads on onboarding pa
                 'message' => 'OK',
                 'data' => [
                     'city' => [
-                        ['idCity' => 3171, 'cityName' => 'Jakarta Selatan'],
+                        ['idCity' => 'R-31.74', 'city' => 'KOTA ADM. JAKARTA SELATAN'],
                     ],
                 ],
             ], 200);
@@ -523,14 +737,14 @@ it('loads province and city references from nested pds payloads on onboarding pa
     });
 
     $this->actingAs($customer)
-        ->get(route('appraisal.contract.onboarding.page', ['id' => $request->id, 'province_id' => 31]))
+        ->get(route('appraisal.contract.onboarding.page', ['id' => $request->id, 'province_id' => 'R-31']))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Penilaian/ContractOnboarding')
-            ->where('references.provinces.0.value', '31')
-            ->where('references.provinces.0.label', 'DKI Jakarta')
-            ->where('references.cities.0.value', '3171')
-            ->where('references.cities.0.label', 'Jakarta Selatan'));
+            ->where('references.provinces.0.value', 'R-31')
+            ->where('references.provinces.0.label', 'DKI JAKARTA')
+            ->where('references.cities.0.value', 'R-31.74')
+            ->where('references.cities.0.label', 'KOTA ADM. JAKARTA SELATAN'));
 });
 
 it('falls back to internal province and city master data when pds references fail', function (): void {
@@ -645,6 +859,14 @@ function fakePeruri(?callable $inspect = null): void
                 'status' => '00',
                 'message' => 'OK',
                 'data' => ['qrImage' => 'data:image/png;base64,AAAABBBB'],
+            ], 200);
+        }
+
+        if (str_contains($request->url(), '/certificate/v1/CORP-TEST/check')) {
+            return Http::response([
+                'status' => '00',
+                'message' => 'OK',
+                'data' => ['isExpired' => false],
             ], 200);
         }
 

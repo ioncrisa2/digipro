@@ -12,8 +12,7 @@ class PeruriClient
     public function __construct(
         private readonly PeruriTokenService $tokenService,
         private readonly PeruriErrorMapper $errorMapper,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $json
@@ -54,7 +53,7 @@ class PeruriClient
             throw new RuntimeException('Konfigurasi Peruri base url belum diisi.');
         }
 
-        $url = $baseUrl . '/' . ltrim($path, '/');
+        $url = $baseUrl.'/'.ltrim($path, '/');
 
         $response = $this->http()
             ->withToken($this->tokenService->accessToken())
@@ -64,13 +63,26 @@ class PeruriClient
             ], fn ($value) => $value !== null));
 
         if (! $response->ok()) {
+            $body = $response->json();
+            $peruriStatus = is_array($body) ? (string) ($body['status'] ?? '') : '';
+            $message = is_array($body)
+                ? $this->errorMapper->messageForStatus($peruriStatus, (string) ($body['message'] ?? ''))
+                : 'Gagal menghubungi layanan Peruri. Silakan coba lagi.';
+
             Log::warning('Peruri HTTP request failed.', [
                 'method' => $method,
                 'path' => $path,
                 'status_code' => $response->status(),
+                'peruri_status' => is_array($body) ? ($body['status'] ?? null) : null,
+                'peruri_message' => is_array($body) ? ($body['message'] ?? null) : null,
             ]);
 
-            throw new RuntimeException('Gagal menghubungi layanan Peruri. Silakan coba lagi.');
+            throw new PeruriApiException(
+                peruriStatus: $peruriStatus,
+                message: $message,
+                httpStatus: $response->status(),
+                body: is_array($body) ? $body : null,
+            );
         }
 
         $body = $response->json();
@@ -81,7 +93,13 @@ class PeruriClient
         $status = (string) ($body['status'] ?? '');
         if ($status !== '00') {
             $message = $this->errorMapper->messageForStatus($status, (string) ($body['message'] ?? null));
-            throw new RuntimeException($message);
+
+            throw new PeruriApiException(
+                peruriStatus: $status,
+                message: $message,
+                httpStatus: $response->status(),
+                body: $body,
+            );
         }
 
         return $body;
@@ -109,4 +127,3 @@ class PeruriClient
             : [];
     }
 }
-

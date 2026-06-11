@@ -4,223 +4,247 @@
     <meta charset="utf-8">
     <title>{{ $doc['title'] ?? 'Penawaran Layanan Estimasi Rentang Harga Properti' }}</title>
     <style>
-        @page { margin: 20px 22px; size: A4; }
+        @page { margin: 24px 58px 34px; size: A4; }
         * { box-sizing: border-box; }
         body {
             margin: 0;
             padding: 0;
             font-family: DejaVu Sans, sans-serif;
-            font-size: 10px;
-            line-height: 1.45;
+            font-size: 10.8px;
+            line-height: 1.42;
             color: #111827;
         }
         .page {
-            padding: 16px 18px 20px;
+            width: 100%;
         }
-        .header-table,
+        .letterhead-table,
+        .letter-meta-table,
         .item-table,
-        .asset-table,
-        .signing-section,
+        .signature-table,
         .signature-meta-table {
             width: 100%;
             border-collapse: collapse;
         }
-        .header-table {
-            margin-bottom: 12px;
+        .letterhead-table {
+            margin-bottom: 18px;
         }
-        .header-logo-cell {
+        .letterhead-logo-cell {
             width: 92px;
             vertical-align: top;
         }
-        .logo-box {
-            width: 72px;
-            height: 72px;
-            border: 3px solid #0f172a;
-            color: #0f172a;
+        .brand-logo {
+            width: 82px;
+            height: auto;
+            display: block;
+        }
+        .logo-mark {
+            width: 76px;
+            height: 76px;
+            border: 8px solid #0f2f63;
+            background: #0f2f63;
+            color: #ffffff;
             text-align: center;
-            font-size: 28px;
+            font-size: 22px;
             font-weight: 700;
-            line-height: 66px;
+            line-height: 60px;
             letter-spacing: 0.04em;
         }
-        .header-info-cell {
+        .letterhead-copy {
             vertical-align: top;
-            padding-left: 8px;
-        }
-        .office-name {
-            margin: 0;
-            font-size: 11px;
-            font-weight: 700;
-            line-height: 1.35;
-            text-transform: uppercase;
+            padding-left: 7px;
             color: #020617;
         }
-        .office-sub {
-            margin-top: 4px;
-            font-size: 9px;
-            line-height: 1.5;
-            color: #334155;
+        .office-eyebrow {
+            margin: 0;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.2;
+            text-transform: uppercase;
         }
-        .header-divider {
-            border: none;
-            border-top: 2px solid #0f172a;
-            margin: 8px 0 10px;
+        .office-name {
+            margin: 1px 0 2px;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.2;
+            text-transform: uppercase;
         }
-        .letter-heading {
-            margin-bottom: 8px;
+        .office-lines {
+            font-size: 8.8px;
+            line-height: 1.28;
         }
-        .letter-heading-left {
-            float: left;
-            max-width: 58%;
+        .letter-meta-table {
+            margin: 0 0 18px;
         }
-        .letter-heading-right {
-            float: right;
-            max-width: 38%;
+        .letter-meta-table td {
+            vertical-align: top;
+            padding: 0;
+        }
+        .letter-date {
             text-align: right;
-        }
-        .clearfix::after {
-            content: '';
-            display: block;
-            clear: both;
+            white-space: nowrap;
         }
         .doc-number,
-        .city-date {
-            font-size: 10px;
+        .request-id {
+            font-size: 10.5px;
+        }
+        .request-id {
+            margin-top: 4px;
+            color: #374151;
         }
         .recipient {
-            margin: 10px 0 8px;
-        }
-        .recipient strong {
+            margin: 0 0 18px;
             font-weight: 700;
+        }
+        .recipient .recipient-line {
+            margin: 0 0 2px;
+        }
+        .recipient .location-line {
+            margin-top: 20px;
         }
         .perihal {
-            margin: 8px 0 10px;
+            margin: 0 0 18px;
             text-align: center;
-            font-size: 10.5px;
+            font-size: 11px;
             font-weight: 700;
-            text-decoration: underline;
-            color: #0f172a;
         }
-        .opening-para,
-        .body-copy,
-        .footer-line {
-            text-align: justify;
+        .perihal span {
+            text-decoration: underline;
         }
         .opening-para,
         .body-copy {
-            margin: 6px 0 10px;
+            margin: 0 0 13px;
+            text-align: justify;
         }
         .item-table {
-            margin-bottom: 6px;
+            margin: 0 0 12px;
+            page-break-inside: avoid;
         }
         .item-table td {
             vertical-align: top;
-            padding: 2px 0;
+            padding: 0;
         }
         .item-num {
-            width: 28px;
-            font-weight: 700;
-            color: #0f172a;
-        }
-        .item-label {
-            width: 168px;
+            width: 34px;
             padding-right: 8px;
             font-weight: 700;
-            color: #0f172a;
+            white-space: nowrap;
+        }
+        .item-label {
+            width: 178px;
+            padding-right: 8px;
+            font-weight: 700;
         }
         .item-colon {
-            width: 12px;
+            width: 16px;
+            padding-right: 8px;
+            text-align: center;
         }
         .item-content {
             text-align: justify;
         }
         .item-content p {
-            margin: 0 0 4px;
+            margin: 0 0 5px;
         }
-        .item-content ul {
-            margin: 2px 0;
+        .item-content ul,
+        .asset-list {
+            margin: 0;
             padding-left: 16px;
         }
-        .item-content li {
-            margin-bottom: 2px;
+        .item-content li,
+        .asset-list li {
+            margin-bottom: 4px;
         }
-        .bold { font-weight: 700; }
-        .underline { text-decoration: underline; }
-        .italic { font-style: italic; }
-        .muted {
-            color: #475569;
+        .asset-list {
+            padding-left: 24px;
         }
-        .asset-table {
-            margin-top: 5px;
-            font-size: 9.2px;
-        }
-        .asset-table th,
-        .asset-table td {
-            border: 1px solid #94a3b8;
-            padding: 4px 5px;
-            vertical-align: top;
-        }
-        .asset-table th {
-            background: #e2e8f0;
-            text-align: center;
+        .asset-title,
+        .fee-highlight,
+        .strong {
             font-weight: 700;
-            color: #0f172a;
         }
-        .asset-note {
-            margin-top: 4px;
-            font-size: 8.8px;
-            color: #475569;
+        .muted {
+            color: #4b5563;
         }
-        .signing-section {
-            margin-top: 20px;
+        .small-note {
+            margin-top: 5px;
+            font-size: 9.3px;
+            color: #4b5563;
         }
-        .signing-section td {
+        .signature-table {
+            margin-top: 26px;
+            page-break-inside: avoid;
+        }
+        .signature-table td {
             width: 50%;
             vertical-align: top;
-            padding-right: 12px;
+            padding: 0;
         }
-        .sign-label {
-            margin-bottom: 4px;
+        .signature-left {
+            padding-right: 28px !important;
+        }
+        .signature-right {
+            padding-left: 20px !important;
+        }
+        .signature-heading {
+            margin: 0 0 4px;
+        }
+        .signature-organization {
+            margin: 0 0 20px;
             font-weight: 700;
-            color: #0f172a;
+            text-transform: uppercase;
         }
-        .sign-box {
-            height: 68px;
-            margin: 6px 0 5px;
-            border: 1px solid #94a3b8;
+        .signature-space {
+            min-height: 76px;
+            margin: 0 0 8px;
         }
-        .sign-name {
-            font-size: 10px;
+        .signature-name {
+            margin: 0;
             font-weight: 700;
-            color: #0f172a;
+            text-decoration: underline;
         }
-        .sign-title {
-            font-size: 9px;
-            color: #475569;
-            line-height: 1.45;
+        .signature-title {
+            margin: 2px 0 0;
+        }
+        .signature-line-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 82px;
+        }
+        .signature-line-table td {
+            padding: 2px 0;
+            vertical-align: bottom;
+        }
+        .signature-line-label {
+            width: 58px;
+        }
+        .signature-line-colon {
+            width: 12px;
+            text-align: center;
+        }
+        .signature-line {
+            border-bottom: 1px solid #6b7280;
+            height: 17px;
         }
         .signature-meta-table {
-            margin-top: 6px;
-            font-size: 9px;
+            margin-top: 8px;
+            font-size: 8.6px;
+            line-height: 1.28;
+            color: #4b5563;
         }
         .signature-meta-table td {
-            padding: 2px 0;
+            padding: 1px 0;
             vertical-align: top;
         }
         .signature-meta-label {
-            width: 74px;
-            color: #475569;
+            width: 58px;
         }
         .footer-line {
-            margin-top: 14px;
+            margin-top: 16px;
             padding-top: 6px;
-            border-top: 1px solid #cbd5e1;
+            border-top: 1px solid #d1d5db;
             font-size: 8.5px;
-            color: #475569;
-        }
-        .fee-highlight {
-            font-weight: 700;
-            color: #0f172a;
+            color: #4b5563;
+            text-align: justify;
         }
     </style>
 </head>
@@ -246,49 +270,55 @@
     $subject = trim((string) ($doc['subject'] ?? 'Lingkup Penugasan Jasa Penilaian Properti'));
     $officeName = (string) ($sender['organization'] ?? 'DigiPro by KJPP HJAR');
     $officeDivision = (string) ($sender['division'] ?? 'Layanan Kajian Nilai Pasar Properti Digital');
+    $brandLogoPath = public_path('images/brand/digipro-by-kjpp-hjar-logo-dark.png');
+    $hasBrandLogo = is_file($brandLogoPath);
 @endphp
 
 <div class="page">
-    <table class="header-table">
+    <table class="letterhead-table">
         <tr>
-            <td class="header-logo-cell">
-                <div class="logo-box">DP</div>
+            <td class="letterhead-logo-cell">
+                @if ($hasBrandLogo)
+                    <img src="{{ $brandLogoPath }}" class="brand-logo" alt="DigiPro by KJPP HJAR">
+                @else
+                    <div class="logo-mark">DP</div>
+                @endif
             </td>
-            <td class="header-info-cell">
+            <td class="letterhead-copy">
+                <p class="office-eyebrow">Kantor Jasa Penilai Publik</p>
                 <p class="office-name">{{ $officeName }}</p>
-                <div class="office-sub">
+                <div class="office-lines">
                     {{ $officeDivision }}<br>
-                    Penugasan berbasis dokumen, foto, dan data digital tanpa inspeksi lapangan.<br>
+                    Penawaran melalui platform DigiPro, berbasis dokumen, foto, dan data digital tanpa inspeksi lapangan.<br>
                     Dukungan pelanggan: {{ $supportContact['phone'] ?? '-' }} / {{ $supportContact['whatsapp'] ?? '-' }}<br>
                     Email: {{ $supportContact['email'] ?? '-' }}
                 </div>
             </td>
         </tr>
     </table>
-    <hr class="header-divider">
 
-    <div class="letter-heading clearfix">
-        <div class="letter-heading-left">
-            <div class="doc-number">{{ $doc['agr_no'] ?? '-' }}</div>
-            @if (!empty($doc['request_id']))
-                <div class="doc-number">ID Permohonan: {{ $doc['request_id'] }}</div>
-            @endif
-        </div>
-        <div class="letter-heading-right">
-            <div class="city-date">{{ $doc['city_date_line'] ?? ($doc['date_label'] ?? '-') }}</div>
-        </div>
-    </div>
+    <table class="letter-meta-table">
+        <tr>
+            <td>
+                <div class="doc-number">{{ $doc['agr_no'] ?? '-' }}</div>
+                @if (!empty($doc['request_id']))
+                    <div class="request-id">ID Permohonan: {{ $doc['request_id'] }}</div>
+                @endif
+            </td>
+            <td class="letter-date">{{ $doc['city_date_line'] ?? ($doc['date_label'] ?? '-') }}</td>
+        </tr>
+    </table>
 
     <div class="recipient">
-        <strong>Kepada Yth.</strong><br>
+        <div class="recipient-line">Kepada Yth.</div>
         @forelse ($recipientLines as $line)
-            {{ $line }}<br>
+            <div class="recipient-line">{{ $line }}</div>
         @empty
-            {{ $doc['user_name'] ?? '-' }}<br>
+            <div class="recipient-line">{{ $doc['user_name'] ?? '-' }}</div>
         @endforelse
     </div>
 
-    <div class="perihal">Perihal : {{ $subject }}</div>
+    <div class="perihal">Perihal : <span>{{ $subject }}</span></div>
 
     @if ($requestReference !== '')
         <p class="opening-para">{{ $requestReference }}</p>
@@ -316,38 +346,25 @@
                             <p>{{ $lines[0] }}</p>
                         @endif
 
-                        <table class="asset-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 24px;">No</th>
-                                    <th>Jenis Aset</th>
-                                    <th>Lokasi</th>
-                                    <th>Dokumen Utama</th>
-                                    <th>Luas (Basis)</th>
-                                    <th>Catatan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($assets as $index => $asset)
-                                    <tr>
-                                        <td style="text-align: center;">{{ $asset['no'] ?? ($index + 1) }}</td>
-                                        <td>{{ $asset['label'] ?? '-' }}</td>
-                                        <td>{{ $asset['address'] ?? '-' }}</td>
-                                        <td>{{ $asset['main_documents'] ?? '-' }}</td>
-                                        <td>{{ $asset['area_basis'] ?? '-' }}</td>
-                                        <td>{{ $asset['note'] ?? '-' }}</td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="6" style="text-align: center; color: #64748b;">Belum ada data aset.</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                        @if (!empty($assets))
+                            <ol class="asset-list">
+                                @foreach ($assets as $index => $asset)
+                                    <li>
+                                        <span class="asset-title">{{ $asset['label'] ?? 'Aset' }}</span>
+                                        yang berlokasi di {{ $asset['address'] ?? '-' }}.
+                                        Dokumen utama: {{ $asset['main_documents'] ?? '-' }}.
+                                        Basis luas: {{ $asset['area_basis'] ?? '-' }}.
+                                        Catatan: {{ $asset['note'] ?? '-' }}.
+                                    </li>
+                                @endforeach
+                            </ol>
+                        @else
+                            <p>Belum ada data aset.</p>
+                        @endif
 
-                        <div class="asset-note">
+                        <p class="small-note">
                             Data aset mengikuti dokumen dan input yang diunggah pengguna pada sistem DigiPro by KJPP HJAR.
-                        </div>
+                        </p>
 
                         @foreach (array_slice($lines, 1) as $line)
                             <p>{{ $line }}</p>
@@ -370,67 +387,75 @@
         </table>
     @endforeach
 
-    <table class="signing-section">
+    <table class="signature-table">
         <tr>
-            <td>
-                <div>Hormat kami,</div>
-                <div class="sign-label">{{ $officeName }}</div>
-                <div class="sign-box"></div>
-                <div class="sign-name">{{ $publicAppraiserSignature['name'] ?? ($sender['representative_name'] ?? '-') }}</div>
-                <div class="sign-title">{{ $sender['representative_title'] ?? 'Perwakilan DigiPro by KJPP HJAR' }}</div>
-                <div class="sign-title">{{ $officeDivision }}</div>
+            <td class="signature-left">
+                <p class="signature-heading">Hormat kami,</p>
+                <p class="signature-organization">{{ $officeName }}</p>
+                <div class="signature-space"></div>
+                <p class="signature-name">{{ $publicAppraiserSignature['name'] ?? ($sender['representative_name'] ?? '-') }}</p>
+                <p class="signature-title">{{ $sender['representative_title'] ?? 'Penilai Publik / Penandatangan Atasan' }}</p>
+                <p class="signature-title">{{ $officeDivision }}</p>
 
                 <table class="signature-meta-table">
                     <tr>
                         <td class="signature-meta-label">Status</td>
-                        <td>{{ $isPublicAppraiserSigned ? 'Sudah ditandatangani digital' : 'Belum ditandatangani digital' }}</td>
+                        <td>: {{ $isPublicAppraiserSigned ? 'Sudah ditandatangani digital' : 'Belum ditandatangani digital' }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Waktu</td>
-                        <td>{{ $publicAppraiserSignature['signed_at'] ?? '-' }}</td>
+                        <td>: {{ $publicAppraiserSignature['signed_at'] ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Email</td>
-                        <td>{{ $publicAppraiserSignature['email'] ?? '-' }}</td>
+                        <td>: {{ $publicAppraiserSignature['email'] ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Signature ID</td>
-                        <td>{{ $publicAppraiserSignature['external_order_id'] ?? '-' }}</td>
+                        <td>: {{ $publicAppraiserSignature['external_order_id'] ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Hash</td>
-                        <td>{{ $documentHash ?: '-' }}</td>
+                        <td>: {{ $documentHash ?: '-' }}</td>
                     </tr>
                 </table>
             </td>
-            <td>
-                <div>Persetujuan Pemberi Tugas,</div>
-                <div class="sign-box"></div>
-                <div class="sign-name">
-                    {{ $customerSignature['name'] ?? ($signature['signed_by_name'] ?? ($approval['client_name'] ?? ($doc['user_name'] ?? '-'))) }}
-                </div>
-                <div class="sign-title">{{ $approval['client_title'] ?? 'Pemberi Tugas / Pengguna Hasil' }}</div>
+            <td class="signature-right">
+                <p class="signature-heading">Persetujuan Customer,</p>
+                <table class="signature-line-table">
+                    <tr>
+                        <td class="signature-line-label">Nama</td>
+                        <td class="signature-line-colon">:</td>
+                        <td class="signature-line">{{ $customerSignature['name'] ?? ($signature['signed_by_name'] ?? ($approval['client_name'] ?? ($doc['user_name'] ?? ''))) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="signature-line-label">Jabatan</td>
+                        <td class="signature-line-colon">:</td>
+                        <td class="signature-line">{{ $approval['client_title'] ?? 'Pemberi Tugas / Pengguna Hasil' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="signature-line-label">Tanggal</td>
+                        <td class="signature-line-colon">:</td>
+                        <td class="signature-line">{{ $customerSignature['signed_at'] ?? ($signature['signed_at'] ?? ($doc['accepted_at'] ?? '')) }}</td>
+                    </tr>
+                </table>
 
                 <table class="signature-meta-table">
                     <tr>
                         <td class="signature-meta-label">Status</td>
-                        <td>{{ $isCustomerSigned ? 'Sudah ditandatangani digital' : 'Menunggu persetujuan digital' }}</td>
-                    </tr>
-                    <tr>
-                        <td class="signature-meta-label">Waktu</td>
-                        <td>{{ $customerSignature['signed_at'] ?? ($signature['signed_at'] ?? ($doc['accepted_at'] ?? '-')) }}</td>
+                        <td>: {{ $isCustomerSigned ? 'Sudah ditandatangani digital' : 'Menunggu persetujuan digital' }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Email</td>
-                        <td>{{ $customerSignature['email'] ?? ($signature['signed_by_email'] ?? ($doc['user_identifier'] ?? '-')) }}</td>
+                        <td>: {{ $customerSignature['email'] ?? ($signature['signed_by_email'] ?? ($doc['user_identifier'] ?? '-')) }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Signature ID</td>
-                        <td>{{ $customerSignature['external_order_id'] ?? ($signature['signature_id'] ?? ($doc['consent_id'] ?? '-')) }}</td>
+                        <td>: {{ $customerSignature['external_order_id'] ?? ($signature['signature_id'] ?? ($doc['consent_id'] ?? '-')) }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Hash</td>
-                        <td>{{ $documentHash ?: '-' }}</td>
+                        <td>: {{ $documentHash ?: '-' }}</td>
                     </tr>
                 </table>
             </td>

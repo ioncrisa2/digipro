@@ -7,14 +7,14 @@ use App\Models\AppraisalRequest;
 use App\Models\ReportSigner;
 use App\Models\User;
 use App\Models\UserSignatureProfile;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class PeruriSignerReadinessService
 {
     public function __construct(
         private readonly DigitalSignatureProvider $provider,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -175,6 +175,25 @@ class PeruriSignerReadinessService
     /**
      * @return array<string, mixed>
      */
+    public function syncCustomerCertificate(UserSignatureProfile $profile): array
+    {
+        $email = trim((string) $profile->peruri_email);
+        $certificate = $email === ''
+            ? $this->statusState('missing_email', 'Email Peruri belum tersedia.', false, 'warning')
+            : $this->inspectCertificate($email);
+
+        $profile->forceFill([
+            'certificate_status' => $certificate['code'],
+            'last_checked_at' => now(),
+            'last_error' => ($certificate['code'] ?? null) === 'error' ? $certificate['message'] : null,
+        ])->save();
+
+        return $certificate;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function forCustomerProfile(UserSignatureProfile $profile, bool $probeRemote = false): array
     {
         $email = trim((string) $profile->peruri_email);
@@ -290,6 +309,12 @@ class PeruriSignerReadinessService
             }
 
             return $this->statusState('unknown', 'Status sertifikat belum dapat dipastikan dari response PDS.', false, 'warning');
+        } catch (PeruriApiException $exception) {
+            if ($this->isPendingCertificateVerification($exception)) {
+                return $this->statusState('pending', 'Kode 10: Sertifikat Peruri sedang menunggu verifikasi.', false, 'warning');
+            }
+
+            return $this->statusState('error', $exception->getMessage(), false, 'danger');
         } catch (RuntimeException $exception) {
             return $this->statusState('error', $exception->getMessage(), false, 'danger');
         }
@@ -334,6 +359,7 @@ class PeruriSignerReadinessService
             'ready' => $this->statusState('ready', 'Siap.', true, 'success'),
             'expired' => $this->statusState('expired', 'Sertifikat expired.', false, 'danger'),
             'inactive' => $this->statusState('inactive', 'Belum aktif atau belum terdaftar.', false, 'warning'),
+            'pending' => $this->statusState('pending', 'Menunggu verifikasi Peruri.', false, 'warning'),
             'missing_email' => $this->statusState('missing_email', 'Email belum tersedia.', false, 'warning'),
             'error' => $this->statusState('error', 'Pemeriksaan terakhir gagal.', false, 'danger'),
             'unknown' => $this->statusState('unknown', 'Status belum dapat dipastikan.', false, 'warning'),
@@ -472,6 +498,7 @@ class PeruriSignerReadinessService
                 'ready' => 'Siap',
                 'expired' => 'Expired',
                 'inactive' => 'Belum Aktif',
+                'pending' => 'Menunggu Verifikasi',
                 'missing_email' => 'Email Belum Ada',
                 'error' => 'Gagal Diperiksa',
                 'unknown' => 'Belum Diketahui',
@@ -482,6 +509,15 @@ class PeruriSignerReadinessService
             'is_ready' => $isReady,
             'tone' => $tone,
         ];
+    }
+
+    private function isPendingCertificateVerification(PeruriApiException $exception): bool
+    {
+        return $exception->peruriStatus === '10'
+            || Str::contains(Str::lower($exception->getMessage()), [
+                'waiting for verification',
+                'menunggu verifikasi',
+            ]);
     }
 
     /**

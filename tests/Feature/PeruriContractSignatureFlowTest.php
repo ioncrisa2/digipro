@@ -60,12 +60,12 @@ it('customer can sign contract and continue to payment while internal signature 
     $customer = User::factory()->create();
     $request = AppraisalRequest::create([
         'user_id' => $customer->id,
-        'request_number' => 'REQ-' . Str::upper(Str::random(8)),
+        'request_number' => 'REQ-'.Str::upper(Str::random(8)),
         'purpose' => 'jual_beli',
         'status' => AppraisalStatusEnum::WaitingSignature,
         'requested_at' => now(),
         'client_name' => 'PT Test DigiPro',
-        'contract_number' => '00015/AGR/DP/04/2026-' . Str::upper(Str::random(4)),
+        'contract_number' => '00015/AGR/DP/04/2026-'.Str::upper(Str::random(4)),
         'contract_date' => now()->toDateString(),
         'contract_status' => ContractStatusEnum::WaitingSignature,
         'fee_total' => 1400000,
@@ -134,6 +134,16 @@ it('customer can sign contract and continue to payment while internal signature 
 
     expect($customerParticipant?->status)->toBe('signed');
     expect($publicParticipant?->status)->toBe('pending');
+
+    $coordinateRecord = Http::recorded()
+        ->first(fn (array $recorded): bool => str_contains($recorded[0]->url(), '/specimen/v1/CORP-TEST/coordinate/signature'));
+    $coordinatePayload = $coordinateRecord[0]->data();
+
+    expect(data_get($coordinatePayload, 'signer.email'))->toBe($customer->email);
+    expect(data_get($coordinatePayload, 'lowerLeftX'))->toBe(360);
+    expect(data_get($coordinatePayload, 'upperRightX'))->toBe(540);
+    expect(data_get($coordinatePayload, 'page'))->toBe(data_get($envelope->meta, 'signature_page'));
+    expect((int) data_get($envelope->meta, 'signature_page'))->toBeGreaterThan(1);
 });
 
 it('public appraiser can sign the pending contract and store final PDF', function () {
@@ -153,12 +163,12 @@ it('public appraiser can sign the pending contract and store final PDF', functio
     $customer = User::factory()->create();
     $request = AppraisalRequest::create([
         'user_id' => $customer->id,
-        'request_number' => 'REQ-' . Str::upper(Str::random(8)),
+        'request_number' => 'REQ-'.Str::upper(Str::random(8)),
         'purpose' => 'jual_beli',
         'status' => AppraisalStatusEnum::ContractSigned,
         'requested_at' => now(),
         'client_name' => 'PT Test DigiPro',
-        'contract_number' => '00015/AGR/DP/04/2026-' . Str::upper(Str::random(4)),
+        'contract_number' => '00015/AGR/DP/04/2026-'.Str::upper(Str::random(4)),
         'contract_date' => now()->toDateString(),
         'contract_status' => ContractStatusEnum::ContractSigned,
         'fee_total' => 1400000,
@@ -176,7 +186,7 @@ it('public appraiser can sign the pending contract and store final PDF', functio
         'uploader_email' => config('peruri.uploader_email'),
         'status' => 'awaiting_internal',
         'document_hash' => 'sha256:test',
-        'meta' => [],
+        'meta' => ['signature_page' => 3],
     ]);
 
     SignatureParticipant::query()->create([
@@ -264,6 +274,15 @@ it('public appraiser can sign the pending contract and store final PDF', functio
         ->first();
 
     expect($eventLog)->not()->toBeNull();
+
+    $coordinateRecord = Http::recorded()
+        ->first(fn (array $recorded): bool => str_contains($recorded[0]->url(), '/specimen/v1/CORP-TEST/coordinate/signature'));
+    $coordinatePayload = $coordinateRecord[0]->data();
+
+    expect(data_get($coordinatePayload, 'signer.email'))->toBe($publicSigner->email);
+    expect(data_get($coordinatePayload, 'lowerLeftX'))->toBe(40);
+    expect(data_get($coordinatePayload, 'upperRightX'))->toBe(220);
+    expect(data_get($coordinatePayload, 'page'))->toBe(3);
 });
 
 it('shows a friendly error when keyla token is invalid', function () {
@@ -283,12 +302,12 @@ it('shows a friendly error when keyla token is invalid', function () {
     $customer = User::factory()->create();
     $request = AppraisalRequest::create([
         'user_id' => $customer->id,
-        'request_number' => 'REQ-' . Str::upper(Str::random(8)),
+        'request_number' => 'REQ-'.Str::upper(Str::random(8)),
         'purpose' => 'jual_beli',
         'status' => AppraisalStatusEnum::WaitingSignature,
         'requested_at' => now(),
         'client_name' => 'PT Test DigiPro',
-        'contract_number' => '00015/AGR/DP/04/2026-' . Str::upper(Str::random(4)),
+        'contract_number' => '00015/AGR/DP/04/2026-'.Str::upper(Str::random(4)),
         'contract_date' => now()->toDateString(),
         'contract_status' => ContractStatusEnum::WaitingSignature,
         'fee_total' => 1400000,

@@ -38,8 +38,6 @@ class UserSignatureProfile extends Model
 
     protected $casts = [
         'is_wna' => 'boolean',
-        'reference_province_id' => 'integer',
-        'reference_city_id' => 'integer',
         'date_of_birth' => 'date',
         'last_checked_at' => 'datetime',
         'identity_payload' => 'array',

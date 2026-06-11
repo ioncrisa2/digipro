@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Enums\AppraisalStatusEnum;
-use App\Enums\ContractStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\AppraisalCreatePageRequest;
 use App\Http\Requests\Customer\AppraisalIndexRequest;
@@ -14,26 +13,26 @@ use App\Http\Requests\Customer\SelectOfferRequest;
 use App\Http\Requests\Customer\SignContractRequest;
 use App\Http\Requests\Customer\StoreAppraisalRequest;
 use App\Http\Requests\Customer\StoreCustomerAppraisalCancellationRequest;
+use App\Http\Requests\Customer\SubmitAppraisalRevisionBatchRequest;
 use App\Http\Requests\Customer\SubmitCustomerSignatureKycRequest;
 use App\Http\Requests\Customer\SubmitCustomerSignatureSpecimenRequest;
-use App\Http\Requests\Customer\SubmitAppraisalRevisionBatchRequest;
 use App\Http\Requests\Customer\SubmitMarketPreviewAppealRequest;
 use App\Http\Requests\Customer\SubmitOfferNegotiationRequest;
-use Illuminate\Http\Request;
 use App\Models\AppraisalRequest;
 use App\Models\User;
 use App\Notifications\AdminActionNotification;
 use App\Notifications\AppraisalStatusUpdated;
-use App\Services\AppraisalRequestCancellationService;
 use App\Services\Admin\AdminNotificationService;
+use App\Services\AppraisalRequestCancellationService;
 use App\Services\Customer\AppraisalRequestService;
 use App\Services\Customer\AppraisalService;
 use App\Services\Customer\CustomerAppraisalWorkflowService;
-use App\Services\Peruri\PeruriSignerReadinessService;
 use App\Services\Peruri\CustomerSignatureOnboardingService;
+use App\Services\Peruri\PeruriSignerReadinessService;
 use App\Services\Revisions\AppraisalRequestRevisionSubmissionService;
 use App\Services\Workflow\AppraisalMarketPreviewService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
@@ -47,8 +46,7 @@ class AppraisalController extends Controller
         private readonly AdminNotificationService $adminNotificationService,
         private readonly PeruriSignerReadinessService $readinessService,
         private readonly CustomerSignatureOnboardingService $customerOnboardingService,
-    ) {
-    }
+    ) {}
 
     public function index(AppraisalIndexRequest $request, AppraisalService $appraisalService)
     {
@@ -75,7 +73,7 @@ class AppraisalController extends Controller
         $districtId = $request->districtId();
 
         // Check if user needs to accept consent
-        $needsConsent = !$appraisalService->hasAcceptedLatestConsent($request);
+        $needsConsent = ! $appraisalService->hasAcceptedLatestConsent($request);
         $consentData = null;
 
         if ($needsConsent) {
@@ -133,7 +131,7 @@ class AppraisalController extends Controller
 
         $this->adminNotificationService->notifyAdmins(
             'Pengajuan pembatalan baru',
-            ($record->request_number ?? ('#' . $record->id)) . ' mengajukan pembatalan request dan menunggu review admin.',
+            ($record->request_number ?? ('#'.$record->id)).' mengajukan pembatalan request dan menunggu review admin.',
             route('admin.appraisal-requests.cancellations.show', $cancellation),
             'heroicon-o-exclamation-triangle',
             $request->user()?->id,
@@ -188,7 +186,7 @@ class AppraisalController extends Controller
                 $request,
                 $record,
                 'Revisi data/dokumen dikirim user',
-                ($record->request_number ?? ('#' . $record->id)) . ' mengirim ulang revisi data atau dokumen untuk ditinjau kembali.',
+                ($record->request_number ?? ('#'.$record->id)).' mengirim ulang revisi data atau dokumen untuk ditinjau kembali.',
                 'heroicon-o-arrow-up-tray'
             );
 
@@ -248,7 +246,7 @@ class AppraisalController extends Controller
             $request,
             $record,
             'Keberatan fee baru',
-            ($record->request_number ?? ('#' . $record->id)) . " mengajukan negosiasi putaran {$round}.",
+            ($record->request_number ?? ('#'.$record->id))." mengajukan negosiasi putaran {$round}.",
             'heroicon-o-hand-raised'
         );
 
@@ -346,7 +344,7 @@ class AppraisalController extends Controller
         return inertia('Penilaian/ContractOnboarding', $this->customerOnboardingService->onboardingPayload(
             $record,
             $request->user(),
-            is_numeric($selectedProvinceId) ? (int) $selectedProvinceId : null,
+            is_string($selectedProvinceId) && $selectedProvinceId !== '' ? $selectedProvinceId : null,
         ));
     }
 
@@ -451,7 +449,7 @@ class AppraisalController extends Controller
 
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
-                ->with('success', 'Readiness customer diperbarui: ' . data_get($readiness, 'overall.message', 'status terbaru tersimpan.'));
+                ->with('success', 'Readiness customer diperbarui: '.data_get($readiness, 'overall.message', 'status terbaru tersimpan.'));
         } catch (\RuntimeException $exception) {
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
@@ -463,8 +461,7 @@ class AppraisalController extends Controller
         SignContractRequest $request,
         int $id,
         AppraisalService $appraisalService
-    )
-    {
+    ) {
         $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
 
         $request->validated();
@@ -477,6 +474,7 @@ class AppraisalController extends Controller
                 ->with('error', $exception->getMessage());
         } catch (\Throwable $e) {
             report($e);
+
             return redirect()
                 ->route('appraisal.contract.page', ['id' => $record->id])
                 ->with('error', 'Gagal memproses tanda tangan digital. Silakan coba lagi.');
@@ -504,7 +502,7 @@ class AppraisalController extends Controller
         }
 
         $freshRecord = $record->fresh(['user']);
-        $requestNumber = $freshRecord->request_number ?? ('REQ-' . $freshRecord->id);
+        $requestNumber = $freshRecord->request_number ?? ('REQ-'.$freshRecord->id);
 
         if ($freshRecord->user) {
             $freshRecord->user->notify(new AppraisalStatusUpdated(
@@ -545,7 +543,7 @@ class AppraisalController extends Controller
         }
 
         $freshRecord = $record->fresh(['user']);
-        $requestNumber = $freshRecord->request_number ?? ('REQ-' . $freshRecord->id);
+        $requestNumber = $freshRecord->request_number ?? ('REQ-'.$freshRecord->id);
 
         if ($freshRecord->user) {
             $freshRecord->user->notify(new AppraisalStatusUpdated(
@@ -597,7 +595,7 @@ class AppraisalController extends Controller
         }
 
         $doc = $appraisalService->buildContractDocumentPayload($record);
-        $requestNumber = preg_replace('/[^A-Za-z0-9\-_.]/', '-', (string) ($record->request_number ?? ('REQ-' . $record->id)));
+        $requestNumber = preg_replace('/[^A-Za-z0-9\-_.]/', '-', (string) ($record->request_number ?? ('REQ-'.$record->id)));
         $fileName = "Penawaran-{$requestNumber}.pdf";
 
         $signedPdfPath = data_get($doc, 'signature.signed_pdf_path');
@@ -636,7 +634,7 @@ class AppraisalController extends Controller
      * Route suggestion:
      *   Route::post('/buat-permohonan/consent/decline', [AppraisalController::class, 'declineConsent'])->name('appraisal.consent.decline');
      */
-   public function declineConsent(CustomerAccessRequest $request, AppraisalService $appraisalService)
+    public function declineConsent(CustomerAccessRequest $request, AppraisalService $appraisalService)
     {
         $appraisalService->declineConsent($request);
 

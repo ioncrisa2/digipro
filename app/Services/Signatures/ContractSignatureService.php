@@ -19,7 +19,9 @@ use Throwable;
 class ContractSignatureService
 {
     private const PROVIDER = 'peruri_signit';
+
     private const MODEL = 'tier';
+
     private const DOCUMENT_TYPE = 'contract';
 
     private const MAX_PDF_SIZE_BYTES = 5_000_000; // Peruri doc: 5MB
@@ -27,8 +29,7 @@ class ContractSignatureService
     public function __construct(
         private readonly DigitalSignatureProvider $provider,
         private readonly PeruriSignerReadinessService $readinessService,
-    ) {
-    }
+    ) {}
 
     public function ensureContractSignerConfigured(AppraisalRequest $record): void
     {
@@ -68,10 +69,12 @@ class ContractSignatureService
             $this->readinessService->assertReadyForSigning($publicAppraiserEmail);
             $this->ensureKeylaTokenVerified($customerEmail, $keylaToken);
 
-            $pdfBinary = $this->renderContractPdfBinary($record, $appraisalService);
+            $renderedContract = $this->renderContractPdf($record, $appraisalService);
+            $pdfBinary = $renderedContract['binary'];
+            $signaturePage = $renderedContract['page_count'];
             $this->ensurePdfSizeAllowed($pdfBinary);
 
-            $documentHash = 'sha256:' . hash('sha256', $pdfBinary);
+            $documentHash = 'sha256:'.hash('sha256', $pdfBinary);
             $requestNumber = $this->safeRequestNumber($record);
             $fileName = "Penawaran-{$requestNumber}.pdf";
             $lockKey = "signature:contract:peruri:customer:{$record->id}";
@@ -86,6 +89,7 @@ class ContractSignatureService
                 $documentHash,
                 $requestNumber,
                 $keylaToken,
+                $signaturePage,
             ): SignatureEnvelope {
                 $envelope = $this->contractEnvelope($record)->loadMissing('participants');
 
@@ -158,6 +162,7 @@ class ContractSignatureService
                         $publicParticipant,
                         $customerEmail,
                         $publicAppraiserEmail,
+                        $signaturePage,
                     ): void {
                         $envelope->update([
                             'external_envelope_id' => $started['order_id_tier'],
@@ -170,6 +175,8 @@ class ContractSignatureService
                                 'model' => self::MODEL,
                                 'document_type' => self::DOCUMENT_TYPE,
                                 'file_name' => $fileName,
+                                'document_page_count' => $signaturePage,
+                                'signature_page' => $signaturePage,
                             ]),
                         ]);
 
@@ -187,11 +194,18 @@ class ContractSignatureService
                     $customerParticipant->refresh();
                 }
 
+                $envelope->update([
+                    'meta' => array_merge((array) ($envelope->meta ?? []), [
+                        'document_page_count' => $signaturePage,
+                        'signature_page' => $signaturePage,
+                    ]),
+                ]);
+
                 $customerCoords = (array) config('peruri.coordinates.contract.customer', []);
                 $this->provider->setSignatureCoordinate(
                     orderId: (string) $customerParticipant->external_order_id,
                     signerEmail: $customerEmail,
-                    coords: $this->normalizeCoords($customerCoords),
+                    coords: $this->normalizeCoords($customerCoords, $signaturePage),
                     visible: true,
                 );
 
@@ -304,11 +318,12 @@ class ContractSignatureService
                     ]);
                 }
 
+                $signaturePage = $this->signaturePageForEnvelope($envelope);
                 $coords = (array) config('peruri.coordinates.contract.public_appraiser', []);
                 $this->provider->setSignatureCoordinate(
                     orderId: (string) $publicParticipant->external_order_id,
                     signerEmail: $signerEmail,
-                    coords: $this->normalizeCoords($coords),
+                    coords: $this->normalizeCoords($coords, $signaturePage),
                     visible: true,
                 );
 
@@ -407,13 +422,24 @@ class ContractSignatureService
         return trim((string) ($customer->signatureProfile?->peruri_email ?: $customer->email));
     }
 
-    private function renderContractPdfBinary(AppraisalRequest $record, AppraisalService $appraisalService): string
+    /**
+     * @return array{binary:string,page_count:int}
+     */
+    private function renderContractPdf(AppraisalRequest $record, AppraisalService $appraisalService): array
     {
         $doc = $appraisalService->buildContractDocumentPayload($record);
 
-        return Pdf::loadView('pdfs.appraisal-contract-offer', [
+        $pdf = Pdf::loadView('pdfs.appraisal-contract-offer', [
             'doc' => $doc,
-        ])->setPaper('a4', 'portrait')->output();
+        ])->setPaper('a4', 'portrait');
+
+        $binary = $pdf->output();
+        $pageCount = (int) $pdf->getDomPDF()->getCanvas()->get_page_count();
+
+        return [
+            'binary' => $binary,
+            'page_count' => max(1, $pageCount),
+        ];
     }
 
     private function ensurePdfSizeAllowed(string $pdfBinary): void
@@ -425,14 +451,14 @@ class ContractSignatureService
 
     private function safeRequestNumber(AppraisalRequest $record): string
     {
-        $requestNumber = (string) ($record->request_number ?? ('REQ-' . $record->id));
+        $requestNumber = (string) ($record->request_number ?? ('REQ-'.$record->id));
 
         return preg_replace('/[^A-Za-z0-9\\-_.]/', '-', $requestNumber);
     }
 
     private function storeOriginalPdf(AppraisalRequest $record, string $pdfBinary, string $safeRequestNumber): string
     {
-        $storedName = "contract-original-{$safeRequestNumber}-" . now()->format('YmdHis') . '.pdf';
+        $storedName = "contract-original-{$safeRequestNumber}-".now()->format('YmdHis').'.pdf';
         $storedPath = "appraisal-requests/{$record->id}/contracts/{$storedName}";
 
         Storage::disk('public')->put($storedPath, $pdfBinary);
@@ -443,7 +469,7 @@ class ContractSignatureService
     private function storeSignedPdf(AppraisalRequest $record, string $pdfBinary): string
     {
         $safeRequestNumber = $this->safeRequestNumber($record);
-        $storedName = "contract-peruri-signed-{$safeRequestNumber}-" . now()->format('YmdHis') . '.pdf';
+        $storedName = "contract-peruri-signed-{$safeRequestNumber}-".now()->format('YmdHis').'.pdf';
         $storedPath = "appraisal-requests/{$record->id}/contracts/{$storedName}";
 
         Storage::disk('public')->put($storedPath, $pdfBinary);
@@ -470,6 +496,7 @@ class ContractSignatureService
 
         if ($file) {
             $file->update($payload);
+
             return;
         }
 
@@ -535,15 +562,22 @@ class ContractSignatureService
      * @param  array<string, mixed>  $coords
      * @return array{page:int,lower_left_x:int,lower_left_y:int,upper_right_x:int,upper_right_y:int}
      */
-    private function normalizeCoords(array $coords): array
+    private function normalizeCoords(array $coords, ?int $pageOverride = null): array
     {
         return [
-            'page' => (int) ($coords['page'] ?? 1),
+            'page' => $pageOverride && $pageOverride > 0 ? $pageOverride : (int) ($coords['page'] ?? 1),
             'lower_left_x' => (int) ($coords['lower_left_x'] ?? 0),
             'lower_left_y' => (int) ($coords['lower_left_y'] ?? 0),
             'upper_right_x' => (int) ($coords['upper_right_x'] ?? 0),
             'upper_right_y' => (int) ($coords['upper_right_y'] ?? 0),
         ];
+    }
+
+    private function signaturePageForEnvelope(SignatureEnvelope $envelope): ?int
+    {
+        $page = data_get($envelope->meta, 'signature_page');
+
+        return is_numeric($page) && (int) $page > 0 ? (int) $page : null;
     }
 
     private function markContractEnvelopeFailed(AppraisalRequest $record, string $message): void

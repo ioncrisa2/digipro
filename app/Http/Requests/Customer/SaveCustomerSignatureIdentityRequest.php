@@ -18,8 +18,8 @@ class SaveCustomerSignatureIdentityRequest extends CustomerFormRequest
             'nik' => $isWna
                 ? ['required', 'string', 'min:6', 'max:32', 'regex:/^[A-Za-z0-9]+$/']
                 : ['required', 'digits:16'],
-            'reference_province_id' => ['required', 'integer', 'min:1'],
-            'reference_city_id' => ['required', 'integer', 'min:1'],
+            'reference_province_id' => ['required', 'string', 'max:32'],
+            'reference_city_id' => ['required', 'string', 'max:32'],
             'gender' => ['required', Rule::in(['M', 'F'])],
             'place_of_birth' => ['required', 'string', 'max:120'],
             'date_of_birth' => ['required', 'date_format:Y-m-d', 'before:today'],
