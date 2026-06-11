@@ -1,6 +1,6 @@
 # DigiPro by KJPP HJAR
 
-Platform penilaian properti end-to-end untuk KJPP dan institusi finansial. Portal pelanggan (Inertia + Vue) menangani permohonan hingga pembayaran, sementara back-office Filament memudahkan tim internal mengelola appraisal, konten, dan master data. Panel reviewer terpisah mendukung proses valuasi.
+Platform penilaian properti end-to-end dari KJPP Henricus Judi Adrianto & Rekan. Portal pelanggan menangani permohonan hingga pembayaran, sementara back-office Filament memudahkan tim internal mengelola appraisal, konten, dan master data. Panel reviewer terpisah mendukung proses valuasi.
 
 ## Fitur Utama
 - **Portal pelanggan**: registrasi & verifikasi email (Laravel Fortify), dashboard status, permohonan penilaian multi-aset, unggah dokumen, mock laporan, notifikasi in-app.
