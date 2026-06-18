@@ -338,7 +338,7 @@ it('shows a friendly error when keyla token is invalid', function () {
             'keyla_token' => 'BADTOKEN',
         ])
         ->assertRedirect(route('appraisal.contract.page', ['id' => $request->id]))
-        ->assertSessionHas('error', 'Token KEYLA tidak valid.');
+        ->assertSessionHas('error', 'Kode KEYLA tidak valid.');
 
     $envelope = SignatureEnvelope::query()
         ->where('subject_type', AppraisalRequest::class)
@@ -349,5 +349,5 @@ it('shows a friendly error when keyla token is invalid', function () {
 
     expect($envelope)->not()->toBeNull();
     expect($envelope->status)->toBe('failed');
-    expect($envelope->last_error)->toBe('Token KEYLA tidak valid.');
+    expect($envelope->last_error)->toBe('Kode KEYLA tidak valid.');
 });

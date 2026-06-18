@@ -27,4 +27,29 @@ class SaveCustomerSignatureIdentityRequest extends CustomerFormRequest
             'ktp_photo' => [$hasStoredKtpPhoto ? 'nullable' : 'required', 'file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'peruri_email.required' => 'Email aktif wajib diisi.',
+            'peruri_email.email' => 'Format email belum benar.',
+            'peruri_phone.required' => 'Nomor HP aktif wajib diisi.',
+            'nik.required' => 'Nomor identitas wajib diisi.',
+            'nik.digits' => 'NIK wajib 16 digit angka.',
+            'nik.regex' => 'Nomor KITAS/KITAP hanya boleh berisi huruf dan angka.',
+            'reference_province_id.required' => 'Pilih provinsi sesuai identitas.',
+            'reference_city_id.required' => 'Pilih kabupaten atau kota sesuai identitas.',
+            'gender.required' => 'Pilih jenis kelamin.',
+            'gender.in' => 'Pilih jenis kelamin yang tersedia.',
+            'place_of_birth.required' => 'Tempat lahir wajib diisi.',
+            'date_of_birth.required' => 'Tanggal lahir wajib diisi.',
+            'date_of_birth.date_format' => 'Tanggal lahir belum valid.',
+            'date_of_birth.before' => 'Tanggal lahir harus sebelum hari ini.',
+            'address.required' => 'Alamat sesuai identitas wajib diisi.',
+            'ktp_photo.required' => 'Foto identitas wajib diunggah.',
+            'ktp_photo.image' => 'Foto identitas harus berupa gambar.',
+            'ktp_photo.mimes' => 'Foto identitas harus berformat JPG atau PNG.',
+            'ktp_photo.max' => 'Ukuran foto identitas maksimal 5 MB.',
+        ];
+    }
 }

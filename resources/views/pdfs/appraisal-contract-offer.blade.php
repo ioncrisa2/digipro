@@ -289,7 +289,7 @@
                 <p class="office-name">{{ $officeName }}</p>
                 <div class="office-lines">
                     {{ $officeDivision }}<br>
-                    Penawaran melalui platform DigiPro, berbasis dokumen, foto, dan data digital tanpa inspeksi lapangan.<br>
+                    Penawaran melalui platform DigiPro, berbasis dokumen, foto, dan data digital.<br>
                     Dukungan pelanggan: {{ $supportContact['phone'] ?? '-' }} / {{ $supportContact['whatsapp'] ?? '-' }}<br>
                     Email: {{ $supportContact['email'] ?? '-' }}
                 </div>

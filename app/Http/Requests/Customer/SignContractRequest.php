@@ -16,8 +16,8 @@ class SignContractRequest extends CustomerFormRequest
     {
         return [
             'agree_contract.accepted' => 'Anda harus menyetujui dokumen sebelum menandatangani kontrak.',
-            'keyla_token.required' => 'Token KEYLA wajib diisi untuk proses tanda tangan digital.',
-            'keyla_token.regex' => 'Token KEYLA hanya boleh berisi huruf/angka tanpa spasi.',
+            'keyla_token.required' => 'Kode dari aplikasi KEYLA wajib diisi untuk proses tanda tangan digital.',
+            'keyla_token.regex' => 'Kode KEYLA hanya boleh berisi huruf/angka tanpa spasi.',
         ];
     }
 }

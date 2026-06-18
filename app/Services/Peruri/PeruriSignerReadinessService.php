@@ -88,12 +88,12 @@ class PeruriSignerReadinessService
             return [
                 'email' => $user->email,
                 'profile_id' => null,
-                'registration' => $this->statusState('inactive', 'Registrasi user PDS belum dilakukan.', false, 'warning'),
-                'kyc' => $this->statusState('inactive', 'Video E-KYC belum dikirim.', false, 'warning'),
-                'specimen' => $this->statusState('inactive', 'Specimen tanda tangan belum dikirim.', false, 'warning'),
-                'certificate' => $this->statusState('missing_email', 'Profil tanda tangan digital customer belum dibuat.', false, 'warning'),
-                'keyla' => $this->statusState('missing_email', 'Profil KEYLA customer belum dibuat.', false, 'warning'),
-                'overall' => $this->statusState('blocked', 'Customer perlu menyelesaikan onboarding PDS/KEYLA terlebih dahulu.', false, 'warning'),
+                'registration' => $this->statusState('inactive', 'Akun tanda tangan belum dibuat.', false, 'warning'),
+                'kyc' => $this->statusState('inactive', 'Video wajah belum dikirim.', false, 'warning'),
+                'specimen' => $this->statusState('inactive', 'Tanda tangan belum disimpan.', false, 'warning'),
+                'certificate' => $this->statusState('missing_email', 'Profil tanda tangan digital belum dibuat.', false, 'warning'),
+                'keyla' => $this->statusState('missing_email', 'Aplikasi KEYLA belum terhubung.', false, 'warning'),
+                'overall' => $this->statusState('blocked', 'Aktifkan tanda tangan digital terlebih dahulu.', false, 'warning'),
                 'checked_at' => null,
                 'last_error' => null,
                 'keyla_qr_image' => null,
@@ -199,18 +199,18 @@ class PeruriSignerReadinessService
         $email = trim((string) $profile->peruri_email);
         $registration = $this->customerStepState(
             (string) ($profile->registration_status ?? ''),
-            'Registrasi user PDS belum dilakukan.',
-            'Registrasi user PDS sudah dikirim.',
+            'Akun tanda tangan belum dibuat.',
+            'Akun tanda tangan sudah dibuat.',
         );
         $kyc = $this->customerStepState(
             (string) ($profile->kyc_status ?? ''),
-            'Video E-KYC belum dikirim.',
-            'Video E-KYC sudah dikirim.',
+            'Video wajah belum dikirim.',
+            'Video wajah sudah dikirim.',
         );
         $specimen = $this->customerStepState(
             (string) ($profile->specimen_status ?? ''),
-            'Specimen tanda tangan belum dikirim.',
-            'Specimen tanda tangan sudah dikirim.',
+            'Tanda tangan belum disimpan.',
+            'Tanda tangan sudah disimpan.',
         );
 
         if ($email === '') {
@@ -222,7 +222,7 @@ class PeruriSignerReadinessService
                 'specimen' => $specimen,
                 'certificate' => $this->statusState('missing_email', 'Email Peruri belum tersedia.', false, 'warning'),
                 'keyla' => $this->statusState('missing_email', 'Email KEYLA belum tersedia.', false, 'warning'),
-                'overall' => $this->statusState('blocked', 'Lengkapi identitas onboarding customer terlebih dahulu.', false, 'warning'),
+                'overall' => $this->statusState('blocked', 'Lengkapi data diri terlebih dahulu.', false, 'warning'),
                 'checked_at' => optional($profile->last_checked_at)->toDateTimeString(),
                 'last_error' => $profile->last_error,
                 'keyla_qr_image' => $profile->keyla_qr_image,
@@ -250,7 +250,7 @@ class PeruriSignerReadinessService
             'certificate' => $certificate,
             'keyla' => $keyla,
             'overall' => $isReady
-                ? $this->statusState('ready', 'Customer siap untuk tanda tangan digital.', true, 'success')
+                ? $this->statusState('ready', 'Tanda tangan digital sudah siap digunakan.', true, 'success')
                 : $this->statusState('blocked', $this->customerBlockedMessage($registration, $kyc, $specimen, $certificate, $keyla), false, 'warning'),
             'checked_at' => optional($profile->last_checked_at)->toDateTimeString(),
             'last_error' => $this->customerLastError($profile, $certificate, $keyla),
@@ -311,7 +311,7 @@ class PeruriSignerReadinessService
             return $this->statusState('unknown', 'Status sertifikat belum dapat dipastikan dari response PDS.', false, 'warning');
         } catch (PeruriApiException $exception) {
             if ($this->isPendingCertificateVerification($exception)) {
-                return $this->statusState('pending', 'Kode 10: Sertifikat Peruri sedang menunggu verifikasi.', false, 'warning');
+                return $this->statusState('pending', 'Akun Anda masih diverifikasi oleh Peruri.', false, 'warning');
             }
 
             return $this->statusState('error', $exception->getMessage(), false, 'danger');
@@ -391,7 +391,7 @@ class PeruriSignerReadinessService
     {
         return match ($status) {
             'submitted', 'ready' => $this->statusState('ready', $readyMessage, true, 'success'),
-            'error' => $this->statusState('error', 'Langkah onboarding terakhir gagal diproses.', false, 'danger'),
+            'error' => $this->statusState('error', 'Langkah terakhir belum berhasil diproses.', false, 'danger'),
             default => $this->statusState('inactive', $defaultMessage, false, 'warning'),
         };
     }
@@ -407,11 +407,11 @@ class PeruriSignerReadinessService
     {
         foreach ([$registration, $kyc, $specimen, $certificate, $keyla] as $state) {
             if (! ($state['is_ready'] ?? false)) {
-                return (string) ($state['message'] ?? 'Customer belum siap onboarding.');
+                return (string) ($state['message'] ?? 'Aktifkan tanda tangan digital terlebih dahulu.');
             }
         }
 
-        return 'Customer belum siap onboarding.';
+        return 'Aktifkan tanda tangan digital terlebih dahulu.';
     }
 
     /**
@@ -445,18 +445,18 @@ class PeruriSignerReadinessService
         }
 
         if (! ($registration['is_ready'] ?? false)) {
-            return $this->statusState('inactive', 'Registrasi user PDS perlu dikirim terlebih dahulu.', false, 'warning');
+            return $this->statusState('inactive', 'Buat akun tanda tangan terlebih dahulu.', false, 'warning');
         }
 
         if (! ($kyc['is_ready'] ?? false)) {
-            return $this->statusState('inactive', 'Video E-KYC perlu dikirim sebelum sertifikat dapat dicek.', false, 'warning');
+            return $this->statusState('inactive', 'Kirim video wajah sebelum verifikasi akun dicek.', false, 'warning');
         }
 
         if (! ($specimen['is_ready'] ?? false)) {
-            return $this->statusState('inactive', 'Specimen tanda tangan perlu dikirim sebelum sertifikat dapat dicek.', false, 'warning');
+            return $this->statusState('inactive', 'Simpan tanda tangan sebelum verifikasi akun dicek.', false, 'warning');
         }
 
-        return $this->statusState('unknown', 'Status sertifikat belum diperiksa. Gunakan tombol cek status untuk sinkronisasi terbaru.', false, 'muted');
+        return $this->statusState('unknown', 'Status verifikasi akun belum diperiksa. Gunakan tombol cek status.', false, 'muted');
     }
 
     /**
@@ -473,18 +473,18 @@ class PeruriSignerReadinessService
         }
 
         if (! ($registration['is_ready'] ?? false)) {
-            return $this->statusState('inactive', 'Registrasi user PDS perlu dikirim terlebih dahulu.', false, 'warning');
+            return $this->statusState('inactive', 'Buat akun tanda tangan terlebih dahulu.', false, 'warning');
         }
 
         if (! ($kyc['is_ready'] ?? false)) {
-            return $this->statusState('inactive', 'Video E-KYC perlu dikirim sebelum KEYLA dapat dicek.', false, 'warning');
+            return $this->statusState('inactive', 'Kirim video wajah sebelum aplikasi KEYLA dicek.', false, 'warning');
         }
 
         if (! ($specimen['is_ready'] ?? false)) {
-            return $this->statusState('inactive', 'Specimen tanda tangan perlu dikirim sebelum KEYLA dapat dicek.', false, 'warning');
+            return $this->statusState('inactive', 'Simpan tanda tangan sebelum aplikasi KEYLA dicek.', false, 'warning');
         }
 
-        return $this->statusState('unknown', 'Status KEYLA belum diperiksa. Gunakan tombol cek status untuk sinkronisasi terbaru.', false, 'muted');
+        return $this->statusState('unknown', 'Status aplikasi KEYLA belum diperiksa. Gunakan tombol cek status.', false, 'muted');
     }
 
     /**

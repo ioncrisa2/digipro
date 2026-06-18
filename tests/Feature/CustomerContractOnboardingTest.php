@@ -106,6 +106,104 @@ it('stores customer onboarding identity on signature profile and request snapsho
     expect(data_get($snapshot, 'customer.email'))->toBe('signature@example.test');
 });
 
+it('saves identity and creates the customer signature account from one action', function (): void {
+    Storage::fake('local');
+
+    $customer = User::factory()->create([
+        'email' => 'portal@example.test',
+        'phone_number' => '081200000001',
+        'billing_nik' => '3173000000000001',
+    ]);
+    $request = createWaitingSignatureAppraisalRequest($customer);
+
+    $capturedPayload = null;
+    fakePeruri(function (ClientRequest $request) use (&$capturedPayload) {
+        if (str_contains($request->url(), '/registration/v1/CORP-TEST/user')) {
+            $capturedPayload = $request->data();
+        }
+    });
+
+    $this->actingAs($customer)
+        ->post(route('appraisal.contract.onboarding.identity-and-register', ['id' => $request->id]), [
+            'peruri_email' => 'signature@example.test',
+            'peruri_phone' => '081255566677',
+            'nik' => '3173000000000002',
+            'is_wna' => false,
+            'reference_province_id' => 'R-31',
+            'reference_city_id' => 'R-31.74',
+            'gender' => 'M',
+            'place_of_birth' => 'Jakarta',
+            'date_of_birth' => '1990-01-15',
+            'address' => 'Jakarta Selatan',
+            'ktp_photo' => UploadedFile::fake()->image('ktp.jpg'),
+        ])
+        ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
+        ->assertSessionHas('success', 'Data diri berhasil disimpan dan akun tanda tangan berhasil dibuat.');
+
+    $profile = $customer->fresh()->signatureProfile;
+
+    expect($profile)->not->toBeNull();
+    expect($profile->peruri_email)->toBe('signature@example.test');
+    expect($profile->registration_status)->toBe('submitted');
+    expect($capturedPayload)->toMatchArray([
+        'email' => 'signature@example.test',
+        'phone' => '081255566677',
+        'ktp' => '3173000000000002',
+        'province' => 'R-31',
+        'city' => 'R-31.74',
+    ]);
+});
+
+it('keeps saved identity when creating the signature account fails', function (): void {
+    Storage::fake('local');
+
+    $customer = User::factory()->create();
+    $request = createWaitingSignatureAppraisalRequest($customer);
+
+    Http::fake(function (ClientRequest $request) {
+        if (str_contains($request->url(), '/auth/v1/token/generate')) {
+            return Http::response([
+                'status' => '00',
+                'message' => 'OK',
+                'data' => [
+                    'accessToken' => 'access-token-test',
+                    'expiredDate' => now()->endOfDay()->toIso8601String(),
+                ],
+            ], 200);
+        }
+
+        if (str_contains($request->url(), '/registration/v1/CORP-TEST/user')) {
+            return Http::response(['status' => '99', 'message' => 'Vendor unavailable', 'data' => []], 200);
+        }
+
+        return Http::response(['status' => '00', 'message' => 'OK', 'data' => []], 200);
+    });
+
+    $this->actingAs($customer)
+        ->post(route('appraisal.contract.onboarding.identity-and-register', ['id' => $request->id]), [
+            'peruri_email' => 'signature@example.test',
+            'peruri_phone' => '081255566677',
+            'nik' => '3173000000000002',
+            'is_wna' => false,
+            'reference_province_id' => 'R-31',
+            'reference_city_id' => 'R-31.74',
+            'gender' => 'M',
+            'place_of_birth' => 'Jakarta',
+            'date_of_birth' => '1990-01-15',
+            'address' => 'Jakarta Selatan',
+            'ktp_photo' => UploadedFile::fake()->image('ktp.jpg'),
+        ])
+        ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
+        ->assertSessionHas('error', 'Data diri sudah tersimpan, tetapi akun tanda tangan belum berhasil dibuat. Coba lagi beberapa saat atau hubungi admin.');
+
+    $profile = $customer->fresh()->signatureProfile;
+
+    expect($profile)->not->toBeNull();
+    expect($profile->peruri_email)->toBe('signature@example.test');
+    expect($profile->registration_status)->toBeNull();
+    Storage::disk('local')->assertExists((string) $profile->ktp_photo_path);
+});
+
 it('does not probe peruri readiness when customer only saves onboarding identity', function (): void {
     Storage::fake('local');
 
@@ -147,6 +245,48 @@ it('does not probe peruri readiness when customer only saves onboarding identity
     expect($profile->certificate_status)->toBeNull();
     expect($profile->keyla_status)->toBeNull();
     expect($profile->last_checked_at)->toBeNull();
+});
+
+it('provides friendly onboarding payload for customer ui and support details', function (): void {
+    Storage::fake('local');
+    Storage::disk('local')->put('signature-profiles/1/identity/ktp.jpg', 'ktp-binary');
+
+    $customer = User::factory()->create();
+    $request = createWaitingSignatureAppraisalRequest($customer);
+    UserSignatureProfile::query()->create([
+        'user_id' => $customer->id,
+        'provider' => 'peruri_signit',
+        'peruri_email' => 'customer-sign@example.test',
+        'peruri_phone' => '081211122233',
+        'nik' => '3173000000000010',
+        'reference_province_id' => 'R-31',
+        'reference_city_id' => 'R-31.74',
+        'gender' => 'M',
+        'place_of_birth' => 'Jakarta',
+        'date_of_birth' => '1990-01-15',
+        'registration_status' => 'submitted',
+        'kyc_status' => 'submitted',
+        'specimen_status' => 'submitted',
+        'certificate_status' => 'ready',
+        'keyla_status' => 'registered',
+        'keyla_qr_image' => 'data:image/png;base64,AAAABBBB',
+        'ktp_photo_path' => 'signature-profiles/1/identity/ktp.jpg',
+        'identity_payload' => ['address' => 'Jl. Testing'],
+    ]);
+
+    fakePeruri();
+
+    $this->actingAs($customer)
+        ->get(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Penilaian/ContractOnboarding')
+            ->where('friendly.step_labels.0', 'Data Diri')
+            ->where('friendly.active_step', 4)
+            ->where('friendly.actions.keyla_refresh_label', 'Saya Sudah Scan, Cek Status')
+            ->where('friendly.auto_refresh.enabled', true)
+            ->where('friendly.keyla_help.0.title', 'Buka aplikasi KEYLA di HP')
+            ->where('friendly.technical_details.0.label', 'Akun tanda tangan'));
 });
 
 it('rejects invalid nik when saving customer onboarding identity', function (): void {
@@ -455,7 +595,7 @@ it('does not register keyla while the certificate is still waiting for verificat
     $this->actingAs($customer)
         ->post(route('appraisal.contract.onboarding.register-keyla', ['id' => $request->id]))
         ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
-        ->assertSessionHas('error', 'Kode 10: Sertifikat Peruri sedang menunggu verifikasi. QR KEYLA baru bisa dibuat setelah sertifikat aktif.');
+        ->assertSessionHas('error', 'Akun Anda masih diverifikasi oleh Peruri. QR aktivasi baru bisa dibuat setelah verifikasi selesai.');
 
     $profile = $customer->fresh()->signatureProfile;
 
@@ -517,7 +657,7 @@ it('marks kyc as submitted when pds says the customer already performed e-kyc', 
             'kyc_video' => UploadedFile::fake()->createWithContent('kyc.mp4', 'video-binary'),
         ])
         ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
-        ->assertSessionHas('success', 'Video E-KYC berhasil dikirim ke PDS.');
+        ->assertSessionHas('success', 'Video wajah berhasil dikirim.');
 
     $profile = $customer->fresh()->signatureProfile;
 
@@ -559,6 +699,38 @@ it('refreshes readiness and reuses customer profile across requests', function (
         ->assertInertia(fn (Assert $page) => $page
             ->component('Penilaian/ContractSign')
             ->where('signingReadiness.customer.overall.is_ready', true));
+});
+
+it('silently refreshes onboarding readiness without flashing status messages', function (): void {
+    $customer = User::factory()->create();
+    $request = createWaitingSignatureAppraisalRequest($customer);
+
+    UserSignatureProfile::query()->create([
+        'user_id' => $customer->id,
+        'provider' => 'peruri_signit',
+        'peruri_email' => 'customer-sign@example.test',
+        'peruri_phone' => '081211122233',
+        'nik' => '3173000000000010',
+        'reference_province_id' => 'R-31',
+        'reference_city_id' => 'R-31.74',
+        'registration_status' => 'submitted',
+        'kyc_status' => 'submitted',
+        'specimen_status' => 'submitted',
+        'identity_payload' => ['address' => 'Jl. Testing'],
+    ]);
+
+    fakePeruriForContractPage();
+
+    $this->actingAs($customer)
+        ->post(route('appraisal.contract.onboarding.refresh-silent', ['id' => $request->id]))
+        ->assertRedirect(route('appraisal.contract.onboarding.page', ['id' => $request->id]))
+        ->assertSessionMissing('success')
+        ->assertSessionMissing('error');
+
+    $profile = $customer->fresh()->signatureProfile;
+
+    expect($profile?->certificate_status)->toBe('ready');
+    expect($profile?->keyla_status)->toBe('ready');
 });
 
 it('surfaces specific peruri token error during readiness refresh', function (): void {

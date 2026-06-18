@@ -3,20 +3,20 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Support\SystemNavigation;
-use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Notifications\Notifiable;
 use App\Notifications\ResetPasswordNotification;
+use App\Support\SystemNavigation;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasFactory, Notifiable, HasRoles, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -42,7 +42,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'billing_nik',
         'billing_email',
         'password',
-        'avatar_url'
+        'avatar_url',
     ];
 
     /**
@@ -94,7 +94,7 @@ class User extends Authenticatable implements MustVerifyEmail
                 'keyla_status' => null,
                 'keyla_qr_image' => null,
                 'last_checked_at' => null,
-                'last_error' => 'Profil customer berubah. Silakan lakukan onboarding PDS kembali.',
+                'last_error' => 'Profil customer berubah. Silakan ulangi aktivasi tanda tangan digital.',
             ])->save();
         });
     }

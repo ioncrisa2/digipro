@@ -10,12 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ArrowLeft, CircleAlert, CircleCheck, RefreshCw, ShieldCheck, Smartphone } from "lucide-vue-next";
 
 const props = defineProps({
     request: { type: Object, required: true },
     profile: { type: Object, required: true },
     readiness: { type: Object, default: () => ({}) },
+    friendly: { type: Object, default: () => ({}) },
     references: { type: Object, default: () => ({}) },
     actions: { type: Object, required: true },
 });
@@ -27,7 +29,10 @@ const cities = computed(() => Array.isArray(props.references?.cities) ? props.re
 const referencesError = computed(() => props.references?.error ?? null);
 const keylaQr = computed(() => props.profile?.keyla_qr_image ?? props.readiness?.keyla_qr_image ?? null);
 
-const stepLabels = ["Data Diri", "Video Verifikasi", "Tanda Tangan", "Aplikasi KEYLA"];
+const fallbackStepLabels = ["Data Diri", "Rekam Wajah", "Tanda Tangan", "Aplikasi HP"];
+const stepLabels = computed(() => Array.isArray(props.friendly?.step_labels) && props.friendly.step_labels.length
+    ? props.friendly.step_labels
+    : fallbackStepLabels);
 const currentStep = ref(1);
 
 const identityForm = useForm({
@@ -64,12 +69,42 @@ const kycDone = computed(() => props.readiness?.kyc?.is_ready === true);
 const specimenDone = computed(() => props.readiness?.specimen?.is_ready === true);
 const certificateState = computed(() => props.readiness?.certificate ?? {});
 const certificateReady = computed(() => certificateState.value?.is_ready === true);
-const certificateMessage = computed(() => certificateState.value?.message ?? "Cek status sertifikat Peruri sebelum membuat QR KEYLA.");
+const accountVerificationMessage = computed(() => certificateReady.value
+    ? (props.friendly?.account_verification_message ?? "Akun tanda tangan Anda sudah selesai diverifikasi.")
+    : (props.friendly?.account_verification_message ?? "Akun Anda masih diverifikasi oleh Peruri. Tekan cek status secara berkala sebelum menghubungkan aplikasi HP."));
 const keylaDone = computed(() => props.readiness?.keyla?.is_ready === true);
 const overallReady = computed(() => props.readiness?.overall?.is_ready === true);
-const currentStepTitle = computed(() => stepLabels[currentStep.value - 1] ?? "");
-const canRegisterKeyla = computed(() => registrationDone.value && kycDone.value && specimenDone.value && certificateReady.value && !keylaDone.value);
-const keylaRefreshLabel = computed(() => keylaQr.value ? "Saya Sudah Scan, Cek Lagi" : "Cek Status Peruri");
+const currentStepTitle = computed(() => stepLabels.value[currentStep.value - 1] ?? "");
+const canRegisterKeyla = computed(() => props.friendly?.actions?.can_register_keyla ?? (registrationDone.value && kycDone.value && specimenDone.value && certificateReady.value && !keylaDone.value));
+const keylaRefreshLabel = computed(() => props.friendly?.actions?.keyla_refresh_label ?? (keylaQr.value ? "Saya Sudah Scan, Cek Status" : "Cek Status Aktivasi"));
+const hasCompleteSavedIdentity = computed(() => Boolean(
+    props.profile?.has_ktp_photo
+    && props.profile?.reference_city_id
+    && props.profile?.gender
+    && props.profile?.date_of_birth
+));
+const identitySubmitLabel = computed(() => {
+    if (props.friendly?.actions?.identity_submit_label) return props.friendly.actions.identity_submit_label;
+    if (registrationDone.value) return "Simpan Perubahan Data";
+    if (hasCompleteSavedIdentity.value) return "Coba Buat Akun Lagi";
+
+    return "Simpan dan Buat Akun Tanda Tangan";
+});
+const overallStatusMessage = computed(() => overallReady.value
+    ? (props.friendly?.status?.message ?? "Aktivasi selesai. Anda sudah bisa kembali ke kontrak untuk tanda tangan.")
+    : (props.friendly?.status?.message ?? "Selesaikan langkah aktif di bawah agar kontrak bisa ditandatangani secara digital."));
+const overallStatusLabel = computed(() => props.friendly?.status?.label ?? props.readiness?.overall?.label ?? "Belum Diketahui");
+const overallStatusTone = computed(() => props.friendly?.status?.tone ?? props.readiness?.overall?.tone ?? "warning");
+const technicalDetails = computed(() => Array.isArray(props.friendly?.technical_details) ? props.friendly.technical_details : []);
+const keylaHelpItems = computed(() => Array.isArray(props.friendly?.keyla_help) ? props.friendly.keyla_help : []);
+const autoRefreshConfig = computed(() => props.friendly?.auto_refresh ?? {});
+const shouldAutoRefreshKeyla = computed(() => Boolean(
+    props.actions?.silent_refresh_url
+    && autoRefreshConfig.value?.enabled
+    && keylaQr.value
+    && !keylaDone.value
+));
+const keylaAutoRefreshMessage = computed(() => autoRefreshConfig.value?.message ?? "DigiPro akan mengecek status aplikasi HP secara otomatis beberapa kali.");
 
 const statusClass = (tone) => ({
     success: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -80,34 +115,37 @@ const statusClass = (tone) => ({
 
 const registrationLabel = computed(() => registrationDone.value ? "Sudah terdaftar" : "Belum terdaftar");
 const activeStepIndex = computed(() => {
+    if (props.friendly?.active_step) return Number(props.friendly.active_step);
     if (!registrationDone.value) return 1;
     if (!kycDone.value) return 2;
     if (!specimenDone.value) return 3;
     return 4;
 });
 
-const progressItems = computed(() => ([
-    {
-        label: "Akun layanan digital",
-        value: registrationDone.value ? "Sudah terdaftar" : "Belum terdaftar",
-        tone: registrationDone.value ? "success" : "warning",
-    },
-    {
-        label: "Video verifikasi",
-        value: kycDone.value ? "Sudah dikirim" : "Belum direkam",
-        tone: kycDone.value ? "success" : "warning",
-    },
-    {
-        label: "Tanda tangan",
-        value: specimenDone.value ? "Sudah tersimpan" : "Belum dibuat",
-        tone: specimenDone.value ? "success" : "warning",
-    },
-    {
-        label: "Aplikasi KEYLA",
-        value: keylaDone.value ? "Sudah aktif" : "Belum terhubung",
-        tone: keylaDone.value ? "success" : "warning",
-    },
-]));
+const progressItems = computed(() => Array.isArray(props.friendly?.steps) && props.friendly.steps.length
+    ? props.friendly.steps
+    : [
+        {
+            label: "Akun tanda tangan",
+            value: registrationDone.value ? "Sudah dibuat" : "Belum dibuat",
+            tone: registrationDone.value ? "success" : "warning",
+        },
+        {
+            label: "Video wajah",
+            value: kycDone.value ? "Sudah dikirim" : "Belum direkam",
+            tone: kycDone.value ? "success" : "warning",
+        },
+        {
+            label: "Tanda tangan",
+            value: specimenDone.value ? "Sudah tersimpan" : "Belum dibuat",
+            tone: specimenDone.value ? "success" : "warning",
+        },
+        {
+            label: "Aplikasi HP",
+            value: keylaDone.value ? "Sudah aktif" : "Belum terhubung",
+            tone: keylaDone.value ? "success" : "warning",
+        },
+    ]);
 
 watch(activeStepIndex, (value) => {
     if (currentStep.value < value || overallReady.value) {
@@ -117,7 +155,7 @@ watch(activeStepIndex, (value) => {
 
 watch(() => flash.value?.error, (message) => {
     if (message) {
-        console.error("PDS onboarding error:", message);
+        console.error("Signature activation error:", message);
     }
 }, { immediate: true });
 
@@ -146,16 +184,15 @@ watch(() => identityForm.reference_province_id, (next, prev) => {
         preserveState: true,
         preserveScroll: true,
         replace: true,
-        only: ["references", "profile", "readiness", "actions", "request"],
+        only: ["references", "profile", "readiness", "friendly", "actions", "request"],
     });
 });
 
-const saveIdentity = () => identityForm.post(props.actions.save_identity_url, {
+const completeIdentity = () => identityForm.post(props.actions.complete_identity_url ?? props.actions.save_identity_url, {
     preserveScroll: true,
     forceFormData: true,
 });
 const refreshReadiness = () => router.post(props.actions.refresh_url, {}, { preserveScroll: true });
-const registerUser = () => router.post(props.actions.register_user_url, {}, { preserveScroll: true });
 const registerKeyla = () => {
     if (!canRegisterKeyla.value) return;
 
@@ -164,6 +201,56 @@ const registerKeyla = () => {
 const goToContract = () => router.visit(props.actions.contract_url);
 const goBackStep = () => { currentStep.value = Math.max(1, currentStep.value - 1); };
 const goNextStep = () => { currentStep.value = Math.min(4, currentStep.value + 1); };
+
+let keylaAutoRefreshTimer = null;
+let keylaAutoRefreshAttempts = 0;
+const isAutoRefreshingKeyla = ref(false);
+
+const stopKeylaAutoRefresh = () => {
+    if (keylaAutoRefreshTimer) {
+        window.clearInterval(keylaAutoRefreshTimer);
+        keylaAutoRefreshTimer = null;
+    }
+    keylaAutoRefreshAttempts = 0;
+};
+
+const silentRefreshReadiness = () => {
+    if (!shouldAutoRefreshKeyla.value || isAutoRefreshingKeyla.value) return;
+
+    const maxAttempts = Number(autoRefreshConfig.value?.max_attempts ?? 8);
+    if (keylaAutoRefreshAttempts >= maxAttempts) {
+        stopKeylaAutoRefresh();
+        return;
+    }
+
+    keylaAutoRefreshAttempts += 1;
+    isAutoRefreshingKeyla.value = true;
+    router.post(props.actions.silent_refresh_url, {}, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+        only: ["profile", "readiness", "friendly"],
+        onFinish: () => {
+            isAutoRefreshingKeyla.value = false;
+        },
+    });
+};
+
+const startKeylaAutoRefresh = () => {
+    if (keylaAutoRefreshTimer || !shouldAutoRefreshKeyla.value) return;
+
+    const intervalMs = Number(autoRefreshConfig.value?.interval_ms ?? 15000);
+    keylaAutoRefreshTimer = window.setInterval(silentRefreshReadiness, Math.max(5000, intervalMs));
+};
+
+watch(shouldAutoRefreshKeyla, (enabled) => {
+    if (enabled) {
+        startKeylaAutoRefresh();
+        return;
+    }
+
+    stopKeylaAutoRefresh();
+}, { immediate: true });
 
 const stopCamera = () => {
     if (mediaRecorder.value && isRecording.value) mediaRecorder.value.stop();
@@ -293,6 +380,7 @@ const submitSpecimen = () => {
 };
 
 onBeforeUnmount(() => {
+    stopKeylaAutoRefresh();
     stopCamera();
     if (recordedVideoUrl.value) URL.revokeObjectURL(recordedVideoUrl.value);
 });
@@ -310,14 +398,14 @@ onBeforeUnmount(() => {
                         <Badge variant="secondary">{{ request.request_number ?? "-" }}</Badge>
                     </div>
                     <p class="max-w-3xl text-sm text-muted-foreground text-pretty">
-                        Ikuti langkah berikut agar kontrak bisa ditandatangani. Anda juga perlu memasang aplikasi KEYLA dari Peruri di ponsel sebelum masuk ke tahap terakhir.
+                        Selesaikan langkah singkat ini agar kontrak bisa ditandatangani secara digital melalui Peruri. Siapkan KTP, HP, dan aplikasi KEYLA.
                     </p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
                     <Button variant="outline" @click="refreshReadiness">
                         <RefreshCw class="mr-2 h-4 w-4" />
-                        Cek Status
+                        Cek Status Aktivasi
                     </Button>
                     <Button variant="outline" @click="goToContract">
                         <ArrowLeft class="mr-2 h-4 w-4" />
@@ -328,13 +416,13 @@ onBeforeUnmount(() => {
 
             <Alert v-if="flash.error" variant="destructive">
                 <CircleAlert />
-                <AlertTitle>Masih ada yang perlu diperbaiki</AlertTitle>
+                <AlertTitle>Perlu diperbaiki</AlertTitle>
                 <AlertDescription>{{ flash.error }}</AlertDescription>
             </Alert>
 
             <Alert v-else-if="flash.success" class="border-emerald-200 bg-emerald-50 text-emerald-900">
                 <CircleCheck />
-                <AlertTitle>Langkah berhasil diproses</AlertTitle>
+                <AlertTitle>Berhasil</AlertTitle>
                 <AlertDescription>{{ flash.success }}</AlertDescription>
             </Alert>
 
@@ -345,8 +433,8 @@ onBeforeUnmount(() => {
                             <CardTitle class="text-base">Progress Aktivasi</CardTitle>
                             <CardDescription>Ringkasan singkat agar Anda tahu langkah mana yang masih perlu diselesaikan.</CardDescription>
                         </div>
-                        <Badge variant="outline" :class="statusClass(readiness?.overall?.tone)">
-                            {{ readiness?.overall?.label ?? "Belum Diketahui" }}
+                        <Badge variant="outline" :class="statusClass(overallStatusTone)">
+                            {{ overallStatusLabel }}
                         </Badge>
                     </div>
 
@@ -361,9 +449,11 @@ onBeforeUnmount(() => {
                                 <span>Status aktivasi</span>
                             </div>
                             <p class="mt-1 text-sm text-slate-600 text-pretty">
-                                {{ readiness?.overall?.message ?? "Lengkapi langkah aktivasi agar kontrak dapat ditandatangani." }}
+                                {{ overallStatusMessage }}
                             </p>
-                            <p v-if="readiness?.last_error" class="mt-2 text-xs text-rose-700">{{ readiness.last_error }}</p>
+                            <p v-if="friendly?.status?.show_last_error || readiness?.last_error" class="mt-2 text-xs text-rose-700">
+                                Status terakhir belum berhasil diperbarui. Coba cek status lagi atau hubungi admin jika tetap gagal.
+                            </p>
                         </div>
                         <Badge variant="outline" :class="statusClass(registrationDone ? 'success' : 'warning')">
                             {{ registrationLabel }}
@@ -373,7 +463,7 @@ onBeforeUnmount(() => {
                     <div class="grid gap-3 md:grid-cols-4">
                         <div
                             v-for="item in progressItems"
-                            :key="item.label"
+                            :key="item.key ?? item.label"
                             class="rounded-2xl border border-slate-200 bg-white px-4 py-3"
                         >
                             <div class="text-sm font-medium text-slate-900">{{ item.label }}</div>
@@ -400,10 +490,10 @@ onBeforeUnmount(() => {
                 <CardContent class="space-y-5">
                     <div v-if="currentStep === 1" class="space-y-5">
                         <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 text-pretty">
-                            Lengkapi data singkat berikut. Setelah itu, tekan tombol daftar agar akun tanda tangan digital Anda dibuat.
+                            Lengkapi data berikut untuk membuat akun tanda tangan digital. Pastikan sesuai KTP atau identitas resmi.
                         </div>
 
-                        <form class="grid gap-4" @submit.prevent="saveIdentity">
+                        <form class="grid gap-4" @submit.prevent="completeIdentity">
                             <div class="grid gap-4 md:grid-cols-2">
                                 <div class="space-y-2">
                                     <Label for="is_wna">Kewarganegaraan</Label>
@@ -416,7 +506,7 @@ onBeforeUnmount(() => {
                                             <SelectItem value="1">WNA</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <p class="text-xs text-slate-500">Pilih sesuai identitas yang akan dikirim ke PDS.</p>
+                                    <p class="text-xs text-slate-500">Pilih sesuai identitas yang digunakan untuk tanda tangan digital.</p>
                                     <p v-if="identityForm.errors.is_wna" class="text-sm text-rose-600">{{ identityForm.errors.is_wna }}</p>
                                 </div>
 
@@ -431,7 +521,7 @@ onBeforeUnmount(() => {
                                             <SelectItem value="F">Perempuan</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <p class="text-xs text-slate-500">Data ini wajib untuk registrasi Form User SIGN-IT.</p>
+                                    <p class="text-xs text-slate-500">Data ini dibutuhkan untuk membuat akun tanda tangan.</p>
                                     <p v-if="identityForm.errors.gender" class="text-sm text-rose-600">{{ identityForm.errors.gender }}</p>
                                 </div>
                             </div>
@@ -439,14 +529,14 @@ onBeforeUnmount(() => {
                             <div class="space-y-2">
                                 <Label for="peruri_email">Email aktif</Label>
                                 <Input id="peruri_email" v-model="identityForm.peruri_email" type="email" class="text-base" />
-                                <p class="text-xs text-slate-500">Gunakan email yang aktif dan bisa diakses untuk proses aktivasi tanda tangan digital.</p>
+                                <p class="text-xs text-slate-500">Gunakan email yang bisa Anda buka.</p>
                                 <p v-if="identityForm.errors.peruri_email" class="text-sm text-rose-600">{{ identityForm.errors.peruri_email }}</p>
                             </div>
 
                             <div class="space-y-2">
                                 <Label for="peruri_phone">Nomor WhatsApp / HP</Label>
                                 <Input id="peruri_phone" v-model="identityForm.peruri_phone" class="text-base" />
-                                <p class="text-xs text-slate-500">Masukkan nomor ponsel yang aktif agar data akun dan verifikasi tetap sinkron.</p>
+                                <p class="text-xs text-slate-500">Gunakan nomor aktif yang bisa menerima pesan atau panggilan.</p>
                                 <p v-if="identityForm.errors.peruri_phone" class="text-sm text-rose-600">{{ identityForm.errors.peruri_phone }}</p>
                             </div>
 
@@ -468,7 +558,7 @@ onBeforeUnmount(() => {
                                 <div class="space-y-2">
                                     <Label for="date_of_birth">Tanggal lahir</Label>
                                     <Input id="date_of_birth" v-model="identityForm.date_of_birth" type="date" class="text-base" />
-                                    <p class="text-xs text-slate-500">Akan dikirim ke PDS dalam format dd/MM/yyyy.</p>
+                                    <p class="text-xs text-slate-500">Isi sesuai identitas resmi.</p>
                                     <p v-if="identityForm.errors.date_of_birth" class="text-sm text-rose-600">{{ identityForm.errors.date_of_birth }}</p>
                                 </div>
                             </div>
@@ -497,7 +587,7 @@ onBeforeUnmount(() => {
                                             <SelectItem v-for="option in provinces" :key="option.value" :value="String(option.value)">{{ option.label }}</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <p class="text-xs text-slate-500">Pilih provinsi sesuai data identitas yang akan dipakai saat registrasi.</p>
+                                    <p class="text-xs text-slate-500">Pilih provinsi sesuai alamat identitas.</p>
                                     <p v-if="identityForm.errors.reference_province_id" class="text-sm text-rose-600">{{ identityForm.errors.reference_province_id }}</p>
                                 </div>
 
@@ -519,20 +609,19 @@ onBeforeUnmount(() => {
                             <div class="space-y-2">
                                 <Label for="address">Alamat sesuai KTP</Label>
                                 <Input id="address" v-model="identityForm.address" class="text-base" />
-                                <p class="text-xs text-slate-500">Isi alamat sesuai KTP atau identitas resmi yang digunakan untuk onboarding.</p>
+                                <p class="text-xs text-slate-500">Isi alamat sesuai KTP atau identitas resmi yang digunakan.</p>
                                 <p v-if="identityForm.errors.address" class="text-sm text-rose-600">{{ identityForm.errors.address }}</p>
                             </div>
 
                             <div class="flex flex-wrap gap-3 border-t border-slate-200 pt-4">
-                                <Button type="submit" :disabled="identityForm.processing">Simpan Data</Button>
-                                <Button type="button" variant="outline" @click="registerUser">Daftarkan Akun</Button>
+                                <Button type="submit" :disabled="identityForm.processing">{{ identityForm.processing ? "Memproses..." : identitySubmitLabel }}</Button>
                             </div>
                         </form>
                     </div>
 
                     <div v-else-if="currentStep === 2" class="space-y-5">
                         <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 text-pretty">
-                            Rekam video singkat langsung dari webcam. Pastikan wajah terlihat jelas dan ruangan cukup terang.
+                            Rekam video singkat untuk memastikan akun tanda tangan benar milik Anda. Pastikan wajah terlihat jelas.
                         </div>
                         <p class="text-xs text-slate-500">Posisikan wajah di tengah frame, hindari cahaya dari belakang, dan pastikan suara sekitar tidak terlalu bising.</p>
 
@@ -550,7 +639,7 @@ onBeforeUnmount(() => {
                             <div class="text-sm font-medium text-slate-900">Preview video</div>
                             <video :src="recordedVideoUrl" class="aspect-video w-full rounded-xl border bg-black" controls playsinline />
                             <div class="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                                <Button type="button" :disabled="!kycForm.kyc_video || kycForm.processing" @click="submitKyc">Gunakan Video Ini</Button>
+                                <Button type="button" :disabled="!kycForm.kyc_video || kycForm.processing" @click="submitKyc">Kirim Video Ini</Button>
                                 <Button type="button" variant="outline" @click="startCamera">Rekam Ulang</Button>
                             </div>
                         </div>
@@ -578,7 +667,7 @@ onBeforeUnmount(() => {
 
                         <div class="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                             <Button type="button" variant="outline" @click="resetSignature">Ulangi</Button>
-                            <Button type="button" variant="outline" :disabled="!hasSignatureStroke" @click="useSignatureCanvas">Gunakan Gambar Ini</Button>
+                            <Button type="button" variant="outline" :disabled="!hasSignatureStroke" @click="useSignatureCanvas">Gunakan Tanda Tangan Ini</Button>
                             <Button type="button" :disabled="!specimenForm.signature_image || specimenForm.processing" @click="submitSpecimen">Simpan Tanda Tangan</Button>
                         </div>
                     </div>
@@ -586,31 +675,56 @@ onBeforeUnmount(() => {
                     <div v-else class="space-y-5">
                         <Alert class="border-sky-200 bg-sky-50 text-sky-950">
                             <Smartphone class="h-4 w-4" />
-                            <AlertTitle>Pasang aplikasi KEYLA dulu</AlertTitle>
+                            <AlertTitle>Hubungkan aplikasi di HP</AlertTitle>
                             <AlertDescription>
-                                Unduh aplikasi KEYLA dari Peruri di ponsel, lalu buat QR di bawah dan scan dari aplikasi tersebut.
+                                Unduh aplikasi KEYLA dari Peruri di HP, lalu buat QR di bawah dan scan dari aplikasi tersebut.
                             </AlertDescription>
                         </Alert>
-                        <p class="text-xs text-slate-500">Setelah QR dibuat, buka aplikasi KEYLA di ponsel Anda lalu scan QR tersebut untuk menghubungkan akun.</p>
+                        <p class="text-xs text-slate-500">Setelah QR dibuat, buka aplikasi KEYLA di HP Anda lalu scan QR tersebut untuk menghubungkan akun.</p>
 
                         <Alert :class="certificateReady ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : 'border-amber-200 bg-amber-50 text-amber-950'">
                             <ShieldCheck v-if="certificateReady" class="h-4 w-4" />
                             <CircleAlert v-else class="h-4 w-4" />
-                            <AlertTitle>Status sertifikat Peruri</AlertTitle>
-                            <AlertDescription>{{ certificateMessage }}</AlertDescription>
+                            <AlertTitle>Status verifikasi akun</AlertTitle>
+                            <AlertDescription>{{ accountVerificationMessage }}</AlertDescription>
                         </Alert>
 
                         <div class="flex flex-wrap gap-2">
-                            <Button type="button" variant="outline" :disabled="!canRegisterKeyla" @click="registerKeyla">Buat QR KEYLA</Button>
+                            <Button type="button" variant="outline" :disabled="!canRegisterKeyla" @click="registerKeyla">Buat QR Aktivasi</Button>
                             <Button type="button" @click="refreshReadiness">{{ keylaRefreshLabel }}</Button>
                         </div>
 
                         <div v-if="keylaQr" class="rounded-2xl border border-slate-200 p-4">
                             <div class="text-sm font-medium text-slate-900">Scan QR dengan aplikasi KEYLA</div>
                             <div class="mt-4 flex justify-center rounded-2xl border bg-white p-4">
-                                <img :src="keylaQr" alt="QR KEYLA customer" class="h-56 w-56 object-contain" />
+                                <img :src="keylaQr" alt="QR aktivasi aplikasi KEYLA" class="h-56 w-56 object-contain" />
+                            </div>
+                            <div v-if="shouldAutoRefreshKeyla" class="mt-3 flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+                                <RefreshCw class="mt-0.5 h-3.5 w-3.5" :class="isAutoRefreshingKeyla ? 'animate-spin' : ''" />
+                                <p>{{ keylaAutoRefreshMessage }}</p>
                             </div>
                         </div>
+
+                        <Accordion v-if="keylaHelpItems.length" type="single" collapsible class="rounded-2xl border border-slate-200 bg-white px-4">
+                            <AccordionItem value="keyla-help" class="border-0">
+                                <AccordionTrigger class="text-left text-sm font-medium hover:no-underline">
+                                    Cara menghubungkan aplikasi KEYLA
+                                </AccordionTrigger>
+                                <AccordionContent class="pb-4">
+                                    <div class="grid gap-3">
+                                        <div v-for="(item, index) in keylaHelpItems" :key="item.title" class="flex gap-3">
+                                            <div class="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+                                                {{ index + 1 }}
+                                            </div>
+                                            <div class="space-y-1">
+                                                <div class="text-sm font-medium text-slate-900">{{ item.title }}</div>
+                                                <p class="text-xs text-slate-600 text-pretty">{{ item.description }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
 
                         <div v-if="overallReady" class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                             <div class="flex items-center gap-2 text-sm font-medium text-emerald-900">
@@ -634,6 +748,29 @@ onBeforeUnmount(() => {
                 <AlertTitle>Referensi wilayah belum tersedia</AlertTitle>
                 <AlertDescription>{{ referencesError }}</AlertDescription>
             </Alert>
+
+            <Accordion v-if="technicalDetails.length" type="single" collapsible class="rounded-2xl border border-slate-200 bg-white px-4">
+                <AccordionItem value="technical-details" class="border-0">
+                    <AccordionTrigger class="text-left text-sm font-medium hover:no-underline">
+                        Detail teknis untuk bantuan admin
+                    </AccordionTrigger>
+                    <AccordionContent class="pb-4">
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <div v-for="item in technicalDetails" :key="item.label" class="rounded-xl border border-slate-200 px-3 py-2">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-medium text-slate-500">{{ item.label }}</div>
+                                        <p class="mt-1 text-sm text-slate-900 break-words">{{ item.value || "-" }}</p>
+                                    </div>
+                                    <Badge v-if="item.code" variant="outline" :class="statusClass(item.tone)">
+                                        {{ item.code }}
+                                    </Badge>
+                                </div>
+                            </div>
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
         </div>
     </DashboardLayout>
 </template>

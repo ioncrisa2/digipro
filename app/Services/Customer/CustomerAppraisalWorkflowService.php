@@ -15,8 +15,7 @@ class CustomerAppraisalWorkflowService
 
     public function __construct(
         private readonly ContractSignatureService $contractSignatureService,
-    ) {
-    }
+    ) {}
 
     public function resolveUserAppraisalRequest(Request $request, int $id): AppraisalRequest
     {
@@ -134,7 +133,7 @@ class CustomerAppraisalWorkflowService
 
         $keylaToken = trim((string) $request->input('keyla_token'));
         if ($keylaToken === '') {
-            throw new RuntimeException('Token KEYLA wajib diisi.');
+            throw new RuntimeException('Kode dari aplikasi KEYLA wajib diisi.');
         }
 
         $envelope = $this->contractSignatureService->customerSignContract(

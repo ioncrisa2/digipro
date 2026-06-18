@@ -8,6 +8,7 @@ use App\Models\GuidelineSet;
 use App\Models\User;
 use App\Services\Reports\AppraisalReportPayloadBuilder;
 use App\Support\AdminWorkspaceAccessSynchronizer;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -21,7 +22,7 @@ it('renders the digipro draft report without inspection date or middle value tex
     $customer = User::factory()->create(['email_verified_at' => now()]);
     $request = AppraisalRequest::create([
         'user_id' => $customer->id,
-        'request_number' => 'REQ-RPT-' . Str::upper(Str::random(6)),
+        'request_number' => 'REQ-RPT-'.Str::upper(Str::random(6)),
         'purpose' => 'jual_beli',
         'valuation_objective' => 'kajian_nilai_pasar_dalam_bentuk_range',
         'status' => AppraisalStatusEnum::ReportPreparation,
@@ -93,11 +94,27 @@ it('renders the digipro draft report without inspection date or middle value tex
 
     $payload = app(AppraisalReportPayloadBuilder::class)->build($request->fresh());
     $html = view('pdfs.appraisal-market-report-draft', ['report' => $payload])->render();
+    $pdfBinary = Pdf::loadView('pdfs.appraisal-market-report-draft', ['report' => $payload])
+        ->setPaper('a4', 'portrait')
+        ->output();
 
+    expect($html)->toContain('Laporan Kajian Pasar Properti');
+    expect($html)->toContain('Estimasi Range Nilai Pasar');
+    expect($html)->toContain('Definisi dan Lingkup Penugasan');
+    expect($html)->toContain('Asumsi dan Syarat Pembatas');
+    expect($html)->toContain('Pernyataan dan Otorisasi');
+    expect($html)->toContain('bukan opini nilai tunggal');
+    expect($html)->toContain('DigiPro by KJPP HJAR tidak melakukan inspeksi lapangan');
     expect($html)->toContain('Tanggal Penilaian');
     expect($html)->not->toContain('Tanggal Inspeksi');
     expect($html)->not->toContain('Nilai Tengah');
+    expect($html)->not->toContain('Property Market Study');
+    expect($html)->not->toContain('summary-boxes');
+    expect($html)->not->toContain('asset-card');
+    expect($html)->not->toContain('signature-box');
     expect($html)->not->toContain('Data Bangunan');
+    expect(str_starts_with($pdfBinary, '%PDF'))->toBeTrue();
+    expect(strlen($pdfBinary))->toBeGreaterThan(10000);
 });
 
 it('shows building section in the draft report only when the asset has building data', function () {
@@ -107,7 +124,7 @@ it('shows building section in the draft report only when the asset has building 
     $customer = User::factory()->create(['email_verified_at' => now()]);
     $request = AppraisalRequest::create([
         'user_id' => $customer->id,
-        'request_number' => 'REQ-RPT-' . Str::upper(Str::random(6)),
+        'request_number' => 'REQ-RPT-'.Str::upper(Str::random(6)),
         'purpose' => 'jual_beli',
         'valuation_objective' => 'kajian_nilai_pasar_dalam_bentuk_range',
         'status' => AppraisalStatusEnum::ReportPreparation,

@@ -2,305 +2,480 @@
 <html lang="id">
 <head>
     <meta charset="utf-8">
-    <title>Invoice Pembayaran</title>
+    <title>{{ $invoice['invoice_number'] ?? 'Invoice Pembayaran' }}</title>
     <style>
-        @page { margin: 22px; }
+        @page { margin: 22px 54px 30px; size: A4; }
+        * { box-sizing: border-box; }
         body {
+            margin: 0;
+            padding: 0;
             font-family: DejaVu Sans, sans-serif;
-            font-size: 11px;
-            line-height: 1.45;
-            color: #0f172a;
-            background: #f8fafc;
+            font-size: 9.4px;
+            line-height: 1.24;
+            color: #111827;
         }
         .page {
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            background: #ffffff;
-            padding: 16px;
+            width: 100%;
         }
-        .top-accent {
-            height: 6px;
-            border-radius: 4px;
-            background: #0ea5e9;
-            margin-bottom: 12px;
-        }
-        .header-table {
+        .top-band-table,
+        .letterhead-table,
+        .invoice-meta-table,
+        .invoice-table,
+        .signature-table,
+        .acceptance-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 12px;
         }
-        .header-left {
-            width: 58%;
-            vertical-align: top;
+        .top-band-table {
+            margin-bottom: 0;
         }
-        .header-right {
-            width: 42%;
-            vertical-align: top;
+        .top-band {
+            height: 16px;
+            background: #44205f;
+            color: #ffffff;
+            font-family: DejaVu Serif, serif;
+            font-size: 18px;
+            line-height: 16px;
             text-align: right;
+            letter-spacing: 0;
         }
-        .company {
-            font-size: 19px;
+        .letterhead-table {
+            margin-bottom: 8px;
+        }
+        .letterhead-logo-cell {
+            width: 78px;
+            vertical-align: top;
+            border-left: 2px solid #1d3557;
+            border-bottom: 2px solid #1d3557;
+        }
+        .brand-logo {
+            width: 70px;
+            height: auto;
+            display: block;
+            margin-top: 2px;
+        }
+        .logo-mark {
+            width: 68px;
+            height: 68px;
+            background: #1d3557;
+            color: #ffffff;
+            text-align: center;
+            font-size: 18px;
             font-weight: 700;
-            letter-spacing: 0.3px;
+            line-height: 68px;
+        }
+        .letterhead-copy {
+            vertical-align: top;
+            padding: 2px 0 0 6px;
+        }
+        .office-eyebrow {
             margin: 0;
-            color: #0f172a;
-        }
-        .invoice-title {
-            margin: 3px 0 0;
-            font-size: 13px;
-            color: #334155;
-            font-weight: 600;
-        }
-        .subline {
-            margin-top: 4px;
-            font-size: 10px;
-            color: #64748b;
-        }
-        .status-badge {
-            display: inline-block;
-            border: 1px solid #22c55e;
-            background: #dcfce7;
-            color: #166534;
-            border-radius: 999px;
-            padding: 3px 12px;
-            font-size: 10px;
+            font-size: 8.2px;
             font-weight: 700;
-            letter-spacing: .25px;
+            line-height: 1.02;
+            text-transform: uppercase;
         }
-        .meta-box {
-            margin-top: 8px;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 9px 10px;
-            background: #f8fafc;
+        .office-name {
+            margin: 0;
+            font-size: 10.2px;
+            font-weight: 700;
+            line-height: 1.1;
+            text-transform: uppercase;
         }
-        .meta-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 12px;
+        .office-lines {
+            margin-top: 1px;
+            font-size: 6.8px;
+            font-weight: 700;
+            line-height: 1.2;
         }
-        .meta-table td {
-            padding: 3px 0;
+        .digipro-line {
+            margin-top: 2px;
+            color: #0f5c88;
+            font-size: 7.2px;
+            font-weight: 700;
+        }
+        .recipient {
+            margin: 4px 0 8px;
+            font-size: 11.4px;
+            font-weight: 700;
+        }
+        .recipient .address {
+            margin-top: 5px;
+            font-size: 8.8px;
+            font-weight: 400;
+            line-height: 1.45;
+        }
+        .invoice-meta-table {
+            margin-bottom: 3px;
+        }
+        .invoice-meta-table td {
+            padding: 0 0 2px;
             vertical-align: top;
         }
         .meta-label {
-            width: 145px;
-            color: #64748b;
+            width: 64%;
+            text-align: right;
+            padding-right: 8px !important;
         }
-        .meta-colon {
-            width: 10px;
-            color: #64748b;
+        .meta-value {
+            width: 36%;
+            border-left: 1px solid #111827;
+            padding-left: 8px !important;
+            font-weight: 400;
         }
-        .section-title {
-            margin: 14px 0 6px;
-            font-size: 11px;
+        .status-line {
+            margin: 0 0 3px;
+            text-align: right;
+            color: #0f5c88;
+            font-size: 7.8px;
             font-weight: 700;
-            color: #0f172a;
-            text-transform: uppercase;
-            letter-spacing: .3px;
         }
-        .detail-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 4px;
+        .invoice-table {
+            border: 1.5px solid #111827;
+            margin-top: 2px;
         }
-        .detail-table th,
-        .detail-table td {
-            border: 1px solid #cbd5e1;
-            padding: 7px;
+        .invoice-table th,
+        .invoice-table td {
+            border: 1px solid #111827;
+            padding: 2px 4px;
             vertical-align: top;
         }
-        .detail-table th {
-            background: #f1f5f9;
-            color: #334155;
-            text-align: left;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: .2px;
+        .invoice-table th {
+            background: #f5c28e;
+            font-size: 8.6px;
+            line-height: 1.05;
+            text-align: center;
+            font-weight: 700;
+        }
+        .no-col {
+            width: 48px;
+            text-align: center;
+        }
+        .description-col {
+            width: auto;
+        }
+        .unit-col {
+            width: 124px;
         }
         .amount-col {
-            width: 175px;
+            width: 126px;
+        }
+        .item-no {
+            text-align: center;
+            vertical-align: middle !important;
+            font-size: 12px;
+            padding-top: 22px !important;
+        }
+        .desc-title {
+            font-weight: 700;
+        }
+        .desc-line {
+            margin-top: 2px;
+        }
+        .muted {
+            color: #4b5563;
+        }
+        .money-label {
+            width: 26px;
+            display: inline-block;
+            font-weight: 700;
+        }
+        .money-value {
+            float: right;
+            font-weight: 700;
+        }
+        .money-cell {
             text-align: right;
+            white-space: nowrap;
         }
-        .total-row td {
-            background: #f8fafc;
+        .total-label {
             font-weight: 700;
         }
-        .payment-box {
-            border: 1px solid #dbeafe;
-            border-radius: 8px;
-            background: #f0f9ff;
-            padding: 8px 10px;
-            margin-top: 6px;
-        }
-        .payment-box-title {
-            font-size: 10px;
+        .total-amount {
             font-weight: 700;
-            color: #0369a1;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            letter-spacing: .25px;
+            text-align: right;
+            white-space: nowrap;
         }
-        .payment-table {
-            width: 100%;
-            border-collapse: collapse;
+        .pay-line {
+            margin: 1px 0 2px;
+            padding-left: 58px;
         }
-        .payment-table td {
-            padding: 2px 0;
+        .amount-words {
+            margin: 0 0 8px;
+            text-align: center;
+            font-size: 8.8px;
+            font-weight: 700;
+        }
+        .signing-organization {
+            margin: 8px 0 22px 64px;
+            font-size: 9.8px;
+            font-weight: 700;
+        }
+        .signature-table {
+            margin-top: 0;
+        }
+        .signature-table td {
+            width: 50%;
+            vertical-align: top;
+            padding: 0;
+        }
+        .signature-left {
+            padding-left: 64px !important;
+            padding-right: 16px !important;
+        }
+        .signature-right {
+            padding-left: 16px !important;
+        }
+        .signature-name {
+            margin: 0;
+            font-size: 8.8px;
+            font-weight: 700;
+            text-decoration: underline;
+        }
+        .signature-title {
+            margin: 1px 0 0;
+            font-size: 8.2px;
+            font-style: italic;
+        }
+        .signature-detail {
+            margin: 2px 0 0;
+            font-size: 8.2px;
+            font-style: italic;
+            line-height: 1.28;
+        }
+        .digipro-note {
+            margin: 0;
+            padding-top: 4px;
+            color: #334155;
+            font-size: 7.4px;
+            line-height: 1.28;
+        }
+        .digipro-note strong {
+            color: #0f5c88;
+        }
+        .acceptance-table {
+            margin-top: 8px;
+        }
+        .acceptance-table td {
             vertical-align: top;
         }
-        .payment-label {
-            width: 148px;
-            color: #475569;
+        .acceptance-cell {
+            width: 134px;
+            height: 70px;
+            border: 1px solid #111827;
+            margin-left: auto;
+            text-align: center;
         }
-        .footer {
-            margin-top: 16px;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 8px;
-            font-size: 10px;
-            color: #64748b;
+        .acceptance-title {
+            padding: 3px 0;
+            border-bottom: 1px solid #111827;
+            font-size: 8px;
+            font-weight: 700;
         }
-        .signature {
-            margin-top: 6px;
-            text-align: right;
-            font-size: 10px;
-            color: #475569;
+        .acceptance-subtitle {
+            padding: 3px 0;
+            border-bottom: 1px solid #111827;
+            background: #d9d9d9;
+            font-size: 7px;
+            font-style: italic;
+            font-weight: 700;
         }
     </style>
 </head>
 <body>
 @php
-    $idr = fn ($value) => 'Rp ' . number_format((int) ($value ?? 0), 0, ',', '.');
-    $gateway = is_array($invoice['gateway_details'] ?? null) ? $invoice['gateway_details'] : null;
     $billing = is_array($invoice['billing_summary'] ?? null) ? $invoice['billing_summary'] : [];
+    $gateway = is_array($invoice['gateway_details'] ?? null) ? $invoice['gateway_details'] : null;
+    $brandLogoPath = public_path('images/brand/digipro-by-kjpp-hjar-logo-dark.png');
+    $hasBrandLogo = is_file($brandLogoPath);
+
+    $idrNumber = fn ($value) => number_format((int) ($value ?? 0), 0, ',', '.');
+    $idr = fn ($value) => 'Rp ' . $idrNumber($value);
+
+    $billingName = trim((string) ($billing['nama_tagihan'] ?? ''));
+    $clientName = $billingName !== '' ? $billingName : (string) ($invoice['client_name'] ?? '-');
+    $billingAddress = trim((string) ($billing['alamat_tagihan'] ?? ''));
+    $invoiceNumber = (string) ($invoice['invoice_number'] ?? '-');
+    $invoiceDate = (string) (($billing['tanggal_invoice'] ?? null) ?: ($invoice['issued_at'] ?? '-'));
+    $requestNumber = (string) ($invoice['request_number'] ?? '-');
+    $contractNumber = (string) ($invoice['contract_number'] ?? '-');
+    $dpp = (int) ($billing['nilai_jasa_dpp'] ?? 0);
+    $ppnRate = (float) ($billing['tarif_ppn_persen'] ?? 11);
+    $ppn = (int) ($billing['nilai_ppn'] ?? 0);
+    $total = (int) ($billing['total_tagihan'] ?? ($invoice['amount'] ?? 0));
+    $pphLabel = (string) ($billing['jenis_pph_dipotong_label'] ?? 'PPh 23');
+    $pph = (int) ($billing['nilai_pph_dipotong'] ?? 0);
+    $net = (int) ($billing['total_transfer_customer'] ?? ($invoice['amount'] ?? $total));
+
+    $terbilang = function (int $value) use (&$terbilang): string {
+        $value = abs($value);
+        $words = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
+
+        if ($value < 12) {
+            return $words[$value];
+        }
+        if ($value < 20) {
+            return trim($terbilang($value - 10) . ' Belas');
+        }
+        if ($value < 100) {
+            return trim($terbilang(intdiv($value, 10)) . ' Puluh ' . $terbilang($value % 10));
+        }
+        if ($value < 200) {
+            return trim('Seratus ' . $terbilang($value - 100));
+        }
+        if ($value < 1000) {
+            return trim($terbilang(intdiv($value, 100)) . ' Ratus ' . $terbilang($value % 100));
+        }
+        if ($value < 2000) {
+            return trim('Seribu ' . $terbilang($value - 1000));
+        }
+        if ($value < 1000000) {
+            return trim($terbilang(intdiv($value, 1000)) . ' Ribu ' . $terbilang($value % 1000));
+        }
+        if ($value < 1000000000) {
+            return trim($terbilang(intdiv($value, 1000000)) . ' Juta ' . $terbilang($value % 1000000));
+        }
+
+        return trim($terbilang(intdiv($value, 1000000000)) . ' Miliar ' . $terbilang($value % 1000000000));
+    };
+
+    $amountWords = trim($terbilang($total)) . ' Rupiah';
 @endphp
 
 <div class="page">
-    <div class="top-accent"></div>
-
-    <table class="header-table">
+    <table class="top-band-table">
         <tr>
-            <td class="header-left">
-                <h1 class="company">{{ $invoice['company_name'] ?? 'DigiPro by KJPP HJAR' }}</h1>
-                <p class="invoice-title">Invoice Pembayaran</p>
-                <div class="subline">Dokumen resmi bukti transaksi layanan penilaian properti</div>
+            <td class="top-band">INVOICE</td>
+        </tr>
+    </table>
+
+    <table class="letterhead-table">
+        <tr>
+            <td class="letterhead-logo-cell">
+                @if ($hasBrandLogo)
+                    <img src="{{ $brandLogoPath }}" class="brand-logo" alt="DigiPro by KJPP HJAR">
+                @else
+                    <div class="logo-mark">DP</div>
+                @endif
             </td>
-            <td class="header-right">
-                <span class="status-badge">{{ $invoice['status_label'] ?? 'LUNAS' }}</span>
-                <div class="meta-box">
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="font-size: 10px; color: #64748b; text-align: left;">No Invoice</td>
-                            <td style="font-size: 10px; font-weight: 700; text-align: right;">{{ $invoice['invoice_number'] ?? '-' }}</td>
-                        </tr>
-                        <tr>
-                            <td style="font-size: 10px; color: #64748b; text-align: left;">Tanggal</td>
-                            <td style="font-size: 10px; font-weight: 700; text-align: right;">{{ $invoice['issued_at'] ?? '-' }}</td>
-                        </tr>
-                    </table>
+            <td class="letterhead-copy">
+                <p class="office-eyebrow">Kantor Jasa Penilai Publik</p>
+                <p class="office-name">Henricus Judi Adrianto dan Rekan</p>
+                <div class="office-lines">
+                    Bidang Jasa Penilai Properti.<br>
+                    KMK No. 17/KM.1/2014, Tgl. 16 Januari 2014<br>
+                    Kantor Pusat: Ruko Terminal Sako No.18, Palembang<br>
+                    Telp. 0711 5615793, Email: henricusja@yahoo.com<br>
+                    Wilayah Kerja Seluruh Indonesia
                 </div>
+                <div class="digipro-line">DigiPro by KJPP HJAR - invoice digital layanan penilaian properti</div>
             </td>
         </tr>
     </table>
 
-    <table class="meta-table">
+    <div class="recipient">
+        To : {{ $clientName }}
+        @if ($billingAddress !== '')
+            <div class="address">Di-<br>{{ $billingAddress }}</div>
+        @endif
+    </div>
+
+    <table class="invoice-meta-table">
         <tr>
-            <td class="meta-label">Nomor Request</td>
-            <td class="meta-colon">:</td>
-            <td>{{ $invoice['request_number'] ?? '-' }}</td>
+            <td class="meta-label">INVOICE NUMBER</td>
+            <td class="meta-value">{{ $invoiceNumber }}</td>
         </tr>
         <tr>
-            <td class="meta-label">Nomor Kontrak</td>
-            <td class="meta-colon">:</td>
-            <td>{{ $invoice['contract_number'] ?? '-' }}</td>
-        </tr>
-        <tr>
-            <td class="meta-label">Nama Klien</td>
-            <td class="meta-colon">:</td>
-            <td>{{ $invoice['client_name'] ?? '-' }}</td>
+            <td class="meta-label">INVOICE DATE</td>
+            <td class="meta-value">{{ $invoiceDate }}</td>
         </tr>
     </table>
 
-    <div class="section-title">Rincian Tagihan</div>
-    <table class="detail-table">
+    <p class="status-line">Status: {{ $invoice['status_label'] ?? 'LUNAS' }}</p>
+
+    <table class="invoice-table">
         <thead>
         <tr>
-            <th style="width: 40px;">No</th>
-            <th>Deskripsi</th>
-            <th class="amount-col">Nominal</th>
+            <th class="no-col">NO</th>
+            <th class="description-col">DESCRIPTION</th>
+            <th class="unit-col">UNIT PRICE</th>
+            <th class="amount-col">AMOUNT</th>
         </tr>
         </thead>
         <tbody>
         <tr>
-            <td>1</td>
-            <td>Nilai jasa penilaian properti (DPP) - {{ $invoice['request_number'] ?? '-' }}</td>
-            <td class="amount-col">{{ $idr($billing['nilai_jasa_dpp'] ?? 0) }}</td>
+            <td class="item-no" rowspan="5">1</td>
+            <td>
+                <div class="desc-title">Fee pekerjaan Penilaian atas nama :</div>
+                <div class="desc-title">{{ $clientName }}</div>
+                <div class="desc-line">Layanan penilaian properti melalui DigiPro.</div>
+                <div class="desc-line muted">Request: {{ $requestNumber }} | Kontrak: {{ $contractNumber }}</div>
+            </td>
+            <td class="money-cell">{{ $idr($total) }}</td>
+            <td></td>
         </tr>
         <tr>
-            <td>2</td>
-            <td>PPN 11%</td>
-            <td class="amount-col">{{ $idr($billing['nilai_ppn'] ?? 0) }}</td>
+            <td class="desc-title">DPP</td>
+            <td class="money-cell"><span class="money-label">Rp</span> {{ $idrNumber($dpp) }}</td>
+            <td></td>
         </tr>
-        <tr class="total-row">
-            <td colspan="2" style="text-align: right;">Total Tagihan</td>
-            <td class="amount-col">{{ $idr($billing['total_tagihan'] ?? ($invoice['amount'] ?? 0)) }}</td>
+        <tr>
+            <td class="desc-title">PPN {{ rtrim(rtrim(number_format($ppnRate, 2, ',', '.'), '0'), ',') }}%</td>
+            <td class="money-cell"><span class="money-label">Rp</span> {{ $idrNumber($ppn) }}</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td class="total-label">TOTAL PEMBAYARAN</td>
+            <td></td>
+            <td class="total-amount"><span class="money-label">Rp</span> {{ $idrNumber($total) }}</td>
+        </tr>
+        <tr>
+            <td class="muted">Dipotong {{ $pphLabel }}: {{ $idr($pph) }}. Total transfer customer: {{ $idr($net) }}.</td>
+            <td colspan="2" class="muted">Metode: {{ (string) ($invoice['method'] ?? 'Midtrans Snap') }}</td>
         </tr>
         </tbody>
     </table>
 
-    <div class="section-title">Informasi Pajak</div>
-    <div class="payment-box">
-        <div class="payment-box-title">PPh Dipotong</div>
-        <table class="payment-table">
-            <tr>
-                <td class="payment-label">Jenis PPh</td>
-                <td>: {{ $billing['jenis_pph_dipotong_label'] ?? 'PPh 23' }}</td>
-            </tr>
-            <tr>
-                <td class="payment-label">Nilai PPh Dipotong</td>
-                <td>: {{ $idr($billing['nilai_pph_dipotong'] ?? 0) }}</td>
-            </tr>
-            <tr>
-                <td class="payment-label">Total Transfer Customer</td>
-                <td>: {{ $idr($billing['total_transfer_customer'] ?? ($invoice['amount'] ?? 0)) }}</td>
-            </tr>
-        </table>
-    </div>
+    <p class="pay-line">Pay this amount</p>
+    <p class="amount-words">{{ $amountWords }}</p>
 
-    <div class="section-title">Informasi Pembayaran</div>
-    <div class="payment-box">
-        <div class="payment-box-title">Detail Gateway</div>
-        <table class="payment-table">
-            <tr>
-                <td class="payment-label">Metode</td>
-                <td>: {{ (string) ($invoice['method'] ?? 'Midtrans Snap') }}</td>
-            </tr>
-            <tr>
-                <td class="payment-label">Order ID</td>
-                <td>: {{ $invoice['external_payment_id'] ?? '-' }}</td>
-            </tr>
-            <tr>
-                <td class="payment-label">Channel</td>
-                <td>
-                    :
-                    @if($gateway)
-                        {{ $gateway['label'] ?? '-' }}
-                        @if(!empty($gateway['reference']))
-                            | {{ $gateway['reference'] }}
-                        @endif
-                    @else
-                        -
+    <div class="signing-organization">KJPP Henricus Judi Adrianto</div>
+
+    <table class="signature-table">
+        <tr>
+            <td class="signature-left">
+                <p class="signature-name">Ir. Marleen E. Dien</p>
+                <p class="signature-title">Bag. Keuangan</p>
+            </td>
+            <td class="signature-right">
+                <p class="signature-name">Dr(ek). Dr(hk). Dr(min). Henricus Judi Adrianto, S.E.,<br>M.Ec.Dev., M.H., M.M, MCIArb., CIB., MAPPI (Cert)</p>
+                <p class="signature-title">Pimpinan</p>
+                <p class="signature-detail">Penilai Properti Izin Men Keu No. : P-1.13.000380<br>MAPPI No : 96-S-0827</p>
+            </td>
+        </tr>
+    </table>
+
+    <table class="acceptance-table">
+        <tr>
+            <td style="width: 70%; padding-left: 64px; padding-right: 18px;">
+                <div class="digipro-note">
+                    <strong>Catatan DigiPro:</strong>
+                    Invoice ini diterbitkan otomatis oleh sistem {{ $invoice['company_name'] ?? 'DigiPro by KJPP HJAR' }}.
+                    Order ID: {{ $invoice['external_payment_id'] ?? '-' }}.
+                    @if ($gateway)
+                        Channel: {{ $gateway['label'] ?? '-' }}@if (!empty($gateway['reference'])) | {{ $gateway['reference'] }}@endif.
                     @endif
-                </td>
-            </tr>
-        </table>
-    </div>
-
-    <div class="footer">
-        Invoice ini diterbitkan otomatis oleh sistem {{ $invoice['company_name'] ?? 'DigiPro by KJPP HJAR' }}.
-        Simpan dokumen ini sebagai arsip transaksi.
-        <div class="signature">Generated at {{ now()->format('Y-m-d H:i:s') }}</div>
-    </div>
+                    Simpan dokumen ini sebagai arsip transaksi.
+                </div>
+            </td>
+            <td>
+                <div class="acceptance-cell">
+                    <div class="acceptance-title">Penerima</div>
+                    <div class="acceptance-subtitle">Ttd dan Stempel Perusahaan</div>
+                </div>
+            </td>
+        </tr>
+    </table>
 </div>
 </body>
 </html>

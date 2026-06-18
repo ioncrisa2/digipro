@@ -321,7 +321,7 @@ class AppraisalController extends Controller
             && data_get($payload, 'signingReadiness.can_customer_sign') !== true) {
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
-                ->with('error', data_get($payload, 'signingReadiness.customer.overall.message', 'Selesaikan onboarding PDS/KEYLA terlebih dahulu.'));
+                ->with('error', data_get($payload, 'signingReadiness.customer.overall.message', 'Aktifkan tanda tangan digital terlebih dahulu agar kontrak bisa ditandatangani.'));
         }
 
         return inertia('Penilaian/ContractSign', $payload);
@@ -335,7 +335,7 @@ class AppraisalController extends Controller
         if (! $this->workflowService->isContractAccessibleStatus((string) $status)) {
             return redirect()
                 ->route('appraisal.show', ['id' => $record->id])
-                ->with('error', 'Kontrak belum siap untuk onboarding tanda tangan digital.');
+                ->with('error', 'Kontrak belum siap untuk aktivasi tanda tangan digital.');
         }
 
         $this->customerOnboardingService->snapshotForRequest($record, $request->user());
@@ -357,7 +357,32 @@ class AppraisalController extends Controller
 
         return redirect()
             ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
-            ->with('success', 'Identitas onboarding PDS berhasil disimpan.');
+            ->with('success', 'Data diri berhasil disimpan.');
+    }
+
+    public function completeContractOnboardingIdentity(SaveCustomerSignatureIdentityRequest $request, int $id)
+    {
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
+
+        $profile = $this->customerOnboardingService->saveIdentity($request->user(), $request->validated());
+
+        try {
+            if (! in_array((string) $profile->registration_status, ['submitted', 'ready'], true)) {
+                $this->customerOnboardingService->registerUser($request->user());
+            }
+
+            $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('success', 'Data diri berhasil disimpan dan akun tanda tangan berhasil dibuat.');
+        } catch (\RuntimeException $exception) {
+            $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+
+            return redirect()
+                ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
+                ->with('error', 'Data diri sudah tersimpan, tetapi akun tanda tangan belum berhasil dibuat. Coba lagi beberapa saat atau hubungi admin.');
+        }
     }
 
     public function registerContractPeruriUser(CustomerAccessRequest $request, int $id)
@@ -370,7 +395,7 @@ class AppraisalController extends Controller
 
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
-                ->with('success', 'Registrasi user PDS berhasil dikirim.');
+                ->with('success', 'Akun tanda tangan berhasil dibuat.');
         } catch (\RuntimeException $exception) {
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
@@ -388,7 +413,7 @@ class AppraisalController extends Controller
 
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
-                ->with('success', 'Video E-KYC berhasil dikirim ke PDS.');
+                ->with('success', 'Video wajah berhasil dikirim.');
         } catch (\RuntimeException $exception) {
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
@@ -406,7 +431,7 @@ class AppraisalController extends Controller
 
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
-                ->with('success', 'Specimen tanda tangan berhasil dikirim ke PDS.');
+                ->with('success', 'Tanda tangan berhasil disimpan.');
         } catch (\RuntimeException $exception) {
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
@@ -424,7 +449,7 @@ class AppraisalController extends Controller
 
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
-                ->with('success', 'QR KEYLA berhasil dibuat. Scan QR pada aplikasi KEYLA Anda.');
+                ->with('success', 'QR aktivasi berhasil dibuat. Scan dari aplikasi KEYLA di HP Anda.');
         } catch (\RuntimeException $exception) {
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
@@ -444,17 +469,33 @@ class AppraisalController extends Controller
                 || in_array(data_get($readiness, 'keyla.code'), ['error'], true)) {
                 return redirect()
                     ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
-                    ->with('error', data_get($readiness, 'last_error', 'Sinkronisasi readiness ke Peruri gagal.'));
+                    ->with('error', data_get($readiness, 'last_error', 'Status aktivasi belum bisa diperbarui. Coba lagi beberapa saat.'));
             }
 
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
-                ->with('success', 'Readiness customer diperbarui: '.data_get($readiness, 'overall.message', 'status terbaru tersimpan.'));
+                ->with('success', 'Status aktivasi diperbarui: '.data_get($readiness, 'overall.message', 'status terbaru tersimpan.'));
         } catch (\RuntimeException $exception) {
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
                 ->with('error', $exception->getMessage());
         }
+    }
+
+    public function refreshContractOnboardingSilently(CustomerAccessRequest $request, int $id)
+    {
+        $record = $this->workflowService->resolveUserAppraisalRequest($request, $id);
+
+        try {
+            $this->customerOnboardingService->syncReadiness($request->user());
+        } catch (\RuntimeException $exception) {
+            report($exception);
+        }
+
+        $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+
+        return redirect()
+            ->route('appraisal.contract.onboarding.page', ['id' => $record->id]);
     }
 
     public function signContract(

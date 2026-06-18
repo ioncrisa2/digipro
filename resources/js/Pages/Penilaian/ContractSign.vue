@@ -42,8 +42,14 @@ const customerCanSign = computed(() => readiness.value?.can_customer_sign === tr
 const signBlockedMessage = computed(() => {
     if (!canSign.value) return "Kontrak belum berada pada tahap tanda tangan.";
     if (customerCanSign.value) return null;
-    return customerReadiness.value?.overall?.message ?? "Akun Peruri/KEYLA belum siap untuk tanda tangan digital.";
+    return "Aktifkan tanda tangan digital terlebih dahulu agar kontrak bisa ditandatangani.";
 });
+const customerVerificationMessage = computed(() => customerReadiness.value?.certificate?.is_ready === true
+    ? "Akun tanda tangan Anda sudah selesai diverifikasi."
+    : "Akun tanda tangan Anda belum selesai diverifikasi. Cek status aktivasi dari halaman aktivasi tanda tangan digital.");
+const customerKeylaMessage = computed(() => customerReadiness.value?.keyla?.is_ready === true
+    ? "Aplikasi KEYLA di HP Anda sudah terhubung."
+    : "Aplikasi KEYLA di HP Anda belum terhubung atau belum aktif.");
 
 const assetRows = computed(() => {
     const rows = contractDoc.value?.assets;
@@ -328,33 +334,33 @@ const badgeClassFor = (tone) => toneClasses[tone] ?? toneClasses.muted;
             <Card>
                 <CardHeader>
                     <CardTitle class="text-base">Tindakan</CardTitle>
-                    <CardDescription>Finalisasi persetujuan kontrak dan validasi kesiapan Peruri/KEYLA</CardDescription>
+                    <CardDescription>Finalisasi persetujuan kontrak dan cek kesiapan tanda tangan digital.</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-3">
                     <div class="grid gap-3 md:grid-cols-2">
                         <div class="rounded-xl border p-4">
                             <div class="flex items-center justify-between gap-3">
                                 <div>
-                                    <div class="text-sm font-medium text-slate-900">Sertifikat Peruri</div>
-                                    <p class="mt-1 text-xs text-slate-500">Status sertifikat elektronik untuk akun customer.</p>
+                                    <div class="text-sm font-medium text-slate-900">Verifikasi akun</div>
+                                    <p class="mt-1 text-xs text-slate-500">Status akun tanda tangan digital Anda.</p>
                                 </div>
                                 <Badge variant="outline" :class="badgeClassFor(customerReadiness.certificate?.tone)">
                                     {{ customerReadiness.certificate?.label ?? "Belum Diketahui" }}
                                 </Badge>
                             </div>
-                            <p class="mt-3 text-xs text-slate-700">{{ customerReadiness.certificate?.message ?? "-" }}</p>
+                            <p class="mt-3 text-xs text-slate-700">{{ customerVerificationMessage }}</p>
                         </div>
                         <div class="rounded-xl border p-4">
                             <div class="flex items-center justify-between gap-3">
                                 <div>
-                                    <div class="text-sm font-medium text-slate-900">Akun KEYLA</div>
-                                    <p class="mt-1 text-xs text-slate-500">Status koneksi KEYLA untuk verifikasi token customer.</p>
+                                    <div class="text-sm font-medium text-slate-900">Aplikasi HP</div>
+                                    <p class="mt-1 text-xs text-slate-500">Status koneksi aplikasi KEYLA di HP Anda.</p>
                                 </div>
                                 <Badge variant="outline" :class="badgeClassFor(customerReadiness.keyla?.tone)">
                                     {{ customerReadiness.keyla?.label ?? "Belum Diketahui" }}
                                 </Badge>
                             </div>
-                            <p class="mt-3 text-xs text-slate-700">{{ customerReadiness.keyla?.message ?? "-" }}</p>
+                            <p class="mt-3 text-xs text-slate-700">{{ customerKeylaMessage }}</p>
                         </div>
                     </div>
 
@@ -388,17 +394,17 @@ const badgeClassFor = (tone) => toneClasses[tone] ?? toneClasses.muted;
                     <div v-if="canSign" class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
                         <div class="text-sm font-medium">Kontrak siap ditandatangani</div>
                         <p class="text-xs text-muted-foreground">
-                            Gunakan token KEYLA dari aplikasi KEYLA untuk melakukan tanda tangan digital melalui Peruri SIGN-IT.
-                            Sistem akan memverifikasi kesiapan sertifikat, akun KEYLA, dan token aktif sebelum signing diproses.
+                            Buka aplikasi KEYLA di HP, lalu masukkan kode yang sedang aktif untuk menandatangani kontrak.
+                            Sistem akan memeriksa kode tersebut sebelum tanda tangan diproses.
                         </p>
                         <div class="rounded-lg border border-emerald-200 bg-white/80 p-3 space-y-1.5">
-                            <div class="text-xs font-medium text-slate-700">Token KEYLA</div>
-                            <Input v-model="keylaToken" placeholder="Masukkan token KEYLA" autocomplete="one-time-code" />
+                            <div class="text-xs font-medium text-slate-700">Kode dari aplikasi KEYLA</div>
+                            <Input v-model="keylaToken" placeholder="Masukkan kode dari aplikasi KEYLA" autocomplete="one-time-code" />
                             <p v-if="flash.error" class="text-[11px] text-rose-700">
-                                Periksa token aktif di aplikasi KEYLA lalu coba lagi.
+                                Periksa kode aktif di aplikasi KEYLA lalu coba lagi.
                             </p>
                             <p class="text-[11px] text-slate-500">
-                                Token KEYLA berubah berkala. Pastikan memasukkan token yang sedang aktif.
+                                Kode KEYLA berubah berkala. Pastikan memasukkan kode yang sedang aktif.
                             </p>
                         </div>
                         <label class="flex items-start gap-2 rounded-lg border border-emerald-300 bg-white/80 p-3">

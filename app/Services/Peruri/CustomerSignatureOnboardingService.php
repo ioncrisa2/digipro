@@ -8,6 +8,7 @@ use App\Models\Province;
 use App\Models\Regency;
 use App\Models\User;
 use App\Models\UserSignatureProfile;
+use App\Support\Peruri\CustomerSignatureOnboardingPresenter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -17,6 +18,7 @@ class CustomerSignatureOnboardingService
     public function __construct(
         private readonly DigitalSignatureProvider $provider,
         private readonly PeruriSignerReadinessService $readinessService,
+        private readonly CustomerSignatureOnboardingPresenter $presenter,
     ) {}
 
     public function profileFor(User $user): UserSignatureProfile
@@ -106,7 +108,7 @@ class CustomerSignatureOnboardingService
         ]);
 
         if ($identityChanged) {
-            $this->resetReadiness($profile, 'Data identitas diperbarui. Silakan lanjutkan onboarding PDS.');
+            $this->resetReadiness($profile, 'Data diri diperbarui. Lanjutkan aktivasi tanda tangan digital.');
         }
 
         $profile->save();
@@ -147,7 +149,9 @@ class CustomerSignatureOnboardingService
                 payload: [],
             );
         } catch (RuntimeException $exception) {
-            if (! str_contains($exception->getMessage(), 'Sudah melakukan')) {
+            $isAlreadySubmitted = $exception instanceof PeruriApiException && $exception->peruriStatus === '28';
+
+            if (! $isAlreadySubmitted && ! str_contains($exception->getMessage(), 'Sudah melakukan')) {
                 throw $exception;
             }
 
@@ -202,8 +206,8 @@ class CustomerSignatureOnboardingService
             $message = (string) ($certificate['message'] ?? 'status belum siap.');
 
             throw new RuntimeException(($certificate['code'] ?? null) === 'pending'
-                ? $message.' QR KEYLA baru bisa dibuat setelah sertifikat aktif.'
-                : 'Sertifikat Peruri belum aktif untuk KEYLA: '.$message);
+                ? 'Akun Anda masih diverifikasi oleh Peruri. QR aktivasi baru bisa dibuat setelah verifikasi selesai.'
+                : 'Akun Anda masih menunggu verifikasi dari Peruri: '.$message);
         }
 
         $response = $this->provider->registerKeyla((string) $profile->peruri_email);
@@ -231,6 +235,29 @@ class CustomerSignatureOnboardingService
         $normalizedProvinceId = $this->pdsProvinceId($profile->reference_province_id);
         $normalizedCityId = $this->pdsCityId($normalizedProvinceId, $profile->reference_city_id);
         $references = $this->referencePayload($selectedProvinceId ?: $normalizedProvinceId);
+        $profilePayload = [
+            'id' => $profile->id,
+            'provider' => $profile->provider,
+            'peruri_email' => $profile->peruri_email,
+            'peruri_phone' => $profile->peruri_phone,
+            'nik' => $profile->nik,
+            'is_wna' => (bool) $profile->is_wna,
+            'reference_province_id' => $normalizedProvinceId ?: '',
+            'reference_city_id' => $normalizedCityId ?: '',
+            'gender' => $profile->gender,
+            'place_of_birth' => $profile->place_of_birth,
+            'date_of_birth' => optional($profile->date_of_birth)->toDateString(),
+            'address' => (string) data_get($profile->identity_payload, 'address', $user->address ?? ''),
+            'has_ktp_photo' => filled($profile->ktp_photo_path),
+            'registration_status' => $profile->registration_status,
+            'kyc_status' => $profile->kyc_status,
+            'specimen_status' => $profile->specimen_status,
+            'certificate_status' => $profile->certificate_status,
+            'keyla_status' => $profile->keyla_status,
+            'keyla_qr_image' => $profile->keyla_qr_image,
+            'last_error' => $profile->last_error,
+            'last_checked_at' => optional($profile->last_checked_at)->toDateTimeString(),
+        ];
 
         return [
             'request' => [
@@ -239,38 +266,19 @@ class CustomerSignatureOnboardingService
                 'contract_number' => $record->contract_number,
                 'contract_date' => optional($record->contract_date)->toDateString(),
             ],
-            'profile' => [
-                'id' => $profile->id,
-                'provider' => $profile->provider,
-                'peruri_email' => $profile->peruri_email,
-                'peruri_phone' => $profile->peruri_phone,
-                'nik' => $profile->nik,
-                'is_wna' => (bool) $profile->is_wna,
-                'reference_province_id' => $normalizedProvinceId ?: '',
-                'reference_city_id' => $normalizedCityId ?: '',
-                'gender' => $profile->gender,
-                'place_of_birth' => $profile->place_of_birth,
-                'date_of_birth' => optional($profile->date_of_birth)->toDateString(),
-                'address' => (string) data_get($profile->identity_payload, 'address', $user->address ?? ''),
-                'has_ktp_photo' => filled($profile->ktp_photo_path),
-                'registration_status' => $profile->registration_status,
-                'kyc_status' => $profile->kyc_status,
-                'specimen_status' => $profile->specimen_status,
-                'certificate_status' => $profile->certificate_status,
-                'keyla_status' => $profile->keyla_status,
-                'keyla_qr_image' => $profile->keyla_qr_image,
-                'last_error' => $profile->last_error,
-                'last_checked_at' => optional($profile->last_checked_at)->toDateTimeString(),
-            ],
+            'profile' => $profilePayload,
             'references' => $references,
             'readiness' => $readiness,
+            'friendly' => $this->presenter->present($profilePayload, $readiness),
             'actions' => [
                 'save_identity_url' => route('appraisal.contract.onboarding.identity', ['id' => $record->id]),
+                'complete_identity_url' => route('appraisal.contract.onboarding.identity-and-register', ['id' => $record->id]),
                 'register_user_url' => route('appraisal.contract.onboarding.register-user', ['id' => $record->id]),
                 'submit_kyc_url' => route('appraisal.contract.onboarding.submit-kyc', ['id' => $record->id]),
                 'set_specimen_url' => route('appraisal.contract.onboarding.set-specimen', ['id' => $record->id]),
                 'register_keyla_url' => route('appraisal.contract.onboarding.register-keyla', ['id' => $record->id]),
                 'refresh_url' => route('appraisal.contract.onboarding.refresh', ['id' => $record->id]),
+                'silent_refresh_url' => route('appraisal.contract.onboarding.refresh-silent', ['id' => $record->id]),
                 'contract_url' => route('appraisal.contract.page', ['id' => $record->id]),
             ],
         ];
@@ -319,7 +327,7 @@ class CustomerSignatureOnboardingService
                 'label' => $overallReady ? 'Siap' : 'Belum Siap',
                 'message' => $overallReady
                     ? 'Customer siap untuk tanda tangan digital.'
-                    : ((string) ($profile->last_error ?: 'Customer masih menyelesaikan onboarding PDS/KEYLA.')),
+                    : ((string) ($profile->last_error ?: 'Customer masih menyelesaikan aktivasi tanda tangan digital.')),
                 'is_ready' => $overallReady,
                 'tone' => $overallReady ? 'success' : 'warning',
             ],
@@ -344,7 +352,7 @@ class CustomerSignatureOnboardingService
             return [
                 'provinces' => $provinceData !== [] ? $provinceData : $this->fallbackProvinceRows(),
                 'cities' => $cityData !== [] ? $cityData : $this->fallbackCityRows($this->localProvinceId($selectedProvinceId)),
-                'error' => $provinceData !== [] ? null : 'Referensi wilayah PDS belum tersedia. Daftar wilayah sementara memakai master data internal.',
+                'error' => $provinceData !== [] ? null : 'Daftar wilayah Peruri belum tersedia. Untuk sementara, pilihan wilayah memakai data internal DigiPro.',
             ];
         } catch (RuntimeException $exception) {
             return [
@@ -470,7 +478,7 @@ class CustomerSignatureOnboardingService
         $fallbackAvailable = $this->fallbackProvinceRows() !== [];
 
         return $fallbackAvailable
-            ? 'Referensi wilayah PDS sedang bermasalah. Daftar wilayah sementara memakai master data internal. '.$message
+            ? 'Daftar wilayah Peruri sedang bermasalah. Untuk sementara, pilihan wilayah memakai data internal DigiPro. '.$message
             : $message;
     }
 
@@ -502,23 +510,23 @@ class CustomerSignatureOnboardingService
     private function ensureIdentityComplete(UserSignatureProfile $profile): UserSignatureProfile
     {
         if (! filled($profile->peruri_email) || ! filled($profile->peruri_phone) || ! filled($profile->nik)) {
-            throw new RuntimeException('Lengkapi identitas onboarding terlebih dahulu.');
+            throw new RuntimeException('Lengkapi data diri terlebih dahulu.');
         }
 
         if (! $profile->reference_province_id || ! $profile->reference_city_id) {
-            throw new RuntimeException('Pilih provinsi dan kota sesuai referensi PDS.');
+            throw new RuntimeException('Pilih provinsi dan kabupaten/kota sesuai identitas.');
         }
 
         if (! filled($profile->gender) || ! filled($profile->place_of_birth) || ! $profile->date_of_birth) {
-            throw new RuntimeException('Lengkapi jenis kelamin, tempat lahir, dan tanggal lahir untuk onboarding PDS.');
+            throw new RuntimeException('Lengkapi jenis kelamin, tempat lahir, dan tanggal lahir.');
         }
 
         if (! filled(data_get($profile->identity_payload, 'address'))) {
-            throw new RuntimeException('Alamat customer wajib diisi untuk onboarding PDS.');
+            throw new RuntimeException('Alamat sesuai identitas wajib diisi.');
         }
 
         if (! filled($profile->ktp_photo_path) || ! Storage::disk('local')->exists((string) $profile->ktp_photo_path)) {
-            throw new RuntimeException('Foto identitas wajib diunggah untuk onboarding PDS.');
+            throw new RuntimeException('Foto identitas wajib diunggah.');
         }
 
         return $profile;
