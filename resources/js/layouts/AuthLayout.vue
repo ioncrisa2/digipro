@@ -21,7 +21,7 @@ import BrandLockup from '@/components/brand/BrandLockup.vue'
     >
       <div class="w-full max-w-[560px]">
         <div class="rounded-3xl border border-white/10 bg-white p-1 shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
-          <div class="rounded-[1.4rem] bg-white px-6 py-8 sm:px-10 sm:py-10">
+          <div class="rounded-[1.4rem] bg-white px-6 py-8 text-slate-900 sm:px-10 sm:py-10">
             <div class="mb-8 flex justify-center">
               <BrandLockup
                 wrapper-class="border border-slate-200 bg-white shadow-sm"

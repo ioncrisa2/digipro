@@ -33,8 +33,10 @@ export const useLoginStore = defineStore('login', () => {
     })
   }
 
-  const reset = () => {
-    form.reset()
+  const reset = (email = '') => {
+    form.email = email || ''
+    form.password = ''
+    form.remember = false
     form.clearErrors()
   }
 

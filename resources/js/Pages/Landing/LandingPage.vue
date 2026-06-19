@@ -17,7 +17,6 @@ import {
   buildLandingSlides,
   landingHeroFallback,
   landingProcessSteps,
-  landingTestimonialAvatarFallback,
 } from '@/components/landing/landingPlaceholders'
 
 import { Button } from '@/components/ui/button'
@@ -50,19 +49,6 @@ const activeSlide = ref(0)
 let slideTimer = null
 const currentSlide = computed(() => slides.value[activeSlide.value])
 
-const testimonialIndex = ref(0)
-let testimonialTimer = null
-const currentTestimonial = computed(() => {
-  if (!props.testimonials?.length) return null
-
-  const item = props.testimonials[testimonialIndex.value % props.testimonials.length]
-
-  return {
-    ...item,
-    avatar: item.photo_url || landingTestimonialAvatarFallback,
-  }
-})
-
 const goSlide = (index) => {
   activeSlide.value = index
 }
@@ -77,21 +63,9 @@ const prevSlide = () => {
   activeSlide.value = (activeSlide.value - 1 + slides.value.length) % slides.value.length
 }
 
-const nextTestimonial = () => {
-  if (!props.testimonials?.length) return
-  if (props.testimonials.length <= 1) return
-  testimonialIndex.value = (testimonialIndex.value + 1) % props.testimonials.length
-}
-
-const goTestimonial = (index) => {
-  testimonialIndex.value = index
-}
-
 const stopTimers = () => {
   if (slideTimer) window.clearInterval(slideTimer)
-  if (testimonialTimer) window.clearInterval(testimonialTimer)
   slideTimer = null
-  testimonialTimer = null
 }
 
 const startTimers = () => {
@@ -99,7 +73,6 @@ const startTimers = () => {
   if (prefersReducedMotion.value) return
 
   if (slides.value.length > 1) slideTimer = window.setInterval(nextSlide, 5000)
-  if (props.testimonials?.length > 1) testimonialTimer = window.setInterval(nextTestimonial, 6500)
 }
 
 const scrollToHash = async () => {
@@ -163,9 +136,6 @@ watch(prefersReducedMotion, () => {
 
       <LandingTestimonialsSection
         :testimonials="props.testimonials"
-        :testimonial-index="testimonialIndex"
-        :current-testimonial="currentTestimonial"
-        @go="goTestimonial"
       />
 
       <LandingFaqSection :faqs="props.faqs" />

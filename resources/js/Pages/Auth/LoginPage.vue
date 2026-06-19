@@ -11,11 +11,18 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck } from 'lucide-vue-next'
 
+const props = defineProps({
+  email: {
+    type: String,
+    default: '',
+  },
+})
+
 const loginStore = useLoginStore()
 const showPassword = ref(false)
 
 onBeforeMount(() => {
-  loginStore.reset()
+  loginStore.reset(props.email)
 })
 
 onBeforeUnmount(() => {

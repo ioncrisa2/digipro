@@ -8,7 +8,13 @@ import BrandLockup from '@/components/brand/BrandLockup.vue'
 import { useReducedMotion } from '@/composables/useReducedMotion'
 import NotificationCenter from '@/components/ui/notification/NotificationCenter.vue'
 
-const navItems = ['Features', 'Showcase', 'Process', 'Testimonials', 'FAQ']
+const navItems = [
+  { label: 'Fitur', id: 'features' },
+  { label: 'Platform', id: 'showcase' },
+  { label: 'Alur Kerja', id: 'process' },
+  { label: 'Kredibilitas', id: 'credibility' },
+  { label: 'FAQ', id: 'faq' },
+]
 
 const page = usePage()
 const currentPath = computed(() => page.url.split('?')[0] || '/')
@@ -20,15 +26,14 @@ const isModifiedClick = (event) => {
   return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0
 }
 
-const sectionIdFromLabel = (section) => section.toLowerCase().replace(/ /g, '-')
-const sectionHref = (section) => `/#${sectionIdFromLabel(section)}`
+const sectionHref = (section) => `/#${section.id}`
 
 const scrollBehavior = () => (prefersReducedMotion.value ? 'auto' : 'smooth')
 
 const handleNavigation = (section, event) => {
   if (isModifiedClick(event)) return
   event?.preventDefault()
-  const sectionId = section.toLowerCase().replace(/ /g, '-')
+  const sectionId = section.id
 
   if (currentPath.value === '/') {
     const el = document.getElementById(sectionId)
@@ -79,12 +84,12 @@ const handleHomeClick = (event) => {
       <div class="hidden md:flex items-center gap-6">
         <a
           v-for="item in navItems"
-          :key="item"
+          :key="item.id"
           :href="sectionHref(item)"
           class="rounded-md text-base font-medium text-slate-600 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
           @click="(event) => handleNavigation(item, event)"
         >
-          {{ item }}
+          {{ item.label }}
         </a>
 
         <div class="h-4 w-px bg-slate-200/70 mx-1" />
@@ -102,7 +107,7 @@ const handleHomeClick = (event) => {
           size="sm"
           class="bg-slate-900 hover:bg-slate-800"
         >
-          <Link href="/login">Login</Link>
+          <Link href="/login">Masuk</Link>
         </Button>
       </div>
 
@@ -120,12 +125,12 @@ const handleHomeClick = (event) => {
             <div class="flex flex-col items-center text-center gap-3 mt-8">
               <a
                 v-for="item in navItems"
-                :key="item"
+                :key="item.id"
                 :href="sectionHref(item)"
                 class="w-full rounded-lg px-3 py-2 text-lg font-medium text-slate-700 transition-colors hover:bg-slate-100/80 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
                 @click="(event) => handleNavigation(item, event)"
               >
-                {{ item }}
+                {{ item.label }}
               </a>
 
               <hr class="border-slate-100" />

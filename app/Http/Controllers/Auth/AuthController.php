@@ -2,25 +2,29 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
 use App\Support\SystemNavigation;
-use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Controllers\Controller;
+use Illuminate\Auth\Events\Registered;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use App\Http\Requests\Auth\RegisterRequest;
-use Illuminate\Auth\Events\Registered;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Models\Role;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 
 /**
  * Handles authentication flows: login, register, 2FA challenge, and logout.
  */
 class AuthController extends Controller
 {
-    public function login()
+    public function login(Request $request)
     {
-        return inertia('Auth/LoginPage');
+        return inertia('Auth/LoginPage', [
+            'email' => (string) $request->query('email', ''),
+        ]);
     }
 
     public function register()
@@ -28,7 +32,7 @@ class AuthController extends Controller
         return inertia('Auth/RegisterPage');
     }
 
-    public function processLogin(LoginRequest $request)
+    public function processLogin(LoginRequest $request): RedirectResponse
     {
         $data = $request->validated();
 
@@ -41,7 +45,7 @@ class AuthController extends Controller
 
         if (! $user || ! $provider->validateCredentials($user, $credentials)) {
             return back()->withErrors([
-                'email' => 'Email or Password is invalid'
+                'email' => 'Email or Password is invalid',
             ])->onlyInput('email');
         }
 
@@ -60,16 +64,12 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         if (! $user->hasVerifiedEmail()) {
-            return redirect()->intended(route('verification.notice'));
+            $request->session()->forget('url.intended');
+
+            return redirect()->route('verification.notice');
         }
 
-        $defaultRoute = $user->isReviewer()
-            ? route(SystemNavigation::firstAccessibleRouteName($user, 'reviewer') ?? 'reviewer.dashboard')
-            : ($user->hasAdminNavigationAccess()
-                ? route('admin.dashboard')
-                : route('dashboard'));
-
-        return redirect()->intended($defaultRoute);
+        return redirect()->to($this->resolveLoginRedirect($request, $user));
     }
 
     public function twoFactorChallenge()
@@ -94,7 +94,7 @@ class AuthController extends Controller
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'password' => Hash::make($data['password'])
+            'password' => Hash::make($data['password']),
         ]);
 
         Role::findOrCreate('customer', $guardName);
@@ -113,5 +113,70 @@ class AuthController extends Controller
         request()->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    private function resolveLoginRedirect(Request $request, User $user): string
+    {
+        $defaultRoute = $this->defaultAuthenticatedRoute($user);
+        $intendedUrl = $request->session()->pull('url.intended');
+
+        if (! is_string($intendedUrl) || ! $this->isIntendedUrlAllowedForUser($intendedUrl, $request, $user)) {
+            return $defaultRoute;
+        }
+
+        return $intendedUrl;
+    }
+
+    private function defaultAuthenticatedRoute(User $user): string
+    {
+        if ($user->isReviewer()) {
+            return route(SystemNavigation::firstAccessibleRouteName($user, 'reviewer') ?? 'reviewer.dashboard');
+        }
+
+        if ($user->hasAdminNavigationAccess()) {
+            return route('admin.dashboard');
+        }
+
+        return route('dashboard');
+    }
+
+    private function isIntendedUrlAllowedForUser(string $intendedUrl, Request $request, User $user): bool
+    {
+        $parts = parse_url($intendedUrl);
+
+        if ($parts === false) {
+            return false;
+        }
+
+        $host = $parts['host'] ?? null;
+
+        if ($host !== null && $host !== $request->getHost()) {
+            return false;
+        }
+
+        $path = '/'.ltrim((string) ($parts['path'] ?? '/'), '/');
+
+        if ($this->pathStartsWith($path, '/reviewer')) {
+            return $user->isReviewer();
+        }
+
+        if ($this->pathStartsWith($path, '/admin')) {
+            return ! $user->isReviewer() && $user->hasAdminNavigationAccess();
+        }
+
+        if ($user->isReviewer()) {
+            return false;
+        }
+
+        if ($user->hasAdminNavigationAccess()) {
+            return $this->pathStartsWith($path, '/profile') || $this->pathStartsWith($path, '/notifications');
+        }
+
+        return true;
+    }
+
+    private function pathStartsWith(string $path, string $prefix): bool
+    {
+        return $path === $prefix || str_starts_with($path, $prefix.'/');
     }
 }

@@ -22,6 +22,7 @@ const props = defineProps({
   maxFileSizeMb: { type: Number, default: 15 },  // per file
   maxTotalSizeMb: { type: Number, default: 30 }, // per field
   helperText: { type: String, default: "" },     // override helper text
+  compact: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["update:modelValue", "error"]);
@@ -292,12 +293,13 @@ const previewPdf = (url) => window.open(url, "_blank");
     <!-- Dropzone -->
     <div
       v-if="props.multiple || files.length === 0"
-      class="rounded-lg border border-dashed p-6 text-center transition cursor-pointer select-none"
-      :class="
+      class="rounded-lg border border-dashed text-center transition cursor-pointer select-none"
+      :class="[
+        props.compact ? 'p-3' : 'p-6',
         isDragging
           ? 'border-primary bg-muted/40'
           : 'border-muted-foreground/30 hover:border-primary/60 hover:bg-muted/30'
-      "
+      ]"
       @click="trigger"
       @dragover.prevent="isDragging = true"
       @dragleave.prevent="isDragging = false"
@@ -312,14 +314,17 @@ const previewPdf = (url) => window.open(url, "_blank");
         @change="handleChange"
       />
 
-      <div class="mx-auto mb-2 h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-        <CloudUpload class="h-5 w-5 text-muted-foreground" />
+      <div
+        class="mx-auto mb-2 rounded-full bg-muted flex items-center justify-center"
+        :class="props.compact ? 'h-8 w-8' : 'h-10 w-10'"
+      >
+        <CloudUpload :class="props.compact ? 'h-4 w-4 text-muted-foreground' : 'h-5 w-5 text-muted-foreground'" />
       </div>
 
-      <div class="text-xs text-muted-foreground">
+      <div :class="props.compact ? 'text-[11px] text-muted-foreground' : 'text-xs text-muted-foreground'">
         <span class="font-semibold text-foreground">Klik upload</span> atau drag file
       </div>
-      <div class="text-[10px] text-muted-foreground/70 mt-1 uppercase">
+      <div v-if="!props.compact" class="text-[10px] text-muted-foreground/70 mt-1 uppercase">
         {{ accept.replace(/\./g, " ") }}
       </div>
     </div>
@@ -338,7 +343,7 @@ const previewPdf = (url) => window.open(url, "_blank");
     <!-- Preview -->
     <div v-if="files.length > 0">
       <!-- Gallery mode (all images) -->
-      <div v-if="isGalleryMode" class="grid grid-cols-3 sm:grid-cols-4 gap-3">
+      <div v-if="isGalleryMode" class="grid gap-2" :class="props.compact ? 'grid-cols-4' : 'grid-cols-3 sm:grid-cols-4'">
         <div
           v-for="(item, i) in files"
           :key="item.url || (item.name + ':' + i)"
@@ -373,30 +378,32 @@ const previewPdf = (url) => window.open(url, "_blank");
       </div>
 
       <!-- List mode (pdf / mixed) -->
-      <div v-else class="grid gap-3">
+      <div v-else class="grid" :class="props.compact ? 'gap-2' : 'gap-3'">
         <div
           v-for="(item, i) in files"
           :key="item.url || (item.name + ':' + i)"
-          class="rounded-lg border bg-background p-4 shadow-sm"
+          class="rounded-lg border bg-background shadow-sm"
+          :class="props.compact ? 'p-2' : 'p-4'"
         >
           <div class="flex items-start justify-between gap-3">
             <!-- Left -->
             <div class="flex items-start gap-3 min-w-0 flex-1">
               <div
-                class="h-10 w-10 rounded-lg border flex items-center justify-center shrink-0"
-                :class="
+                class="rounded-lg border flex items-center justify-center shrink-0"
+                :class="[
+                  props.compact ? 'h-8 w-8' : 'h-10 w-10',
                   item.isPdf
                     ? 'bg-red-50 text-red-600 border-red-200'
                     : 'bg-muted text-muted-foreground'
-                "
+                ]"
               >
                 <span v-if="item.isPdf" class="text-[10px] font-bold">PDF</span>
-                <ImageIcon v-else-if="item.isImage" class="h-5 w-5" />
-                <FileText v-else class="h-5 w-5" />
+                <ImageIcon v-else-if="item.isImage" :class="props.compact ? 'h-4 w-4' : 'h-5 w-5'" />
+                <FileText v-else :class="props.compact ? 'h-4 w-4' : 'h-5 w-5'" />
               </div>
 
               <div class="min-w-0 flex-1">
-                <div class="text-sm font-medium text-foreground clamp-2" :title="item.name">
+                <div :class="props.compact ? 'text-xs font-medium text-foreground clamp-2' : 'text-sm font-medium text-foreground clamp-2'" :title="item.name">
                   {{ item.name }}
                 </div>
 

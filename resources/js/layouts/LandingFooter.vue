@@ -15,7 +15,7 @@ import BrandLockup from '@/components/brand/BrandLockup.vue'
           <p class="text-base text-slate-300 mt-2">
             Produk digital resmi untuk proses penilaian properti oleh KJPP Henricus Judi Adrianto & Rekan.
           </p>
-          <p class="text-sm text-slate-500 mt-4">(c) 2026 DigiPro by KJPP HJAR. All rights reserved.</p>
+          <p class="text-sm text-slate-500 mt-4">(c) 2026 DigiPro by KJPP HJAR. Seluruh hak dilindungi.</p>
         </div>
 
         <div>
@@ -23,7 +23,7 @@ import BrandLockup from '@/components/brand/BrandLockup.vue'
           <div class="mt-3 flex flex-col gap-2 text-base">
             <Link href="/" class="hover:text-white">Beranda</Link>
             <Link href="/contact" class="hover:text-white">Kontak</Link>
-            <Link href="/login" class="hover:text-white">Login</Link>
+            <Link href="/login" class="hover:text-white">Masuk</Link>
           </div>
         </div>
 

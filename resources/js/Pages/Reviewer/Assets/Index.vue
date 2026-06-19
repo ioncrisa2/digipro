@@ -6,7 +6,6 @@ import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import StatusBadge from '@/components/reviewer/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
@@ -64,10 +63,10 @@ const resetFilters = () => {
 };
 
 const summaryCards = [
-  { key: 'total', label: 'Total Aset' },
-  { key: 'butuh_penyesuaian', label: 'Butuh Penyesuaian' },
-  { key: 'sudah_punya_range', label: 'Sudah Ada Range' },
-  { key: 'siap_nilai_final', label: 'Sudah Nilai Final' },
+  { key: 'total', label: 'Aset aktif', caption: 'Dalam workspace' },
+  { key: 'butuh_penyesuaian', label: 'Perlu adjust', caption: 'Belum lengkap' },
+  { key: 'sudah_punya_range', label: 'Ada range', caption: 'Range pasar siap' },
+  { key: 'siap_nilai_final', label: 'Nilai final', caption: 'Sudah terisi' },
 ];
 
 const columns = [
@@ -85,27 +84,35 @@ const columns = [
   <Head title="Reviewer - Aset" />
 
   <ReviewerLayout title="Aset Reviewer">
-    <div class="space-y-6">
-      <section>
-        <h1 class="text-3xl font-semibold tracking-tight text-slate-950">Aset Reviewer</h1>
-        <p class="mt-2 text-sm text-slate-600">
-          Baca konteks aset, pantau kebutuhan penyesuaian, dan buka jalur kerja ke harga tanah maupun BTB bangunan.
-        </p>
+    <div class="space-y-5">
+      <section class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div class="max-w-3xl">
+          <h1 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Aset Reviewer</h1>
+          <p class="mt-2 text-sm leading-6 text-slate-600">
+            Kelola aset yang perlu penyesuaian harga tanah, BTB bangunan, range pasar, dan nilai final.
+          </p>
+        </div>
+
+        <div class="grid gap-2 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-sm sm:grid-cols-4 lg:min-w-[640px]">
+          <div
+            v-for="card in summaryCards"
+            :key="card.key"
+            class="rounded-xl px-3 py-2.5"
+          >
+            <div class="text-2xl font-semibold leading-none text-slate-950">{{ summary[card.key] ?? 0 }}</div>
+            <div class="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ card.label }}</div>
+            <div class="mt-1 text-xs text-slate-500">{{ card.caption }}</div>
+          </div>
+        </div>
       </section>
 
-      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card v-for="card in summaryCards" :key="card.key" class="border-slate-200/80 shadow-sm">
-          <CardContent class="p-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ card.label }}</p>
-            <p class="mt-3 text-4xl font-semibold text-slate-950">{{ summary[card.key] ?? 0 }}</p>
-          </CardContent>
-        </Card>
-      </section>
-
-      <Card class="border-slate-200/80 shadow-sm">
-        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+      <section class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div class="flex flex-col gap-4 border-b border-slate-200/80 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle>Daftar Aset Aktif</CardTitle>
+            <h2 class="text-base font-semibold text-slate-950">Daftar Aset</h2>
+            <p class="mt-1 text-sm text-slate-500">
+              {{ records.meta?.total ?? 0 }} aset ditemukan. Gunakan filter hanya saat daftar mulai panjang.
+            </p>
           </div>
           <AdminTableToolbar
             :search-value="form.q"
@@ -142,8 +149,9 @@ const columns = [
               </label>
             </div>
           </AdminTableToolbar>
-        </CardHeader>
-        <CardContent>
+        </div>
+
+        <div class="p-4">
           <AdminDataTable
             :columns="columns"
             :rows="records.data"
@@ -195,8 +203,8 @@ const columns = [
               </div>
             </template>
           </AdminDataTable>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   </ReviewerLayout>
 </template>

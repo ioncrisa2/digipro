@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useForm, Link } from '@inertiajs/vue3'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,16 @@ const form = useForm({
   password: '',
   password_confirmation: '',
 })
+
+watch(
+  () => [props.token, props.email],
+  ([token, email]) => {
+    form.token = token || ''
+    form.email = email || ''
+    form.reset('password', 'password_confirmation')
+    form.clearErrors()
+  }
+)
 
 const rules = computed(() => {
   const p = form.password || ''
@@ -50,6 +60,10 @@ const ruleItems = computed(() => [
 ])
 
 const submit = () => {
+  if (!canSubmit.value) {
+    return
+  }
+
   form.post('/reset-password', {
     preserveScroll: true,
     onSuccess: () => form.reset('password', 'password_confirmation'),
@@ -77,6 +91,10 @@ const submit = () => {
           <span class="font-medium text-slate-700">{{ form.email }}</span>
         </div>
       </div>
+
+      <p v-if="form.errors.email || form.errors.token" class="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-600">
+        {{ form.errors.email || form.errors.token }}
+      </p>
 
       <div class="grid gap-2">
         <Label for="password">Password Baru</Label>

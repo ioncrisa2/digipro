@@ -6,7 +6,6 @@ import AdminDataTable from '@/components/admin/AdminDataTable.vue';
 import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue';
 import StatusBadge from '@/components/reviewer/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -61,20 +60,6 @@ const resetFilters = () => {
   applyFilters();
 };
 
-const applyQueueFilter = (value) => {
-  form.queue = value;
-  form.status = 'all';
-  applyFilters();
-};
-
-const summaryCards = [
-  { key: 'total', label: 'Total Queue' },
-  { key: 'siap_review', label: 'Siap Review' },
-  { key: 'sedang_review', label: 'Sedang Review' },
-  { key: 'siap_preview', label: 'Siap Preview' },
-  { key: 'total_aset', label: 'Total Aset' },
-];
-
 const columns = [
   { key: 'request', label: 'Permohonan', cellClass: 'min-w-[180px]' },
   { key: 'client', label: 'Klien', cellClass: 'min-w-[180px]' },
@@ -90,53 +75,20 @@ const columns = [
   <Head title="Reviewer - Review Queue" />
 
   <ReviewerLayout title="Review Queue">
-    <div class="space-y-6">
-      <section>
-        <h1 class="text-3xl font-semibold tracking-tight text-slate-950">Queue Reviewer</h1>
-        <p class="mt-2 text-sm text-slate-600">
-          Workspace untuk membaca antrean pekerjaan, memfilter permohonan aktif, dan membuka review yang paling relevan.
+    <div class="space-y-5">
+      <section class="max-w-3xl">
+        <h1 class="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Antrian Review</h1>
+        <p class="mt-2 text-sm leading-6 text-slate-600">
+          Daftar request yang masuk ke workspace reviewer. Buka item dari tabel, gunakan filter hanya saat perlu mempersempit antrean.
         </p>
       </section>
 
-      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Card v-for="card in summaryCards" :key="card.key" class="border-slate-200/80 shadow-sm">
-          <CardContent class="p-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ card.label }}</p>
-            <p class="mt-3 text-4xl font-semibold text-slate-950">{{ summary[card.key] ?? 0 }}</p>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section class="grid gap-4 xl:grid-cols-4">
-        <button
-          v-for="queue in queueOptions"
-          :key="queue.value"
-          type="button"
-          class="rounded-2xl border p-4 text-left transition"
-          :class="form.queue === queue.value ? 'border-slate-950 bg-slate-950 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-900 hover:border-slate-300'"
-          @click="applyQueueFilter(queue.value)"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.18em]" :class="form.queue === queue.value ? 'text-slate-300' : 'text-slate-500'">
-                Antrean
-              </p>
-              <h2 class="mt-2 text-lg font-semibold">{{ queue.label }}</h2>
-            </div>
-            <div class="text-3xl font-semibold tabular-nums">{{ queue.count ?? 0 }}</div>
-          </div>
-          <p class="mt-3 text-sm" :class="form.queue === queue.value ? 'text-slate-300' : 'text-slate-600'">
-            {{ queue.description }}
-          </p>
-        </button>
-      </section>
-
-      <Card class="border-slate-200/80 shadow-sm">
-        <CardHeader class="flex flex-col gap-4 space-y-0 lg:flex-row lg:items-start lg:justify-between">
+      <section class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div class="flex flex-col gap-4 border-b border-slate-200/80 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle>Daftar Review Aktif</CardTitle>
-            <p class="mt-1 text-sm text-slate-600">
-              Fokuskan daftar berdasarkan antrean kerja reviewer: mulai review, lanjut valuasi, atau kirim preview.
+            <h2 class="text-base font-semibold text-slate-950">Daftar Request Masuk</h2>
+            <p class="mt-1 text-sm text-slate-500">
+              {{ records.meta?.total ?? 0 }} request tersedia di antrean reviewer.
             </p>
           </div>
           <AdminTableToolbar
@@ -178,8 +130,9 @@ const columns = [
               </Select>
             </div>
           </AdminTableToolbar>
-        </CardHeader>
-        <CardContent>
+        </div>
+
+        <div class="p-4">
           <AdminDataTable
             :columns="columns"
             :rows="records.data"
@@ -222,8 +175,8 @@ const columns = [
               {{ formatDateTime(row.requested_at) }}
             </template>
           </AdminDataTable>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   </ReviewerLayout>
 </template>
