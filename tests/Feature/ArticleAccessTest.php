@@ -4,6 +4,9 @@ use App\Models\Article;
 use App\Models\ArticleCategory;
 use App\Models\User;
 use App\Support\AdminWorkspaceAccessSynchronizer;
+use Database\Seeders\ArticleCategorySeeder;
+use Database\Seeders\EditorialArticleSeeder;
+use Database\Seeders\TagSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Permission;
@@ -128,4 +131,48 @@ it('marks scheduled articles correctly in the admin workspace', function () {
             ->component('Admin/Articles/Index')
             ->where('summary.scheduled', 1)
             ->where('records.data.0.editorial_status_label', 'Scheduled'));
+});
+
+it('publishes editorial article refresh content with structured references', function () {
+    $this->seed([
+        ArticleCategorySeeder::class,
+        TagSeeder::class,
+    ]);
+
+    Article::create([
+        'title' => 'AI dan Big Data dalam Penilaian Properti Tahun 2026: Ketika Valuasi Berubah dari Seni Menjadi Ilmu Data',
+        'slug' => 'ai-big-data-penilaian-properti-2026',
+        'content_html' => '<p>Konten lama</p>',
+        'cover_image_path' => 'articles/old-ai-cover.png',
+        'is_published' => true,
+        'published_at' => now()->subDay(),
+    ]);
+
+    Article::create([
+        'title' => 'Perubahan Regulasi Penilaian Properti 2026: Tantangan Baru bagi Penilai, Perbankan, dan Industri Properti',
+        'slug' => 'regulasi-penilaian-properti-2026',
+        'content_html' => '<p>Konten lama</p>',
+        'cover_image_path' => 'articles/old-regulation-cover.jpg',
+        'is_published' => true,
+        'published_at' => now()->subDay(),
+    ]);
+
+    $this->seed(EditorialArticleSeeder::class);
+
+    $article = Article::query()
+        ->where('slug', 'ai-big-data-penilaian-properti-2026')
+        ->firstOrFail();
+
+    expect($article->title)->toBe('Membaca Data Pembanding untuk Review Appraisal Properti')
+        ->and($article->cover_image_path)->toBe('/images/articles/digipro-data-pembanding.svg')
+        ->and($article->content_html)->toContain('Bank Indonesia, Survei Harga Properti Residensial')
+        ->and(preg_match_all('/<h[23]/', $article->content_html))->toBeGreaterThan(5);
+
+    $this
+        ->get(route('articles.show', $article->slug))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Articles/Show')
+            ->where('article.title', 'Membaca Data Pembanding untuk Review Appraisal Properti')
+            ->where('article.cover_image_path', '/images/articles/digipro-data-pembanding.svg'));
 });

@@ -86,9 +86,13 @@
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
 
-    --landing-bg: #f7f4ef;
-    --landing-muted: #f4eee5;
-    --landing-invert: #111827;
+    --landing-bg: #f8fafc;
+    --landing-muted: #f1f5f9;
+    --landing-invert: #0b1220;
+    --landing-navy: #0b1220;
+    --landing-gold: #c8a45d;
+    --landing-gold-dark: #8a6a2c;
+    --landing-gold-soft: #f5e8c8;
     --landing-text: #0f172a;
     --landing-font-display: 'Space Grotesk', var(--font-sans);
 

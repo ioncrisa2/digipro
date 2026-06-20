@@ -73,11 +73,11 @@ const contentDocument = computed(() => {
       <meta v-if="metaDescription" name="description" :content="metaDescription" />
     </Head>
 
-    <section class="border-b border-black/5">
+    <section class="border-b border-slate-800 bg-[var(--landing-navy)] text-white">
       <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <Link
           href="/artikel"
-          class="inline-flex items-center gap-2 rounded-md text-sm font-medium text-slate-600 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 motion-reduce:transition-none"
+          class="inline-flex items-center gap-2 rounded-md text-sm font-medium text-slate-300 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--landing-navy)] motion-reduce:transition-none"
         >
           <ArrowLeft class="h-4 w-4" />
           Kembali ke Artikel
@@ -86,7 +86,8 @@ const contentDocument = computed(() => {
     </section>
 
     <article>
-      <section class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+      <section class="bg-[var(--landing-navy)] text-white">
+        <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
         <div class="grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_420px] lg:items-end">
           <div class="max-w-4xl">
             <ArticleMeta
@@ -95,15 +96,15 @@ const contentDocument = computed(() => {
               :category="article.category"
               :views="article.views"
               :show-views="true"
-              container-class="flex flex-wrap items-center gap-3 text-sm text-slate-500"
-              category-class="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase text-emerald-700"
+              container-class="flex flex-wrap items-center gap-3 text-sm text-slate-300"
+              category-class="rounded-lg bg-[var(--landing-gold)]/15 px-3 py-1 text-[11px] font-semibold uppercase text-[var(--landing-gold)]"
             />
 
-            <h1 class="mt-6 max-w-4xl text-balance text-4xl font-semibold leading-[1.02] text-slate-950 sm:text-5xl lg:text-6xl">
+            <h1 class="mt-6 max-w-4xl text-balance text-4xl font-bold leading-[1.02] text-white sm:text-5xl lg:text-6xl">
               {{ article.title }}
             </h1>
 
-            <p v-if="article.excerpt" class="mt-6 max-w-3xl text-pretty text-lg leading-8 text-slate-600 sm:text-xl">
+            <p v-if="article.excerpt" class="mt-6 max-w-3xl text-pretty text-lg leading-8 text-slate-300 sm:text-xl">
               {{ article.excerpt }}
             </p>
 
@@ -111,7 +112,7 @@ const contentDocument = computed(() => {
               <span
                 v-for="tag in article.tags"
                 :key="tag"
-                class="rounded-full bg-slate-100 px-3 py-2 text-[11px] font-semibold uppercase text-slate-700"
+                class="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-semibold uppercase text-slate-300"
               >
                 #{{ tag }}
               </span>
@@ -122,21 +123,22 @@ const contentDocument = computed(() => {
             <ArticleCover
               :cover-path="article.cover_image_path"
               :alt="article.title"
-              wrapper-class="aspect-[4/3] overflow-hidden rounded-[2rem] border border-black/5 bg-slate-200/70 shadow-[0_24px_70px_rgba(15,23,42,0.10)]"
+              wrapper-class="aspect-[4/3] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-[0_18px_44px_rgba(0,0,0,0.18)]"
               image-class="h-full w-full object-cover"
-              fallback-class="flex h-full w-full items-center justify-center bg-slate-950 text-sm font-semibold uppercase text-white/75"
+              fallback-class="flex h-full w-full items-center justify-center bg-[var(--landing-navy)] text-sm font-semibold uppercase text-white/75"
             />
           </div>
         </div>
+        </div>
       </section>
 
-      <section class="border-t border-black/5 bg-white/72">
+      <section class="border-t border-slate-200 bg-white">
         <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
           <div class="grid gap-10 xl:grid-cols-[minmax(0,1fr)_300px]">
             <div class="min-w-0 xl:max-w-3xl">
               <div
                 v-if="contentDocument.toc.length"
-                class="mb-10 rounded-[1.75rem] border border-black/5 bg-slate-50 p-5 xl:hidden"
+                class="mb-10 rounded-2xl border border-slate-200 bg-slate-50 p-5 xl:hidden"
               >
                 <p class="text-[11px] font-semibold uppercase text-slate-500">Daftar isi</p>
                 <nav class="mt-4">
@@ -164,7 +166,7 @@ const contentDocument = computed(() => {
             </div>
 
             <aside class="space-y-5 xl:sticky xl:top-28 xl:self-start">
-              <div v-if="contentDocument.toc.length" class="hidden rounded-[1.75rem] border border-black/5 bg-slate-50 p-5 xl:block">
+              <div v-if="contentDocument.toc.length" class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-5 xl:block">
                 <p class="text-[11px] font-semibold uppercase text-slate-500">Daftar isi</p>
                 <nav class="mt-4">
                   <ul class="space-y-2.5">
@@ -187,13 +189,13 @@ const contentDocument = computed(() => {
                 </nav>
               </div>
 
-              <div class="rounded-[1.75rem] border border-black/5 bg-white/80 p-5 shadow-[0_16px_48px_rgba(15,23,42,0.06)]">
+              <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
                 <p class="text-[11px] font-semibold uppercase text-slate-500">Tentang artikel ini</p>
                 <div class="mt-4 space-y-4 text-pretty text-sm leading-7 text-slate-600">
                   <p>Ditulis untuk membantu pembacaan pasar, pemahaman alur penilaian, dan konteks kerja properti yang lebih presisi.</p>
                   <Link
                     href="/artikel"
-                    class="inline-flex items-center gap-2 font-semibold text-slate-950 transition hover:text-emerald-800 motion-reduce:transition-none"
+                    class="inline-flex items-center gap-2 font-semibold text-[var(--landing-navy)] transition hover:text-slate-700 motion-reduce:transition-none"
                   >
                     Lihat artikel lainnya
                     <ArrowRight class="h-4 w-4" />
@@ -206,12 +208,12 @@ const contentDocument = computed(() => {
       </section>
     </article>
 
-    <section v-if="relatedArticles.length" class="border-t border-black/5 bg-slate-50">
+    <section v-if="relatedArticles.length" class="border-t border-slate-200 bg-slate-50">
       <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p class="text-[11px] font-semibold uppercase text-slate-500">Artikel terkait</p>
-            <h2 class="mt-2 text-balance text-3xl font-semibold text-slate-950">
+            <h2 class="mt-2 text-balance text-3xl font-bold text-[var(--landing-navy)]">
               Bacaan lanjutan
             </h2>
           </div>
@@ -225,14 +227,14 @@ const contentDocument = computed(() => {
             v-for="related in relatedArticles"
             :key="related.slug"
             :href="route('articles.show', related.slug)"
-            class="group overflow-hidden rounded-[1.75rem] border border-black/5 bg-white/85 shadow-[0_16px_48px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(15,23,42,0.10)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+            class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.045)] transition-colors duration-150 hover:border-[var(--landing-gold)]/55 motion-reduce:transition-none"
           >
             <ArticleCover
               :cover-path="related.cover_image_path"
               :alt="related.title"
               wrapper-class="aspect-[4/3] overflow-hidden bg-slate-200/70"
-              image-class="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-              fallback-class="flex h-full w-full items-center justify-center bg-slate-950 text-xs font-semibold uppercase text-white/75"
+              image-class="h-full w-full object-cover"
+              fallback-class="flex h-full w-full items-center justify-center bg-[var(--landing-navy)] text-xs font-semibold uppercase text-white/75"
             />
 
             <div class="p-6">
@@ -241,10 +243,10 @@ const contentDocument = computed(() => {
                 :read-source="related.excerpt"
                 :category="related.category"
                 container-class="flex flex-wrap items-center gap-3 text-sm text-slate-500"
-                category-class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase text-slate-700"
+                category-class="rounded-lg bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase text-slate-700"
               />
 
-              <h3 class="mt-4 text-balance text-2xl font-semibold leading-tight text-slate-950 transition group-hover:text-emerald-800 motion-reduce:transition-none">
+              <h3 class="mt-4 text-balance text-2xl font-bold leading-tight text-[var(--landing-navy)]">
                 {{ related.title }}
               </h3>
 
@@ -269,7 +271,8 @@ const contentDocument = computed(() => {
 .article-content :deep(h3),
 .article-content :deep(h4) {
   font-family: 'Space Grotesk', sans-serif;
-  color: #0f172a;
+  color: #0b1220;
+  scroll-margin-top: 7rem;
 }
 
 .article-content :deep(h1) {
@@ -312,19 +315,19 @@ const contentDocument = computed(() => {
 }
 
 .article-content :deep(strong) {
-  color: #0f172a;
+  color: #0b1220;
   font-weight: 700;
 }
 
 .article-content :deep(a) {
-  color: #0f172a;
+  color: #0b1220;
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 
 .article-content :deep(blockquote) {
-  border-left: 4px solid #10b981;
+  border-left: 4px solid #c8a45d;
   padding-left: 1.25rem;
   color: #475569;
   font-style: italic;
@@ -332,17 +335,17 @@ const contentDocument = computed(() => {
 
 .article-content :deep(code) {
   border-radius: 0.45rem;
-  background: #eef2ef;
+  background: #f1f5f9;
   padding: 0.15rem 0.45rem;
   font-size: 0.92em;
-  color: #0f172a;
+  color: #0b1220;
 }
 
 .article-content :deep(pre) {
   overflow-x: auto;
   margin: 2rem 0;
   border-radius: 1.25rem;
-  background: #0f172a;
+  background: #0b1220;
   padding: 1.4rem;
   color: #e2e8f0;
 }
@@ -372,11 +375,11 @@ const contentDocument = computed(() => {
 }
 
 .article-content :deep(th) {
-  background: #f5f2ea;
+  background: #f5e8c8;
   padding: 0.85rem 1rem;
   text-align: left;
   font-weight: 600;
-  color: #0f172a;
+  color: #0b1220;
 }
 
 .article-content :deep(td) {

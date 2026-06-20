@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
+import { onMounted, computed, nextTick } from 'vue'
 
 import LandingNavbar from '@/layouts/LandingNavbar.vue'
 import LandingFooter from '@/layouts/LandingFooter.vue'
@@ -15,7 +15,6 @@ import LandingFinalCtaSection from '@/components/landing/LandingFinalCtaSection.
 import {
   buildLandingFeatureCards,
   buildLandingSlides,
-  landingHeroFallback,
   landingProcessSteps,
 } from '@/components/landing/landingPlaceholders'
 
@@ -40,40 +39,9 @@ const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: scrollBehavior() })
 }
 
-const resolvedHeroBackground = computed(() => props.heroBackgroundUrl || landingHeroFallback)
 const slides = computed(() => buildLandingSlides(props.platformPreviewImages))
 const featureCards = computed(() => buildLandingFeatureCards(props.features ?? []))
 const processSteps = landingProcessSteps
-
-const activeSlide = ref(0)
-let slideTimer = null
-const currentSlide = computed(() => slides.value[activeSlide.value])
-
-const goSlide = (index) => {
-  activeSlide.value = index
-}
-
-const nextSlide = () => {
-  if (slides.value.length <= 1) return
-  activeSlide.value = (activeSlide.value + 1) % slides.value.length
-}
-
-const prevSlide = () => {
-  if (slides.value.length <= 1) return
-  activeSlide.value = (activeSlide.value - 1 + slides.value.length) % slides.value.length
-}
-
-const stopTimers = () => {
-  if (slideTimer) window.clearInterval(slideTimer)
-  slideTimer = null
-}
-
-const startTimers = () => {
-  stopTimers()
-  if (prefersReducedMotion.value) return
-
-  if (slides.value.length > 1) slideTimer = window.setInterval(nextSlide, 5000)
-}
 
 const scrollToHash = async () => {
   const raw = window.location.hash || ''
@@ -87,28 +55,8 @@ const scrollToHash = async () => {
   el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
 }
 
-const handleVisibilityChange = () => {
-  if (document.hidden) {
-    stopTimers()
-    return
-  }
-
-  startTimers()
-}
-
 onMounted(() => {
   scrollToHash()
-  startTimers()
-  document.addEventListener('visibilitychange', handleVisibilityChange)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('visibilitychange', handleVisibilityChange)
-  stopTimers()
-})
-
-watch(prefersReducedMotion, () => {
-  startTimers()
 })
 </script>
 
@@ -117,28 +65,23 @@ watch(prefersReducedMotion, () => {
     <LandingNavbar />
 
     <main id="content">
-      <LandingHeroSection :background-url="resolvedHeroBackground" />
-
-      <LandingPlatformPreviewSection
-        :slides="slides"
-        :active-slide="activeSlide"
-        :current-slide="currentSlide"
-        @previous="prevSlide"
-        @next="nextSlide"
-        @go="goSlide"
-      />
+      <LandingHeroSection />
 
       <LandingFeaturesSection :feature-cards="featureCards" />
 
-      <LandingWorkflowSection :process-steps="processSteps" />
+      <LandingPlatformPreviewSection
+        :slides="slides"
+      />
 
-      <LandingRecentArticlesSection :articles="props.recentArticles" />
+      <LandingWorkflowSection :process-steps="processSteps" />
 
       <LandingTestimonialsSection
         :testimonials="props.testimonials"
       />
 
       <LandingFaqSection :faqs="props.faqs" />
+
+      <LandingRecentArticlesSection :articles="props.recentArticles" />
 
       <LandingFinalCtaSection />
     </main>

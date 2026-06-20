@@ -68,7 +68,7 @@ onBeforeUnmount(() => {
     class="sticky top-0 z-50 transition-[background-color,border-color,box-shadow,opacity,transform] duration-200 motion-reduce:transition-none"
     :class="
       isScrolled
-        ? 'border-b border-slate-200/80 bg-white/95 shadow-[0_8px_30px_rgba(15,23,42,0.08)]'
+        ? 'border-b border-slate-200 bg-white/95 shadow-sm'
         : 'bg-transparent'
     "
   >
@@ -81,11 +81,11 @@ onBeforeUnmount(() => {
       </Link>
 
       <div class="hidden flex-1 items-center justify-center lg:flex">
-        <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-white/90 p-1 shadow-sm">
+        <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-white/90 p-1 shadow-sm">
           <Link
             :href="route('articles.index')"
-            class="rounded-full px-4 py-2 text-sm font-medium transition"
-            :class="!activeCategory ? 'bg-slate-950 text-white' : 'text-slate-600 hover:text-slate-950'"
+            class="rounded-lg px-4 py-2 text-sm font-medium transition"
+            :class="!activeCategory ? 'bg-[var(--landing-navy)] text-white' : 'text-slate-600 hover:text-slate-950'"
           >
             Semua
           </Link>
@@ -93,10 +93,10 @@ onBeforeUnmount(() => {
             v-for="category in categories.slice(0, 4)"
             :key="category.slug"
             :href="route('articles.index', { category: category.slug })"
-            class="rounded-full px-4 py-2 text-sm font-medium transition"
+            class="rounded-lg px-4 py-2 text-sm font-medium transition"
             :class="
               activeCategory === category.slug
-                ? 'bg-slate-950 text-white'
+                ? 'bg-[var(--landing-navy)] text-white'
                 : 'text-slate-600 hover:text-slate-950'
             "
           >
@@ -106,19 +106,19 @@ onBeforeUnmount(() => {
       </div>
 
       <form
-        class="hidden items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-slate-900/20 focus-within:ring-offset-2 focus-within:ring-offset-white xl:flex"
+        class="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-[var(--landing-navy)]/20 focus-within:ring-offset-2 focus-within:ring-offset-white xl:flex"
         @submit.prevent="submitSearch"
       >
         <Search class="h-4 w-4 text-slate-400" />
         <input
           v-model="searchQuery"
           type="search"
-          placeholder="Cari insight penilaian…"
+          placeholder="Cari insight penilaian..."
           class="w-44 bg-transparent text-base text-slate-700 outline-none placeholder:text-slate-400 md:text-sm"
         />
         <select
           v-model="searchScope"
-          class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+          class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[var(--landing-navy)] focus-visible:ring-offset-2"
         >
           <option v-for="option in searchOptions" :key="option.value" :value="option.value">
             {{ option.label }}
@@ -128,7 +128,7 @@ onBeforeUnmount(() => {
 
       <div class="ml-auto hidden md:block">
         <Button
-          class="rounded-full bg-slate-950 px-5 text-white hover:bg-slate-800"
+          class="rounded-xl bg-[var(--landing-navy)] px-5 text-white hover:bg-slate-800"
           as-child
         >
           <Link href="/">
@@ -141,7 +141,7 @@ onBeforeUnmount(() => {
       <div class="ml-auto lg:hidden">
         <Sheet>
           <SheetTrigger as-child>
-            <Button aria-label="Buka menu" variant="ghost" size="icon" class="h-11 w-11 rounded-full border border-slate-200 bg-white/80 shadow-sm">
+            <Button aria-label="Buka menu" variant="ghost" size="icon" class="h-11 w-11 rounded-xl border border-slate-200 bg-white/80 shadow-sm">
               <Menu class="h-5 w-5 text-slate-900" />
             </Button>
           </SheetTrigger>
@@ -164,7 +164,7 @@ onBeforeUnmount(() => {
                 <label class="block text-[11px] font-semibold uppercase text-slate-500">
                   Cari Artikel
                 </label>
-                <div class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm focus-within:ring-2 focus-within:ring-slate-900/20 focus-within:ring-offset-2 focus-within:ring-offset-white">
+                <div class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm focus-within:ring-2 focus-within:ring-[var(--landing-navy)]/20 focus-within:ring-offset-2 focus-within:ring-offset-white">
                   <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
                     <Search class="h-4 w-4 text-slate-400" />
                     <input
@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
                       class="w-full bg-transparent text-base text-slate-700 outline-none placeholder:text-slate-400"
                     />
                   </div>
-                  <div class="mt-3 rounded-2xl bg-slate-100 p-1">
+                  <div class="mt-3 rounded-xl bg-slate-100 p-1">
                     <div class="grid grid-cols-3 gap-1" role="radiogroup" aria-label="Cakupan pencarian">
                     <label
                       v-for="option in searchOptions"
@@ -183,7 +183,7 @@ onBeforeUnmount(() => {
                     >
                       <input v-model="searchScope" type="radio" class="sr-only" :value="option.value" />
                       <span
-                        class="block min-h-11 rounded-xl px-3 py-2 text-center text-xs font-semibold transition motion-reduce:transition-none"
+                        class="block min-h-11 rounded-lg px-3 py-2 text-center text-xs font-semibold transition motion-reduce:transition-none"
                         :class="
                           searchScope === option.value
                             ? 'bg-white text-slate-950 shadow-sm'
@@ -206,7 +206,7 @@ onBeforeUnmount(() => {
                   <Link
                     :href="route('articles.index')"
                     class="flex min-h-11 items-center rounded-xl px-4 py-3 text-sm font-semibold transition motion-reduce:transition-none"
-                    :class="!activeCategory ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'"
+                    :class="!activeCategory ? 'bg-[var(--landing-navy)] text-white' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'"
                     :aria-current="!activeCategory ? 'page' : undefined"
                   >
                     Semua Artikel
@@ -218,7 +218,7 @@ onBeforeUnmount(() => {
                     class="flex min-h-11 items-center rounded-xl px-4 py-3 text-sm font-semibold transition motion-reduce:transition-none"
                     :class="
                       activeCategory === category.slug
-                        ? 'bg-slate-950 text-white'
+                        ? 'bg-[var(--landing-navy)] text-white'
                         : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
                     "
                     :aria-current="activeCategory === category.slug ? 'page' : undefined"
@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
                 </nav>
               </div>
 
-              <Button class="w-full rounded-full bg-slate-950 text-white hover:bg-slate-800" as-child>
+              <Button class="w-full rounded-xl bg-[var(--landing-navy)] text-white hover:bg-slate-800" as-child>
                 <Link href="/">
                   Buka DigiPro by KJPP HJAR
                   <ArrowRight class="ml-2 h-4 w-4" />
