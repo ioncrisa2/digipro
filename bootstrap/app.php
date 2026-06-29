@@ -1,23 +1,26 @@
 <?php
 
-use Illuminate\Foundation\Application;
-use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsureCustomerRole;
 use App\Http\Middleware\EnsureNotReviewerRole;
 use App\Http\Middleware\EnsureReviewerRole;
 use App\Http\Middleware\EnsureSuperAdminRole;
-use App\Http\Middleware\RecordUserActivity;
 use App\Http\Middleware\EnsureSystemSectionPermission;
-use Illuminate\Http\Request;
+use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RecordUserActivity;
+use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Laravel\Sanctum\Http\Middleware\CheckAbilities;
+use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -29,6 +32,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'reviewer.role' => EnsureReviewerRole::class,
             'super_admin.role' => EnsureSuperAdminRole::class,
             'system.section' => EnsureSystemSectionPermission::class,
+            'abilities' => CheckAbilities::class,
+            'ability' => CheckForAnyAbility::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [
@@ -41,6 +46,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->shouldRenderJsonWhen(function (Request $request, \Throwable $exception): bool {
+            return $request->is('api/*') || $request->expectsJson();
+        });
+
         $exceptions->respond(function (Response $response, \Throwable $exception, Request $request) {
             if ($request->expectsJson()) {
                 return $response;

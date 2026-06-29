@@ -14,7 +14,15 @@ class EnsureCustomerRole
         $user = $request->user();
 
         if (! $user) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                abort(401);
+            }
+
             return redirect()->route('login');
+        }
+
+        if (($request->is('api/*') || $request->expectsJson()) && ! $user->hasRole('customer')) {
+            abort(403);
         }
 
         if ($user->isReviewer()) {
