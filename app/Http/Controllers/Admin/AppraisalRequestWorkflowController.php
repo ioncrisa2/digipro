@@ -11,8 +11,8 @@ use App\Http\Requests\Admin\StoreAppraisalFieldCorrectionRequest;
 use App\Http\Requests\Admin\StoreAppraisalOfferRequest;
 use App\Http\Requests\Admin\StoreAppraisalReportConfigurationRequest;
 use App\Http\Requests\Admin\StoreAppraisalRequestRevisionBatchRequest;
-use App\Http\Requests\Admin\UploadFinalReportRequest;
 use App\Http\Requests\Admin\UpdateAppraisalPhysicalReportRequest;
+use App\Http\Requests\Admin\UploadFinalReportRequest;
 use App\Models\AppraisalRequest;
 use App\Models\AppraisalRequestRevisionItem;
 use App\Services\Admin\AdminAppraisalRequestWorkflowWorkspaceService;
@@ -25,8 +25,7 @@ class AppraisalRequestWorkflowController extends Controller
 {
     public function __construct(
         private readonly AdminAppraisalRequestWorkflowWorkspaceService $workspaceService,
-    ) {
-    }
+    ) {}
 
     public function storeRevisionBatch(
         StoreAppraisalRequestRevisionBatchRequest $request,
@@ -68,7 +67,10 @@ class AppraisalRequestWorkflowController extends Controller
         return $this->handleAction(fn () => $this->workspaceService->verifyDocs(
             $appraisalRequest,
             (int) $request->user()->id
-        ));
+        ), redirectUrl: route('admin.appraisal-requests.show', [
+            'appraisalRequest' => $appraisalRequest,
+            'tab' => 'penawaran',
+        ]));
     }
 
     public function markDocsIncomplete(AppraisalRequest $appraisalRequest): RedirectResponse
@@ -194,10 +196,15 @@ class AppraisalRequestWorkflowController extends Controller
         ));
     }
 
-    private function handleAction(callable $callback, bool $handleValidationErrors = false): RedirectResponse
-    {
+    private function handleAction(
+        callable $callback,
+        bool $handleValidationErrors = false,
+        ?string $redirectUrl = null,
+    ): RedirectResponse {
         try {
-            return back()->with('success', $callback());
+            $response = $redirectUrl ? redirect()->to($redirectUrl) : back();
+
+            return $response->with('success', $callback());
         } catch (\RuntimeException $exception) {
             return back()->with('error', $exception->getMessage());
         } catch (ValidationException $exception) {

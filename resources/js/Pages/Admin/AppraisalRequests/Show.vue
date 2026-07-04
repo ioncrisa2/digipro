@@ -1,6 +1,6 @@
 <script setup>
 import { computed, defineAsyncComponent, reactive, ref, toRefs } from 'vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, Download, ExternalLink, Eye, FileText, Search, X } from 'lucide-vue-next';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Badge } from '@/components/ui/badge';
@@ -203,7 +203,9 @@ const {
   revisionWorkspace,
 } = toRefs(props);
 
-const activeTab = ref('ringkasan');
+const page = usePage();
+const requestedTab = new URLSearchParams(String(page.url ?? '').split('?')[1] ?? '').get('tab');
+const activeTab = ref(requestedTab === 'penawaran' ? 'penawaran' : 'ringkasan');
 
 const offerForm = useForm({
   billing_dpp_amount: offerAction.value?.defaults?.billing_dpp_amount ?? '',
@@ -681,12 +683,7 @@ const latestNegotiationEntry = computed(() => {
   const entries = negotiations.value ?? [];
   return entries.length ? entries[entries.length - 1] : null;
 });
-const showInitialOfferShortcut = computed(() => (
-  activeTab.value !== 'negosiasi'
-  && Boolean(offerAction.value)
-  && !hasNegotiationHistory.value
-  && offerAction.value?.label === 'Kirim Penawaran'
-));
+const showOfferShortcut = computed(() => activeTab.value !== 'penawaran' && Boolean(offerAction.value));
 const negotiationStatusSummary = computed(() => {
   if (!hasNegotiationHistory.value) {
     return {
@@ -727,8 +724,8 @@ const negotiationStatusSummary = computed(() => {
   };
 });
 
-const openNegotiationTab = () => {
-  activeTab.value = 'negosiasi';
+const openOfferTab = () => {
+  activeTab.value = 'penawaran';
 };
 
 const resetRevisionForm = () => {
@@ -886,8 +883,8 @@ const submitRevisionItem = () => {
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
-          <Button v-if="showInitialOfferShortcut" type="button" @click="openNegotiationTab">
-            Kirim Penawaran
+          <Button v-if="showOfferShortcut" type="button" @click="openOfferTab">
+            {{ offerAction.label }}
           </Button>
 
           <Button
@@ -915,7 +912,7 @@ const submitRevisionItem = () => {
           <Button type="button" :variant="activeTab === 'ringkasan' ? 'default' : 'ghost'" @click="activeTab = 'ringkasan'">Ringkasan</Button>
           <Button type="button" :variant="activeTab === 'aset' ? 'default' : 'ghost'" @click="activeTab = 'aset'">Aset</Button>
           <Button type="button" :variant="activeTab === 'dokumen' ? 'default' : 'ghost'" @click="activeTab = 'dokumen'">Dokumen</Button>
-          <Button type="button" :variant="activeTab === 'negosiasi' ? 'default' : 'ghost'" @click="activeTab = 'negosiasi'">Negosiasi</Button>
+          <Button type="button" :variant="activeTab === 'penawaran' ? 'default' : 'ghost'" @click="activeTab = 'penawaran'">Penawaran</Button>
           <Button v-if="showContractTab" type="button" :variant="activeTab === 'kontrak' ? 'default' : 'ghost'" @click="activeTab = 'kontrak'">Kontrak</Button>
           <Button type="button" :variant="activeTab === 'pembayaran' ? 'default' : 'ghost'" @click="activeTab = 'pembayaran'">Pembayaran</Button>
           <Button v-if="showReportTab" type="button" :variant="activeTab === 'laporan' ? 'default' : 'ghost'" @click="activeTab = 'laporan'">Laporan</Button>
@@ -2247,13 +2244,13 @@ const submitRevisionItem = () => {
             </CardContent>
           </Card>
 
-          <Card v-if="activeTab === 'negosiasi'">
+          <Card v-if="activeTab === 'penawaran'">
             <CardHeader>
-              <CardTitle>Negosiasi</CardTitle>
-              <CardDescription>Kelola penawaran awal, respons keberatan user, dan pantau histori negosiasi.</CardDescription>
+              <CardTitle>Penawaran</CardTitle>
+              <CardDescription>Tetapkan nilai jasa, kirim penawaran ke customer, dan kelola respons negosiasi dari satu tempat.</CardDescription>
             </CardHeader>
-            <CardContent class="space-y-4">
-              <div :class="['rounded-2xl border p-4', negotiationStatusSummary.tone]">
+            <CardContent class="space-y-6">
+              <div :class="['rounded-xl border p-4', negotiationStatusSummary.tone]">
                 <p class="text-sm font-semibold">{{ negotiationStatusSummary.title }}</p>
                 <p class="mt-2 text-sm">{{ negotiationStatusSummary.description }}</p>
                 <div v-if="latestNegotiationEntry" class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -2263,7 +2260,7 @@ const submitRevisionItem = () => {
                 </div>
               </div>
 
-              <div v-if="offerAction" class="rounded-2xl border bg-white p-5 space-y-5">
+              <div v-if="offerAction" class="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Aksi Admin</p>
@@ -2275,7 +2272,7 @@ const submitRevisionItem = () => {
                   </Badge>
                 </div>
 
-                <div v-if="approveLatestNegotiationAction" class="rounded-2xl border bg-slate-50 p-4">
+                <div v-if="approveLatestNegotiationAction" class="rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Keberatan User Terbaru</p>
                   <div class="mt-3 grid gap-2 text-sm text-slate-700">
                     <p>Harapan fee: {{ formatCurrency(approveLatestNegotiationAction.expected_fee) }}</p>
@@ -2311,24 +2308,24 @@ const submitRevisionItem = () => {
                     </div>
                   </div>
 
-                  <div class="rounded-2xl border bg-slate-50 p-4 text-sm text-slate-700">
+                  <div class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
                     Sistem pembayaran memakai pelunasan penuh melalui payment gateway. Admin hanya menginput Nilai Jasa (DPP), lalu sistem menghitung PPN 11%, PPh 23 Dipotong, dan Total Transfer Customer.
                   </div>
 
-                  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div class="rounded-2xl border bg-white p-4">
+                  <div class="grid overflow-hidden rounded-xl border bg-slate-50 md:grid-cols-2 xl:grid-cols-4">
+                    <div class="border-b p-4 md:border-r xl:border-b-0">
                       <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">PPN 11%</p>
                       <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(offerVatValue) }}</p>
                     </div>
-                    <div class="rounded-2xl border bg-white p-4">
+                    <div class="border-b p-4 xl:border-b-0 xl:border-r">
                       <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Tagihan</p>
                       <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(offerGrossValue) }}</p>
                     </div>
-                    <div class="rounded-2xl border bg-white p-4">
+                    <div class="border-b p-4 md:border-r md:border-b-0">
                       <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">PPh 23 Dipotong</p>
                       <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(offerPphValue) }}</p>
                     </div>
-                    <div class="rounded-2xl border bg-white p-4">
+                    <div class="p-4">
                       <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Transfer Customer</p>
                       <p class="mt-2 text-sm font-semibold text-slate-950">{{ formatCurrency(offerNetValue) }}</p>
                     </div>
@@ -2357,28 +2354,34 @@ const submitRevisionItem = () => {
                 </form>
               </div>
 
-              <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <div class="rounded-2xl border bg-slate-50 p-4">
+              <div class="grid overflow-hidden rounded-xl border bg-slate-50 sm:grid-cols-2 xl:grid-cols-5">
+                <div class="border-b p-4 sm:border-r xl:border-b-0">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Event</p>
                   <p class="mt-2 text-2xl font-semibold text-slate-950">{{ negotiationSummary.total }}</p>
                 </div>
-                <div class="rounded-2xl border bg-slate-50 p-4">
+                <div class="border-b p-4 xl:border-r xl:border-b-0">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Counter Request</p>
                   <p class="mt-2 text-2xl font-semibold text-slate-950">{{ negotiationSummary.counter_requests }}</p>
                 </div>
-                <div class="rounded-2xl border bg-slate-50 p-4">
+                <div class="border-b p-4 sm:border-r xl:border-b-0">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Offer Admin</p>
                   <p class="mt-2 text-2xl font-semibold text-slate-950">{{ negotiationSummary.offers_sent }}</p>
                 </div>
-                <div class="rounded-2xl border bg-slate-50 p-4">
+                <div class="border-b p-4 xl:border-r xl:border-b-0">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Disetujui</p>
                   <p class="mt-2 text-2xl font-semibold text-slate-950">{{ negotiationSummary.accepted }}</p>
                 </div>
-                <div class="rounded-2xl border bg-slate-50 p-4">
+                <div class="p-4">
                   <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dibatalkan</p>
                   <p class="mt-2 text-2xl font-semibold text-slate-950">{{ negotiationSummary.cancelled }}</p>
                 </div>
               </div>
+
+              <section class="space-y-4 border-t pt-6">
+                <div>
+                  <h3 class="text-base font-semibold text-slate-950">Riwayat Penawaran & Negosiasi</h3>
+                  <p class="mt-1 text-sm text-slate-500">Telusuri penawaran admin, respons customer, dan keputusan akhir berdasarkan urutan waktu.</p>
+                </div>
 
               <div class="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
                 <div class="space-y-2">
@@ -2411,11 +2414,10 @@ const submitRevisionItem = () => {
                 </div>
               </div>
 
-              <div v-for="entry in filteredNegotiations" :key="entry.id" class="rounded-2xl border p-4">
+              <div v-for="entry in filteredNegotiations" :key="entry.id" class="rounded-xl border border-slate-200 bg-white p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div>
                     <div class="flex flex-wrap items-center gap-2">
-                      <p class="font-medium text-slate-950">{{ entry.action_label }}</p>
                       <Badge variant="outline" :class="negotiationToneClass(entry.action_tone)">
                         {{ entry.action_label }}
                       </Badge>
@@ -2427,11 +2429,11 @@ const submitRevisionItem = () => {
                   </div>
                   <span class="text-xs text-slate-500">{{ formatDateTime(entry.created_at) }}</span>
                 </div>
-                <div class="mt-3 grid gap-2 text-sm text-slate-700">
-                  <p>Offered: {{ formatCurrency(entry.offered_fee) }}</p>
-                  <p>Expected: {{ formatCurrency(entry.expected_fee) }}</p>
-                  <p>Selected: {{ formatCurrency(entry.selected_fee) }}</p>
-                  <p v-if="entry.reason">Catatan: {{ entry.reason }}</p>
+                <div class="mt-4 grid gap-3 text-sm text-slate-700 sm:grid-cols-3">
+                  <p><span class="block text-xs text-slate-500">Penawaran Admin</span>{{ formatCurrency(entry.offered_fee) }}</p>
+                  <p><span class="block text-xs text-slate-500">Harapan Customer</span>{{ formatCurrency(entry.expected_fee) }}</p>
+                  <p><span class="block text-xs text-slate-500">Nilai Terpilih</span>{{ formatCurrency(entry.selected_fee) }}</p>
+                  <p v-if="entry.reason" class="sm:col-span-3"><span class="block text-xs text-slate-500">Catatan</span>{{ entry.reason }}</p>
                 </div>
               </div>
               <div v-if="!filteredNegotiations.length" class="rounded-2xl border border-dashed p-4 text-sm text-slate-500">
@@ -2441,6 +2443,7 @@ const submitRevisionItem = () => {
                     : 'Belum ada histori negosiasi.'
                 }}
               </div>
+              </section>
             </CardContent>
           </Card>
 

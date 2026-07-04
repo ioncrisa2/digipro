@@ -2,7 +2,7 @@
 
 namespace App\Support\Admin;
 
-use App\Enums\AppraisalStatusEnum;
+use App\Enums\ContractStatusEnum;
 use App\Models\AppraisalRequest;
 use App\Services\Admin\AppraisalRequestWorkflowService;
 
@@ -77,13 +77,13 @@ class AppraisalRequestActionResolver
         }
 
         $defaults = $workflowService->resolveOfferDefaults($appraisalRequest);
-        $statusValue = $appraisalRequest->status?->value ?? $appraisalRequest->status;
+        $contractStatusValue = $appraisalRequest->contract_status?->value ?? $appraisalRequest->contract_status;
+        $isCounterOffer = $contractStatusValue === ContractStatusEnum::Negotiation->value;
 
         return [
-            'label' => $statusValue === AppraisalStatusEnum::WaitingOffer->value
-                ? 'Kirim Counter Offer'
-                : 'Kirim Penawaran',
-            'description' => $statusValue === AppraisalStatusEnum::WaitingOffer->value
+            'mode' => $isCounterOffer ? 'counter' : 'initial',
+            'label' => $isCounterOffer ? 'Kirim Counter Offer' : 'Kirim Penawaran',
+            'description' => $isCounterOffer
                 ? 'Gunakan form ini untuk merespons negosiasi user dengan penawaran revisi.'
                 : 'Gunakan form ini untuk mengirim penawaran awal ke user.',
             'url' => route('admin.appraisal-requests.actions.send-offer', $appraisalRequest),

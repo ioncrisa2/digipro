@@ -6,7 +6,6 @@ use App\Enums\FinanceDocumentStatusEnum;
 use App\Enums\PurposeEnum;
 use App\Enums\TaxIdentityTypeEnum;
 use App\Enums\WithholdingTaxTypeEnum;
-use Carbon\Carbon;
 use App\Models\AppraisalAsset;
 use App\Models\AppraisalAssetFile;
 use App\Models\AppraisalRequest;
@@ -22,27 +21,28 @@ use App\Models\ConsentDocument;
 use App\Models\ConstructionCostIndex;
 use App\Models\ContactMessage;
 use App\Models\CostElement;
+use App\Models\District;
 use App\Models\Faq;
 use App\Models\Feature;
 use App\Models\FloorIndex;
 use App\Models\GuidelineSet;
 use App\Models\LandingMediaSetting;
+use App\Models\MappiRcnStandard;
 use App\Models\Payment;
 use App\Models\PrivacyPolicy;
 use App\Models\Province;
 use App\Models\Regency;
-use App\Models\MappiRcnStandard;
 use App\Models\Tag;
-use App\Models\Testimonial;
 use App\Models\TermsDocument;
+use App\Models\Testimonial;
 use App\Models\User;
 use App\Models\ValuationSetting;
+use App\Models\Village;
 use App\Notifications\AppraisalPhysicalReportUpdated;
 use App\Notifications\AppraisalStatusUpdated;
-use App\Models\District;
-use App\Models\Village;
-use App\Support\SystemNavigation;
 use App\Support\AdminWorkspaceAccessSynchronizer;
+use App\Support\SystemNavigation;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
@@ -118,7 +118,7 @@ function createFinanceBillingRequest(array $attributes = []): AppraisalRequest
 
     return AppraisalRequest::create(array_merge([
         'user_id' => $requester->id,
-        'request_number' => 'REQ-BILLING-' . str_pad((string) fake()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT),
+        'request_number' => 'REQ-BILLING-'.str_pad((string) fake()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT),
         'purpose' => PurposeEnum::JualBeli,
         'status' => AppraisalStatusEnum::ContractSigned,
         'requested_at' => now(),
@@ -2063,12 +2063,27 @@ it('verifies docs from the vue admin workflow', function () {
     $this
         ->actingAs($admin)
         ->post(route('admin.appraisal-requests.actions.verify-docs', $record))
-        ->assertRedirect();
+        ->assertRedirect(route('admin.appraisal-requests.show', [
+            'appraisalRequest' => $record,
+            'tab' => 'penawaran',
+        ]));
 
     $record->refresh();
 
     expect($record->status)->toBe(AppraisalStatusEnum::WaitingOffer);
     expect($record->verified_at)->not->toBeNull();
+
+    $this->actingAs($admin)
+        ->get(route('admin.appraisal-requests.show', [
+            'appraisalRequest' => $record,
+            'tab' => 'penawaran',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/AppraisalRequests/Show')
+            ->where('offerAction.mode', 'initial')
+            ->where('offerAction.label', 'Kirim Penawaran')
+        );
 });
 
 it('marks docs incomplete from the vue admin workflow', function () {
