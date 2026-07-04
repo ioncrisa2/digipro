@@ -10,6 +10,7 @@
 | Task 3 — Customer Read API | **Completed** | Dashboard, Appraisal list/options/detail/tracking, Profile read, dan Notifications list tersedia serta diuji. |
 | Task 3A — Appraisal Write API | **Complete** | Draft, multi-aset, upload/delete file, consent accept, dan submit tersedia serta diuji. |
 | Task 3B — Profile dan Notifications API | **Complete untuk registry/database** | Profile mutation, password, avatar, mark read, dan registry device token tersedia; push delivery belum ada. |
+| Task 3C — API Contract Freeze P0 | **Complete** | Seluruh 38 route implemented tercakup; 34 contoh JSON valid dan 51 test API lulus. |
 | Task 4 — Flutter Foundation | **Ready** | ApiClient dan Auth integration boleh mulai di repo Flutter terpisah. |
 | Task 5 — Auth Flutter | **Ready** | Auth API real sudah tersedia. |
 | Task 6–9 — Flutter MVP utama | **Backend ready** | Dashboard, appraisal read/write, profile, dan database notifications dapat diintegrasikan ke API real. |

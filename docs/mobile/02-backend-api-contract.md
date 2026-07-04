@@ -114,13 +114,7 @@ Route::middleware([
 - authenticated non-customer return 403 JSON;
 - customer valid lanjut.
 
-Route yang sudah ada saat audit:
-
-```text
-GET /api/v1/customer/status
-```
-
-Endpoint tersebut berada di group `prefix('customer')`. Endpoint target di bawah, seperti `/api/v1/dashboard` dan `/api/v1/appraisals`, belum memiliki route. Jangan otomatis menambahkan atau menghapus segment `/customer`; ikuti path yang benar-benar didaftarkan saat feature API diimplementasikan.
+Per 2026-07-04 terdapat 38 route `/api/v1`. Hanya smoke endpoint yang memakai segment `customer/status`; dashboard, appraisal, profile, dan notifications berada langsung di bawah `/api/v1`.
 
 ## Response envelope
 
@@ -133,7 +127,7 @@ Object response:
 }
 ```
 
-`meta` bersifat opsional dan hanya dikirim jika response membutuhkannya. Endpoint implemented `/customer/status` tidak mengirim `meta`.
+`message` dan `meta` bersifat opsional. `JsonResource` tunggal umumnya mengirim `data`; collection paginated mengirim `data`, `links`, dan `meta`; controller action dapat menambahkan `message`, `stats`, `filters`, atau `unread_count` di top level.
 
 List pagination mengikuti Laravel:
 
@@ -149,10 +143,9 @@ List pagination mengikuti Laravel:
   "meta": {
     "current_page": 1,
     "last_page": 3,
-    "per_page": 15,
+    "per_page": 10,
     "total": 40
-  },
-  "message": "OK"
+  }
 }
 ```
 
@@ -209,6 +202,23 @@ Token untuk smoke check diperoleh dari register, login, atau verifikasi 2FA Auth
 | 500 | Server error | Tampilkan retry, logging internal. |
 | Timeout/offline | Network failure | Pertahankan data lama/draft, sediakan retry. |
 
+Response error aktual yang harus dapat diparse Flutter:
+
+```json
+{"message":"Unauthenticated."}
+```
+
+```json
+{
+  "message": "The given data was invalid.",
+  "errors": {
+    "billing_regency_id": ["Kabupaten/kota billing tidak cocok dengan provinsi yang dipilih."]
+  }
+}
+```
+
+Response `403` dari endpoint tertentu dapat menambahkan `code`, misalnya `customer_access_required`. Ownership failure sengaja memakai `404` dan tidak mengungkap apakah resource milik user lain ada.
+
 ## Auth endpoints
 
 Status: **Implemented** dan diuji di `tests/Feature/MobileAuthApiTest.php`.
@@ -227,6 +237,21 @@ Status: **Implemented** dan diuji di `tests/Feature/MobileAuthApiTest.php`.
 | POST | `/api/v1/auth/logout-all` | Sanctum | Revoke semua token dengan ability `mobile:customer`. |
 
 Register/login menerima `device_name` opsional. Token memiliki ability `mobile:customer` dan expiry default 30 hari. Tidak ada refresh-token endpoint.
+
+Outcome aktual:
+
+| Endpoint | Success | Response |
+| --- | --- | --- |
+| `auth/register` | `201` | Token envelope, user, dan pesan verifikasi email. |
+| `auth/login` | `200` | Token envelope atau 2FA challenge. |
+| `auth/two-factor/verify` | `200` | Token envelope setelah challenge valid. |
+| `auth/forgot-password` | `200` | Pesan generik anti-enumeration. |
+| `auth/reset-password` | `200` | Pesan reset berhasil; semua token user dicabut. |
+| `auth/email/verification-notification` | `200` | `data.email_verified` dan message. |
+| `auth/email/verify/{id}/{hash}` | `200` | `data.email_verified: true` dan message. |
+| `auth/me` | `200` | `data` berupa `UserResource`, plus `message: "OK"`. |
+| `auth/logout` | `200` | `{"message":"Logout berhasil."}`. |
+| `auth/logout-all` | `200` | `{"message":"Semua sesi mobile berhasil diakhiri."}`. |
 
 Register request:
 
@@ -261,6 +286,15 @@ Login request:
 ```
 
 Forgot-password request hanya berisi `email`. Reset-password request berisi `token`, `email`, `password`, dan `password_confirmation`.
+
+```json
+{
+  "token": "password-broker-token",
+  "email": "customer@example.com",
+  "password": "PasswordBaru1!",
+  "password_confirmation": "PasswordBaru1!"
+}
+```
 
 Login sukses tanpa 2FA:
 
@@ -313,7 +347,7 @@ Forgot-password selalu mengembalikan pesan generik agar tidak membocorkan apakah
 
 ## Feature endpoints
 
-Status aktual per endpoint wajib dibaca dari `API-IMPLEMENTATION-STATUS.md`. Dashboard, Appraisal list/options/detail/tracking, Profile read, dan Notifications list sudah memiliki route, Form Request bila menerima query, Resource, ownership rule, dan Pest test. Endpoint write di bagian yang sama tetap draft sampai implementasinya tersedia.
+Status aktual per endpoint wajib dibaca dari `API-IMPLEMENTATION-STATUS.md`. Bagian berikut mendokumentasikan kontrak aktual endpoint yang sudah implemented, bukan desain hipotesis.
 
 ## Dashboard endpoint
 
@@ -323,18 +357,221 @@ Status aktual per endpoint wajib dibaca dari `API-IMPLEMENTATION-STATUS.md`. Das
 
 Resource dashboard tidak boleh mengembalikan route Inertia seperti `detail_url`. Gunakan `id`, `type`, `status`, `action_key`.
 
+Success `200`:
+
+```json
+{
+  "data": {
+    "stats": {
+      "total_requests": 3,
+      "in_progress": 2,
+      "completed": 1,
+      "need_revision": 0
+    },
+    "featured_request": {
+      "id": 18,
+      "request_number": "REQ-2026-0018",
+      "status": {
+        "value": "offer_sent",
+        "label": "Penawaran Dikirim",
+        "tone": "warning",
+        "requires_action": true,
+        "action_key": "review_offer"
+      },
+      "purpose": "jual_beli",
+      "purpose_label": "Jual Beli",
+      "report_type": "terinci",
+      "report_type_label": "Terinci",
+      "location": "Jl. Contoh No. 1",
+      "assets_count": 1,
+      "requested_at": "2026-07-01T08:00:00+00:00",
+      "updated_at": "2026-07-04T08:00:00+00:00"
+    },
+    "recent_requests": [],
+    "actions": [
+      {
+        "action_key": "review_offer",
+        "label": "Penawaran Menunggu Respons",
+        "count": 1,
+        "tone": "warning",
+        "status_filter": "offer_sent"
+      }
+    ],
+    "profile_completion_alert": null,
+    "support_contact": {
+      "name": "Tim Support DigiPro by KJPP HJAR",
+      "phone": "",
+      "whatsapp": "",
+      "email": "",
+      "availability_label": "Senin-Jumat 08:00-17:00 WIB"
+    }
+  }
+}
+```
+
 ## Appraisal endpoints
 
 | Method | Endpoint | Keterangan |
 | --- | --- | --- |
 | GET | `/api/v1/appraisals` | List dengan filter `q`, `status`, pagination. |
 | GET | `/api/v1/appraisals/options` | Enum asset type, purpose, status, initial location options. |
-| POST | `/api/v1/appraisals` | Buat permohonan multi-aset. |
 | GET | `/api/v1/appraisals/{appraisal}` | Detail. |
 | GET | `/api/v1/appraisals/{appraisal}/tracking` | Timeline. |
-| POST | `/api/v1/appraisals/{appraisal}/cancellation-request` | Ajukan pembatalan. |
 | POST | `/api/v1/appraisals/consent/accept` | Accept consent latest. |
-| POST | `/api/v1/appraisals/consent/decline` | Decline consent latest. |
+
+Query list aktual:
+
+```text
+GET /api/v1/appraisals?q=REQ-2026&status=submitted&per_page=10&page=1
+```
+
+`status` menerima `all` atau nilai `AppraisalStatusEnum`; `per_page` hanya `10`, `25`, atau `50`.
+
+Success list `200`:
+
+```json
+{
+  "data": [
+    {
+      "id": 18,
+      "request_number": "REQ-2026-0018",
+      "status": {
+        "value": "submitted",
+        "label": "Submitted",
+        "tone": "info",
+        "requires_action": false,
+        "action_key": null
+      },
+      "purpose": "jual_beli",
+      "purpose_label": "Jual Beli",
+      "report_type": "terinci",
+      "report_type_label": "Terinci",
+      "location": "Jl. Contoh No. 1",
+      "assets_count": 1,
+      "requested_at": "2026-07-01T08:00:00+00:00",
+      "updated_at": "2026-07-01T08:00:00+00:00"
+    }
+  ],
+  "links": {},
+  "meta": {
+    "current_page": 1,
+    "last_page": 1,
+    "per_page": 10,
+    "total": 1
+  },
+  "stats": {
+    "total": 1,
+    "by_status": {
+      "submitted": 1
+    }
+  },
+  "filters": {
+    "q": "REQ-2026",
+    "status": "submitted",
+    "per_page": 10
+  }
+}
+```
+
+`GET appraisals/options` mengembalikan `data.asset_types`, `purposes`, `report_types`, `valuation_objectives`, `statuses`, `provinces`, `asset_fields`, `upload_limits`, dan `consent`, plus `message: "OK"`. Contoh berikut dipendekkan ke satu item per collection; nilai upload limit mengikuti konfigurasi PHP server:
+
+```json
+{
+  "data": {
+    "asset_types": [{"value": "tanah_bangunan", "label": "Tanah dan Bangunan"}],
+    "purposes": [{"value": "jual_beli", "label": "Jual Beli"}],
+    "report_types": [{"value": "terinci", "label": "Terinci"}],
+    "valuation_objectives": [{"value": "kajian_nilai_pasar_dalam_bentuk_range", "label": "Kajian Nilai Pasar dalam Bentuk Range"}],
+    "statuses": [{"value": "draft", "label": "Draft", "tone": "neutral", "requires_action": false, "action_key": null}],
+    "provinces": [{"id": "31", "name": "DKI Jakarta"}],
+    "asset_fields": {
+      "usage": [{"value": "rumah_tinggal", "label": "Rumah Tinggal"}],
+      "title_document": [{"value": "shm", "label": "SHM"}],
+      "land_shape": [],
+      "land_position": [],
+      "land_condition": [],
+      "topography": []
+    },
+    "upload_limits": {
+      "max_files": 20,
+      "max_file_size": "10M",
+      "max_request_size": "20M"
+    },
+    "consent": null
+  },
+  "message": "OK"
+}
+```
+
+Detail `GET appraisals/{id}` mengembalikan `data` dengan field: `id`, `request_number`, status presentation, `purpose`, `valuation_objective`, `report`, `client`, `contract`, `fee_total`, notes, timestamps, `assets_count`, `assets`, `payment`, dan `cancellation_request`:
+
+```json
+{
+  "data": {
+    "id": 18,
+    "request_number": "REQ-2026-0018",
+    "status": {"value": "submitted", "label": "Submitted", "tone": "info", "requires_action": false, "action_key": null},
+    "purpose": {"value": "jual_beli", "label": "Jual Beli"},
+    "valuation_objective": {"value": "kajian_nilai_pasar_dalam_bentuk_range", "label": "Kajian Nilai Pasar dalam Bentuk Range"},
+    "report": {"type": "terinci", "type_label": "Terinci", "format": "both", "physical_copies_count": 1, "generated_at": null},
+    "client": {"name": "PT Contoh", "address": "Jakarta", "spk_number": "SPK-001"},
+    "contract": {"number": null, "date": null, "status": null, "status_label": null},
+    "fee_total": null,
+    "assets_count": 1,
+    "assets": [
+      {
+        "id": 41,
+        "asset_code": null,
+        "type": "tanah_bangunan",
+        "type_label": "Tanah dan Bangunan",
+        "address": "Jl. Properti No. 1",
+        "location": {
+          "province": {"id": "31", "name": "DKI Jakarta"},
+          "regency": {"id": "3171", "name": "Jakarta Selatan"},
+          "district": {"id": "3171010", "name": "Tebet"},
+          "village": {"id": "3171010001", "name": "Tebet Barat"}
+        },
+        "coordinates": {"latitude": -6.2297, "longitude": 106.8295},
+        "land_area": 120,
+        "building_area": 80
+      }
+    ],
+    "payment": null,
+    "cancellation_request": null
+  }
+}
+```
+
+Tracking mengembalikan `data.request`, `data.timeline`, `data.payment`, dan `data.cancellation_request`:
+
+```json
+{
+  "data": {
+    "request": {
+      "id": 18,
+      "request_number": "REQ-2026-0018",
+      "status": {"value": "submitted", "label": "Submitted", "tone": "info", "requires_action": false, "action_key": null},
+      "assets_count": 1,
+      "requested_at": "2026-07-01T08:00:00+00:00",
+      "verified_at": null,
+      "cancelled_at": null
+    },
+    "timeline": [
+      {
+        "key": "request_submitted",
+        "title": "Permohonan Dikirim",
+        "description": "Permohonan REQ-2026-ABC123 berhasil dikirim.",
+        "at": "2026-07-01 15:00",
+        "type": "submitted"
+      }
+    ],
+    "payment": null,
+    "cancellation_request": null
+  }
+}
+```
+
+Resource milik customer lain selalu disamarkan sebagai `404`.
 
 ## Draft dan upload appraisal
 
@@ -343,6 +580,7 @@ Untuk mobile yang lebih tahan koneksi buruk, gunakan draft server-side:
 | Method | Endpoint | Keterangan |
 | --- | --- | --- |
 | POST | `/api/v1/appraisals/drafts` | Buat draft server-side. |
+| GET | `/api/v1/appraisals/drafts/{draft}` | Baca draft. |
 | PUT | `/api/v1/appraisals/drafts/{draft}` | Update draft. |
 | POST | `/api/v1/appraisals/drafts/{draft}/assets` | Tambah asset. |
 | PUT | `/api/v1/appraisals/drafts/{draft}/assets/{asset}` | Update asset. |
@@ -351,49 +589,162 @@ Untuk mobile yang lebih tahan koneksi buruk, gunakan draft server-side:
 | DELETE | `/api/v1/appraisals/drafts/{draft}/files/{file}` | Hapus file. |
 | POST | `/api/v1/appraisals/drafts/{draft}/submit` | Submit final. |
 
-Jika waktu pendek, boleh langsung `POST /api/v1/appraisals` multipart, tetapi UX lebih rapuh. Catat konsekuensi teknisnya.
+`POST /api/v1/appraisals` langsung tidak diimplementasikan. Flutter wajib memakai draft server-side.
 
-## Create appraisal form contract
+## Kontrak aktual draft appraisal
 
-Step 1 — Tujuan dan data dasar:
+Create/update draft request:
 
-- `purpose`: required.
-- `asset_type_summary`: optional untuk ringkasan awal.
-- `notes`: optional.
+```json
+{
+  "purpose": "jual_beli",
+  "report_type": "terinci",
+  "client_name": "PT Contoh",
+  "client_address": "Jl. Contoh No. 1",
+  "client_spk_number": "SPK-001",
+  "user_request_note": "Catatan customer",
+  "sertifikat_on_hand_confirmed": true,
+  "certificate_not_encumbered_confirmed": true
+}
+```
 
-Step 2 — Daftar aset:
+Semua field draft memakai `sometimes`; create tanpa field akan memakai default service. Create sukses `201`, show/update sukses `200`. Ketiganya mengembalikan `AppraisalDraftResource`.
 
-- `assets[]`: minimal 1.
-- `asset_type`: required.
-- `address`: required.
-- `province_id`: required.
-- `regency_id`: required.
-- `district_id`: required.
-- `village_id`: optional/required sesuai backend.
-- `latitude`: optional tetapi disarankan.
-- `longitude`: optional tetapi disarankan.
+Create asset request; `asset_type` wajib saat `POST`, field lain dapat dilengkapi bertahap:
 
-Step 3 — Detail aset:
+```json
+{
+  "asset_type": "tanah_bangunan",
+  "peruntukan": "rumah_tinggal",
+  "title_document": "shm",
+  "province_id": "31",
+  "regency_id": "3171",
+  "district_id": "3171010",
+  "village_id": "3171010001",
+  "address": "Jl. Properti No. 1",
+  "coordinates_lat": -6.2297,
+  "coordinates_lng": 106.8295,
+  "land_area": 120,
+  "building_area": 80,
+  "building_floors": 2,
+  "build_year": 2020
+}
+```
 
-- `land_area`: conditional.
-- `building_area`: conditional.
-- `building_year`: optional/conditional.
-- `certificate_type`: optional/conditional.
-- `road_width`: optional.
-- `front_width`: optional.
-- `description`: optional.
+Create asset sukses `201`; update dan delete asset sukses `200`. Response memakai bentuk draft berikut:
 
-Step 4 — Dokumen dan foto:
+```json
+{
+  "data": {
+    "id": 18,
+    "request_number": "REQ-2026-ABC123",
+    "status": {
+      "value": "draft",
+      "label": "Draft",
+      "tone": "neutral",
+      "requires_action": false,
+      "action_key": null
+    },
+    "purpose": "jual_beli",
+    "report_type": "terinci",
+    "client_name": "PT Contoh",
+    "client_address": "Jl. Contoh No. 1",
+    "client_spk_number": "SPK-001",
+    "user_request_note": "Catatan customer",
+    "sertifikat_on_hand_confirmed": true,
+    "certificate_not_encumbered_confirmed": true,
+    "report_format": "both",
+    "physical_copies_count": 1,
+    "assets_count": 1,
+    "assets": [
+      {
+        "id": 41,
+        "asset_type": "tanah_bangunan",
+        "province_id": "31",
+        "regency_id": "3171",
+        "district_id": "3171010",
+        "village_id": "3171010001",
+        "address": "Jl. Properti No. 1",
+        "coordinates_lat": -6.2297,
+        "coordinates_lng": 106.8295,
+        "land_area": 120,
+        "building_area": 80,
+        "building_floors": 2,
+        "build_year": 2020,
+        "files": []
+      }
+    ],
+    "created_at": "2026-07-04T08:00:00+00:00",
+    "updated_at": "2026-07-04T08:00:00+00:00"
+  }
+}
+```
 
-- `asset_photos[]`: optional/conditional.
-- `certificate_file`: optional/conditional.
-- `identity_file`: optional/conditional.
-- `supporting_files[]`: optional.
+Field asset lain yang dapat dikirim: `land_shape`, `land_position`, `land_condition`, `topography`, `maps_link`, `renovation_year`, `frontage_width`, dan `access_road_width`.
 
-Step 5 — Review:
+Upload file memakai `multipart/form-data`:
 
-- `consent_accepted`: required true.
-- submit final.
+```text
+type=photo_front
+files[]=front-1.jpg
+files[]=front-2.webp
+```
+
+Tipe valid: `doc_pbb`, `doc_imb`, `doc_old_report`, `doc_certs`, `photo_access_road`, `photo_front`, dan `photo_interior`. Maksimal 20 file/request; dokumen maksimal 10 MB per file dan foto 15 MB per file. Upload sukses `201`:
+
+```json
+{
+  "data": [
+    {
+      "id": 91,
+      "type": "photo_front",
+      "original_name": "front-1.jpg",
+      "mime": "image/jpeg",
+      "size": 204800,
+      "created_at": "2026-07-04T08:10:00+00:00"
+    }
+  ]
+}
+```
+
+Delete file sukses mengembalikan `204 No Content`.
+
+Accept consent request dan response `200`:
+
+```json
+{
+  "document_id": 3,
+  "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "accepted": true
+}
+```
+
+```json
+{
+  "data": {
+    "document_id": 3,
+    "version": "2026-07-v1",
+    "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "accepted_at": "2026-07-04T08:15:00+00:00"
+  },
+  "message": "Persetujuan berhasil disimpan."
+}
+```
+
+Submit tidak memiliki body selain header auth. Success `200`:
+
+```json
+{
+  "data": {
+    "id": 18,
+    "request_number": "REQ-2026-0018",
+    "status": "submitted"
+  },
+  "message": "Permohonan berhasil dikirim."
+}
+```
+
+Submit `422` jika profil billing, aset, hierarki lokasi, dokumen wajib, consent, atau guideline belum lengkap. Submit ulang terhadap record yang bukan lagi draft mengembalikan `404`.
 
 ## Offer dan negosiasi
 
@@ -474,6 +825,8 @@ Mobile tidak memanggil webhook. Mobile hanya membaca status payment dari backend
 
 ## Profile dan account
 
+Status: **Implemented** dan diuji di `tests/Feature/CustomerAccountApiTest.php`.
+
 | Method | Endpoint | Keterangan |
 | --- | --- | --- |
 | GET | `/api/v1/profile` | Data profil dan billing. |
@@ -484,7 +837,106 @@ Mobile tidak memanggil webhook. Mobile hanya membaca status payment dari backend
 | POST | `/api/v1/profile/avatar` | Upload avatar. |
 | DELETE | `/api/v1/profile/avatar` | Remove avatar. |
 
+`GET profile`, update profile, upload avatar, dan remove avatar mengembalikan bentuk `ProfileResource` berikut; action mutation menambahkan `message` di top level:
+
+```json
+{
+  "data": {
+    "id": 7,
+    "name": "Customer Mobile",
+    "email": "customer@example.com",
+    "email_verified": true,
+    "phone_number": "081234567890",
+    "whatsapp_number": "081234567890",
+    "address": "Jakarta",
+    "company_name": null,
+    "avatar_url": "https://api.example.com/storage/avatars/avatar.webp",
+    "billing": {
+      "recipient_name": "Finance Mobile",
+      "email": "billing@example.com",
+      "address": null,
+      "address_detail": "Jl. Billing No. 10",
+      "postal_code": "12810",
+      "npwp": null,
+      "nik": null,
+      "province": {"id": "31", "name": "DKI Jakarta"},
+      "regency": {"id": "3171", "name": "Jakarta Selatan"},
+      "district": {"id": "3171010", "name": "Tebet"},
+      "village": {"id": "3171010001", "name": "Tebet Barat"}
+    },
+    "profile_complete": true,
+    "two_factor_enabled": false
+  }
+}
+```
+
+Update profile request `PUT profile`:
+
+```json
+{
+  "name": "Customer Mobile",
+  "email": "customer@example.com",
+  "phone_number": "081234567890",
+  "whatsapp_number": "081234567890",
+  "address": "Jakarta",
+  "billing_recipient_name": "Finance Mobile",
+  "billing_province_id": "31",
+  "billing_regency_id": "3171",
+  "billing_district_id": "3171010",
+  "billing_village_id": "3171010001",
+  "billing_postal_code": "12810",
+  "billing_address_detail": "Jl. Billing No. 10",
+  "billing_npwp": null,
+  "billing_nik": null,
+  "billing_email": "billing@example.com"
+}
+```
+
+`name` dan `email` wajib. Hierarki billing divalidasi lintas province/regency/district/village. Jika email berubah, `email_verified` menjadi `false`, notifikasi verifikasi mobile dikirim, dan feature endpoint akan terblokir middleware `verified` sampai verifikasi selesai.
+
+Location options:
+
+```text
+GET /api/v1/profile/location-options?type=regencies&province_id=31
+```
+
+`type` bernilai `provinces`, `regencies`, `districts`, atau `villages`. Parent ID wajib sesuai type. Success `200`:
+
+```json
+{
+  "data": [
+    {"value": "3171", "label": "Jakarta Selatan (3171)"}
+  ]
+}
+```
+
+Password verify request dan response:
+
+```json
+{"current_password": "password-lama"}
+```
+
+```json
+{"data": {"valid": true}}
+```
+
+Password update request:
+
+```json
+{
+  "current_password": "password-lama",
+  "password": "password-baru",
+  "password_confirmation": "password-baru"
+}
+```
+
+Success `200`: `{"message":"Password berhasil diperbarui."}`. Password lama salah menghasilkan `422` pada `current_password`.
+
+Avatar upload memakai `multipart/form-data` dengan field `avatar`; format valid JPG/JPEG/PNG/WebP maksimal 2 MB. Upload/replace dan delete mengembalikan `ProfileResource`; file avatar lama dihapus. Delete tidak memerlukan body.
+
 ## Notifications dan device token
+
+Status database notifications dan token registry: **Implemented**. Push delivery provider: **Planned**.
 
 | Method | Endpoint | Keterangan |
 | --- | --- | --- |
@@ -493,6 +945,80 @@ Mobile tidak memanggil webhook. Mobile hanya membaca status payment dari backend
 | POST | `/api/v1/notifications/read-all` | Mark all as read. |
 | POST | `/api/v1/notifications/device-token` | Register/update FCM/APNs token. |
 | DELETE | `/api/v1/notifications/device-token` | Remove token saat logout/device revoke. |
+
+Notification list menerima `per_page` `10`, `20`, atau `50`, serta `page` minimal 1. Success `200` memakai pagination Laravel dan menambahkan `unread_count`:
+
+```json
+{
+  "data": [
+    {
+      "id": "4e82d0b6-1f5c-4fe0-a371-90f78ac9fd7a",
+      "type": "AppraisalRequestCreated",
+      "title": "Permohonan berhasil dibuat",
+      "message": "Permohonan REQ-2026-0018 berhasil dibuat.",
+      "read": false,
+      "read_at": null,
+      "created_at": "2026-07-04T08:00:00+00:00",
+      "action": {
+        "key": "view_appraisal",
+        "resource_type": "appraisal",
+        "resource_id": 18
+      },
+      "context": {"appraisal_id": 18}
+    }
+  ],
+  "links": {},
+  "meta": {},
+  "unread_count": 1
+}
+```
+
+Mark one read tidak memiliki body. Success `200` mengembalikan notification resource yang sama dengan `read: true` dan `unread_count` terbaru. Notification milik user lain menghasilkan `404`.
+
+Mark all read tidak memiliki body. Success `200`:
+
+```json
+{
+  "data": {
+    "updated_count": 3,
+    "unread_count": 0
+  }
+}
+```
+
+Register/update device token request:
+
+```json
+{
+  "token": "provider-device-token-minimum-20-characters",
+  "platform": "android",
+  "provider": "fcm",
+  "device_name": "Pixel 9",
+  "app_version": "1.0.0",
+  "os_version": "16",
+  "locale": "id-ID"
+}
+```
+
+`platform` hanya `android`/`ios`; `provider` hanya `fcm`/`apns` dan default `fcm`. Create pertama mengembalikan `201`; update token yang sama mengembalikan `200`:
+
+```json
+{
+  "data": {
+    "id": 12,
+    "platform": "android",
+    "provider": "fcm",
+    "device_name": "Pixel 9",
+    "app_version": "1.0.0",
+    "os_version": "16",
+    "locale": "id-ID",
+    "last_seen_at": "2026-07-04T08:00:00+00:00"
+  },
+  "message": "Device token berhasil disimpan."
+}
+```
+
+Token mentah tidak pernah dikembalikan. Backend menyimpannya terenkripsi dan memakai SHA-256 hash unik untuk lookup. Device token delete menerima JSON `{"token":"..."}` dan selalu mengembalikan `204 No Content`; query dibatasi ke user login sehingga token user lain tidak terhapus.
 
 Tabel `user_device_tokens`:
 

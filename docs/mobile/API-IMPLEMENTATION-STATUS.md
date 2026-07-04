@@ -327,7 +327,7 @@ Urutan ini mengikat pekerjaan backend berikutnya. Jangan melompat ke area lain h
 - [x] Appraisal Draft/Multi-asset/Upload/Submit API.
 - [x] Profile dan Account API.
 - [x] Database Notifications dan Device Token Registry API.
-- [ ] P0 — Tambahkan contoh request/response aktual ke `02-backend-api-contract.md` untuk seluruh endpoint implemented.
+- [x] P0 — Contoh request/response aktual seluruh 38 endpoint implemented disinkronkan ke `02-backend-api-contract.md` pada 2026-07-04.
 - [ ] P1 — Offer: detail, accept, negotiate, select, ownership, status transition, dan idempotency test.
 - [ ] P2 — Cancellation request sebagai resource appraisal tersendiri; jangan mempertahankan `offer/cancel` yang ambigu.
 - [ ] P3 — Revision: open batch/detail dan submit file/data revision.

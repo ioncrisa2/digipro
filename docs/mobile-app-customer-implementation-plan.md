@@ -82,7 +82,7 @@ Status canonical dan detail endpoint ada di [`docs/mobile/API-IMPLEMENTATION-STA
 
 ### Belum selesai — kerjakan dalam urutan ini
 
-- [ ] P0 — Bekukan contoh request/response aktual untuk endpoint implemented di dokumentasi kontrak.
+- [x] P0 — Contoh request/response aktual untuk seluruh 38 endpoint implemented dibekukan pada 2026-07-04.
 - [ ] P1 — Offer detail, accept, negotiate, dan select; cancellation memakai endpoint appraisal tersendiri, bukan `offer/cancel` ambigu.
 - [ ] P2 — Revisi dokumen: open batch/detail dan submit revisi.
 - [ ] P3 — Contract read, onboarding, PDF, dan sign; keputusan Peruri/mobile flow wajib dikunci.
