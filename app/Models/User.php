@@ -7,6 +7,7 @@ use App\Notifications\ResetPasswordNotification;
 use App\Support\SystemNavigation;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -144,6 +145,26 @@ class User extends Authenticatable implements MustVerifyEmail
     public function signatureProfile(): HasOne
     {
         return $this->hasOne(UserSignatureProfile::class);
+    }
+
+    public function billingProvince(): BelongsTo
+    {
+        return $this->belongsTo(Province::class, 'billing_province_id');
+    }
+
+    public function billingRegency(): BelongsTo
+    {
+        return $this->belongsTo(Regency::class, 'billing_regency_id');
+    }
+
+    public function billingDistrict(): BelongsTo
+    {
+        return $this->belongsTo(District::class, 'billing_district_id');
+    }
+
+    public function billingVillage(): BelongsTo
+    {
+        return $this->belongsTo(Village::class, 'billing_village_id');
     }
 
     public function sendPasswordResetNotification($token): void

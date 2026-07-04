@@ -2,11 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\AppraisalAssetComparable;
-use App\Models\AppraisalAssetFile;
-use App\Models\AppraisalRequest;
-use App\Models\BuildingValuation;
-use App\Models\ConstructionCostIndex;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -55,10 +50,10 @@ class AppraisalAsset extends Model
     ];
 
     protected $casts = [
-        'province_id'     => 'string',
-        'regency_id'      => 'string',
-        'district_id'     => 'string',
-        'village_id'      => 'string',
+        'province_id' => 'string',
+        'regency_id' => 'string',
+        'district_id' => 'string',
+        'village_id' => 'string',
         'land_value_final' => 'integer',
         'building_value_final' => 'integer',
         'market_value_final' => 'integer',
@@ -68,16 +63,36 @@ class AppraisalAsset extends Model
         'coordinates_lng' => 'float',
         'certificate_issued_at' => 'date',
         'land_book_date' => 'date',
-        'land_area'       => 'float',
+        'land_area' => 'float',
         'document_land_area' => 'float',
-        'building_area'   => 'float',
-        'frontage_width'  => 'float',
+        'building_area' => 'float',
+        'frontage_width' => 'float',
         'access_road_width' => 'float',
     ];
 
     public function request(): BelongsTo
     {
         return $this->belongsTo(AppraisalRequest::class, 'appraisal_request_id');
+    }
+
+    public function province(): BelongsTo
+    {
+        return $this->belongsTo(Province::class);
+    }
+
+    public function regency(): BelongsTo
+    {
+        return $this->belongsTo(Regency::class);
+    }
+
+    public function district(): BelongsTo
+    {
+        return $this->belongsTo(District::class);
+    }
+
+    public function village(): BelongsTo
+    {
+        return $this->belongsTo(Village::class);
     }
 
     public function ikkRef(): BelongsTo

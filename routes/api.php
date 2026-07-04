@@ -5,6 +5,12 @@ use App\Http\Controllers\Api\V1\Auth\MobileEmailVerificationController;
 use App\Http\Controllers\Api\V1\Auth\MobilePasswordController;
 use App\Http\Controllers\Api\V1\Auth\MobileTwoFactorController;
 use App\Http\Controllers\Api\V1\Customer\MobileApiStatusController;
+use App\Http\Controllers\Api\V1\Customer\MobileAppraisalConsentController;
+use App\Http\Controllers\Api\V1\Customer\MobileAppraisalController;
+use App\Http\Controllers\Api\V1\Customer\MobileAppraisalDraftController;
+use App\Http\Controllers\Api\V1\Customer\MobileDashboardController;
+use App\Http\Controllers\Api\V1\Customer\MobileNotificationController;
+use App\Http\Controllers\Api\V1\Customer\MobileProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')
@@ -41,6 +47,46 @@ Route::prefix('v1')
                         Route::post('/logout', [MobileAuthController::class, 'logout'])->name('logout');
                         Route::post('/logout-all', [MobileAuthController::class, 'logoutAll'])->name('logout-all');
                     });
+            });
+
+        Route::middleware(['auth:sanctum', 'abilities:mobile:customer', 'verified', 'customer.role'])
+            ->group(function (): void {
+                Route::get('/dashboard', MobileDashboardController::class)->name('dashboard');
+                Route::get('/appraisals', [MobileAppraisalController::class, 'index'])->name('appraisals.index');
+                Route::get('/appraisals/options', [MobileAppraisalController::class, 'options'])->name('appraisals.options');
+                Route::post('/appraisals/consent/accept', MobileAppraisalConsentController::class)
+                    ->name('appraisals.consent.accept');
+                Route::prefix('appraisals/drafts/{draft}')
+                    ->whereNumber('draft')
+                    ->name('appraisals.drafts.')
+                    ->group(function (): void {
+                        Route::get('/', [MobileAppraisalDraftController::class, 'show'])->name('show');
+                        Route::put('/', [MobileAppraisalDraftController::class, 'update'])->name('update');
+                        Route::post('/assets', [MobileAppraisalDraftController::class, 'storeAsset'])->name('assets.store');
+                        Route::put('/assets/{asset}', [MobileAppraisalDraftController::class, 'updateAsset'])
+                            ->whereNumber('asset')
+                            ->name('assets.update');
+                        Route::delete('/assets/{asset}', [MobileAppraisalDraftController::class, 'destroyAsset'])
+                            ->whereNumber('asset')
+                            ->name('assets.destroy');
+                        Route::post('/assets/{asset}/files', [MobileAppraisalDraftController::class, 'storeFiles'])
+                            ->whereNumber('asset')
+                            ->name('files.store');
+                        Route::delete('/files/{file}', [MobileAppraisalDraftController::class, 'destroyFile'])
+                            ->whereNumber('file')
+                            ->name('files.destroy');
+                        Route::post('/submit', [MobileAppraisalDraftController::class, 'submit'])->name('submit');
+                    });
+                Route::post('/appraisals/drafts', [MobileAppraisalDraftController::class, 'store'])
+                    ->name('appraisals.drafts.store');
+                Route::get('/appraisals/{appraisal}', [MobileAppraisalController::class, 'show'])
+                    ->whereNumber('appraisal')
+                    ->name('appraisals.show');
+                Route::get('/appraisals/{appraisal}/tracking', [MobileAppraisalController::class, 'tracking'])
+                    ->whereNumber('appraisal')
+                    ->name('appraisals.tracking');
+                Route::get('/profile', MobileProfileController::class)->name('profile.show');
+                Route::get('/notifications', MobileNotificationController::class)->name('notifications.index');
             });
 
         Route::middleware(['auth:sanctum', 'abilities:mobile:customer', 'verified', 'customer.role'])
