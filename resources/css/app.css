@@ -145,6 +145,67 @@
     font-family: var(--auth-font-display);
 }
 
+.customer-portal {
+    --background: #f7f3ee;
+    --foreground: #263b44;
+    --card: #fffdf9;
+    --card-foreground: #263b44;
+    --popover: #fffdf9;
+    --popover-foreground: #263b44;
+    --primary: #245766;
+    --primary-foreground: #ffffff;
+    --secondary: #efe7df;
+    --secondary-foreground: #344b55;
+    --muted: #f0ebe5;
+    --muted-foreground: #68777c;
+    --accent: #f2e2d9;
+    --accent-foreground: #813f2d;
+    --border: #ded7cf;
+    --input: #d7cfc6;
+    --ring: #2d6877;
+    --customer-canvas: #f7f3ee;
+    --customer-surface: #fffdf9;
+    --customer-surface-muted: #f1ebe4;
+    --customer-ink: #263b44;
+    --customer-muted: #68777c;
+    --customer-brand: #a94f35;
+    --customer-brand-soft: #f4e2d9;
+    --customer-trust: #245766;
+    --customer-nav: #203d46;
+    --customer-nav-muted: #9fb2b7;
+    font-family: var(--font-sans);
+    color: var(--customer-ink);
+}
+
+.customer-portal .customer-display {
+    font-family: var(--landing-font-display);
+    letter-spacing: -0.025em;
+}
+
+.customer-portal h1,
+.customer-portal h2,
+.customer-portal h3 {
+    font-family: var(--landing-font-display);
+}
+
+.customer-portal .customer-kicker {
+    color: var(--customer-brand);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.customer-portal [data-slot="card"] {
+    border-color: var(--border);
+    box-shadow: 0 1px 2px rgb(38 59 68 / 0.05);
+}
+
+.customer-portal ::selection {
+    background: var(--customer-brand-soft);
+    color: var(--customer-ink);
+}
+
 .dark {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);

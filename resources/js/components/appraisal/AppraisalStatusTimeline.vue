@@ -10,7 +10,7 @@ const timelineDotClass = (type) => {
     if (key === "success") return "bg-emerald-500";
     if (key === "danger") return "bg-rose-500";
     if (key === "warning") return "bg-amber-500";
-    if (["offer", "payment", "submitted", "info"].includes(key)) return "bg-sky-500";
+    if (["offer", "payment", "submitted", "info"].includes(key)) return "bg-[var(--customer-brand)]";
 
     return "bg-slate-400";
 };
@@ -25,7 +25,7 @@ const timelineDotClass = (type) => {
         <div
             v-for="item in events"
             :key="item.key"
-            class="relative border-l border-slate-200 pl-6"
+            class="relative border-l border-[var(--border)] pl-6"
         >
             <span
                 class="absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full"

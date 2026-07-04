@@ -32,7 +32,7 @@ defineProps({
       <EmptyMedia variant="icon" class="bg-slate-100">
         <FileText class="text-slate-500" />
       </EmptyMedia>
-      <EmptyTitle class="text-2xl">Belum Ada Permohonan</EmptyTitle>
+      <EmptyTitle class="text-2xl">Belum Ada Data</EmptyTitle>
       <EmptyDescription class="text-base max-w-md mx-auto">
         Anda belum memiliki permohonan penilaian. Mulai dengan membuat permohonan baru untuk
         mendapatkan penilaian properti Anda.

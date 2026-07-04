@@ -72,23 +72,23 @@ watch(
 
 <template>
   <aside
-    class="bg-slate-900 text-slate-100 shrink-0 flex flex-col transition-[transform] duration-200 motion-reduce:transition-none fixed inset-y-0 left-0 z-40 lg:static"
+    class="fixed inset-y-0 left-0 z-40 flex shrink-0 flex-col bg-[var(--customer-nav,#0f172a)] text-white transition-[transform] duration-200 motion-reduce:transition-none lg:static"
     :class="[
       sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       sidebarCollapsed ? 'lg:w-20' : 'lg:w-64',
       sidebarCollapsed ? 'w-20' : 'w-64',
     ]"
   >
-    <div class="h-16 flex items-center px-4 border-b border-slate-800">
+    <div class="flex h-16 items-center border-b border-white/10 px-4">
       <div
-        class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 border border-slate-700"
+        class="flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-[var(--customer-brand,#1e293b)]"
         :class="sidebarCollapsed ? 'mx-auto' : 'mr-3'"
       >
         <span class="text-sm font-semibold">DG</span>
       </div>
       <div v-if="!sidebarCollapsed" class="flex flex-col leading-tight">
         <span class="font-semibold text-sm">DIGIPRO BY KJPP HJAR</span>
-        <span class="text-[11px] text-slate-400">{{ portalLabel }}</span>
+        <span class="text-[11px] text-[var(--customer-nav-muted,#94a3b8)]">{{ portalLabel }}</span>
       </div>
       <button
         type="button"
@@ -110,8 +110,8 @@ watch(
           :class="[
             sidebarCollapsed ? 'justify-center px-2 py-2' : 'px-4 py-2',
             isActive(item)
-              ? 'bg-slate-800 text-white'
-              : 'text-slate-300 hover:bg-slate-800/60 hover:text-white',
+              ? 'bg-[var(--customer-brand,#1e293b)] text-white shadow-sm'
+              : 'text-[#d8e2e4] hover:bg-white/10 hover:text-white',
           ]"
         >
           <component
@@ -119,7 +119,7 @@ watch(
             :class="[
               'h-5 w-5',
               sidebarCollapsed ? '' : 'mr-3',
-              isActive(item) ? 'text-white' : 'text-slate-400',
+              isActive(item) ? 'text-white' : 'text-[var(--customer-nav-muted,#94a3b8)]',
             ]"
           />
           <span v-if="!sidebarCollapsed">{{ item.label }}</span>
@@ -176,7 +176,7 @@ watch(
       </div>
     </nav>
 
-    <div class="px-3 py-3 border-t border-slate-800">
+    <div class="border-t border-white/10 px-3 py-3">
       <Link
         :href="profileHref"
         :title="sidebarCollapsed ? 'Profil Saya' : ''"
@@ -184,21 +184,21 @@ watch(
         :class="[
           sidebarCollapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2',
           isProfileActive
-            ? 'bg-slate-800 text-white'
-            : 'text-slate-300 hover:bg-slate-800/60 hover:text-white',
+            ? 'bg-[var(--customer-brand,#1e293b)] text-white'
+            : 'text-[#d8e2e4] hover:bg-white/10 hover:text-white',
         ]"
       >
-        <div class="h-8 w-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+        <div class="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/10">
           <User class="h-4 w-4" :class="isProfileActive ? 'text-white' : 'text-slate-300'" />
         </div>
         <div v-if="!sidebarCollapsed" class="min-w-0">
           <div class="truncate font-medium">{{ user.name || "Profil Saya" }}</div>
-          <div class="text-[11px] text-slate-400 truncate">Profil Saya</div>
+          <div class="truncate text-[11px] text-[var(--customer-nav-muted,#94a3b8)]">Profil Saya</div>
         </div>
       </Link>
     </div>
 
-    <div v-if="!sidebarCollapsed" class="px-4 py-3 border-t border-slate-800 text-[11px] text-slate-500">
+    <div v-if="!sidebarCollapsed" class="border-t border-white/10 px-4 py-3 text-[11px] text-[var(--customer-nav-muted,#64748b)]">
       DIGIPRO BY KJPP HJAR (c) {{ year }}
     </div>
   </aside>

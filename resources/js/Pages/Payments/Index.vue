@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive } from 'vue'
-import { Link } from '@inertiajs/vue3'
+import { Head, Link } from '@inertiajs/vue3'
 import AdminDataTable from '@/components/admin/AdminDataTable.vue'
 import AdminTableToolbar from '@/components/admin/AdminTableToolbar.vue'
 import { Badge } from '@/components/ui/badge'
@@ -200,21 +200,24 @@ const columns = [
 </script>
 
 <template>
+  <Head title="Pembayaran" />
+
   <UserDashboardLayout>
     <template #title>Pembayaran</template>
 
-    <div class="space-y-6">
+    <div class="mx-auto max-w-7xl space-y-6">
       <div class="flex flex-col gap-2">
-        <h1 class="text-2xl font-semibold text-slate-900">Pembayaran</h1>
-        <p class="text-sm text-slate-500">
+        <p class="customer-kicker">Administrasi Penilaian</p>
+        <h1 class="customer-display text-3xl font-semibold text-[var(--customer-ink)]">Pembayaran</h1>
+        <p class="max-w-3xl text-sm leading-6 text-[var(--customer-muted)]">
           Pantau status tagihan, lanjutkan pembayaran, dan unduh invoice yang sudah lunas.
         </p>
       </div>
 
-      <Card class="overflow-hidden border-slate-200/80 bg-white/90 shadow-sm">
-        <CardHeader class="flex flex-col gap-4 space-y-0 border-b border-slate-200/80 bg-slate-50/60 lg:flex-row lg:items-start lg:justify-between">
+      <Card class="gap-0 overflow-hidden py-0">
+        <CardHeader class="flex flex-col gap-4 space-y-0 border-b border-[var(--border)] bg-[var(--customer-surface-muted)]/60 pt-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <CardTitle class="text-slate-950">Daftar Tagihan</CardTitle>
+            <CardTitle class="customer-display text-lg text-slate-950">Daftar Tagihan</CardTitle>
             <CardDescription>
               Gunakan tabel ini untuk melihat invoice aktif dan membuka halaman pembayaran terkait.
             </CardDescription>
@@ -257,7 +260,7 @@ const columns = [
         </CardHeader>
 
         <CardContent class="p-5">
-          <div v-if="!rows.length" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-6 py-12 text-sm text-slate-500">
+          <div v-if="!rows.length" class="rounded-xl border border-dashed border-[var(--border)] bg-[var(--customer-surface-muted)]/50 px-6 py-12 text-sm text-[var(--customer-muted)]">
             Belum ada pembayaran yang cocok dengan filter aktif.
           </div>
 

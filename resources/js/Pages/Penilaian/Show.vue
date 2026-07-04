@@ -156,27 +156,31 @@ const submitCancellationRequest = () => {
     <Head :title="`Detail Request ${req.request_number}`" />
 
     <DashboardLayout>
-        <div class="space-y-5">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="mx-auto max-w-7xl space-y-5">
+            <header class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--customer-surface)] px-5 py-5 sm:px-6">
+                <span class="absolute inset-y-0 left-0 w-1.5 bg-[var(--customer-brand)]" aria-hidden="true" />
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-start gap-3">
-                    <Button variant="ghost" size="icon" @click="goBack">
+                    <Button variant="ghost" size="icon" aria-label="Kembali ke daftar permohonan" @click="goBack">
                         <ArrowLeft class="h-5 w-5" />
                     </Button>
 
                     <div>
+                        <p class="customer-kicker">Dossier Permohonan</p>
                         <div class="flex flex-wrap items-center gap-2">
-                            <h1 class="text-xl font-semibold">Detail Request Penilaian</h1>
-                            <Badge variant="secondary">{{ req.request_number }}</Badge>
+                            <h1 class="customer-display mt-1 text-2xl font-semibold sm:text-3xl">Detail Penilaian</h1>
                             <Badge :variant="statusVariant">{{ statusLabel }}</Badge>
                         </div>
-                        <p class="text-sm text-muted-foreground">{{ subtitle }}</p>
+                        <p class="mt-2 font-mono text-xs font-semibold text-[var(--customer-brand)]">{{ req.request_number }}</p>
+                        <p class="mt-1 text-sm text-muted-foreground">{{ subtitle }}</p>
                     </div>
                 </div>
-            </div>
+                </div>
+            </header>
 
-            <Card class="overflow-hidden border-slate-200">
-                <CardHeader class="pb-3">
-                    <CardTitle class="text-base">Progress Permohonan</CardTitle>
+            <Card class="overflow-hidden">
+                <CardHeader class="border-b border-[var(--border)] bg-[var(--customer-surface-muted)]/50 pb-4">
+                    <CardTitle class="customer-display text-lg">Status dan Tindakan Berikutnya</CardTitle>
                     <CardDescription>
                         Ringkasan milestone utama, status aktif, dan tindakan berikutnya untuk permohonan Anda.
                     </CardDescription>
@@ -200,7 +204,7 @@ const submitCancellationRequest = () => {
                         </Button>
                     </div>
 
-                    <div class="border-t border-slate-200 pt-6">
+                    <div class="border-t border-[var(--border)] pt-6">
                         <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 <p class="text-sm font-semibold text-slate-950">3 Event Terbaru</p>
@@ -546,9 +550,10 @@ const submitCancellationRequest = () => {
                 </CardContent>
             </Card>
 
-            <Card>
+            <Card class="overflow-hidden">
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-base">Ringkasan Request & Berkas</CardTitle>
+                    <p class="customer-kicker">Ikhtisar Dossier</p>
+                    <CardTitle class="customer-display text-lg">Ringkasan Request & Berkas</CardTitle>
                     <CardDescription>Data inti request dan ikhtisar berkas dalam satu tampilan</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-3 text-sm">
@@ -640,9 +645,10 @@ const submitCancellationRequest = () => {
                 </CardContent>
             </Card>
 
-            <Card>
+            <Card class="overflow-hidden">
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-base">Pusat Dokumen</CardTitle>
+                    <p class="customer-kicker">Arsip Permohonan</p>
+                    <CardTitle class="customer-display text-lg">Pusat Dokumen</CardTitle>
                     <CardDescription>
                         Semua arsip request, dokumen sistem, invoice, legal final, dan file aset dalam satu workspace yang lebih mudah discan.
                     </CardDescription>
@@ -655,9 +661,10 @@ const submitCancellationRequest = () => {
                 </CardContent>
             </Card>
 
-            <Card>
+            <Card class="overflow-hidden">
                 <CardHeader class="pb-2">
-                    <CardTitle class="text-base">Aset</CardTitle>
+                    <p class="customer-kicker">Objek Penilaian</p>
+                    <CardTitle class="customer-display text-lg">Aset</CardTitle>
                     <CardDescription>Daftar aset yang diajukan untuk dinilai</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-2">
@@ -665,7 +672,8 @@ const submitCancellationRequest = () => {
                         Belum ada aset.
                     </div>
 
-                    <div v-for="(a, assetIndex) in (req.assets ?? [])" :key="a.id" class="rounded-lg border p-3">
+                    <div v-for="(a, assetIndex) in (req.assets ?? [])" :key="a.id" class="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--customer-surface-muted)]/35 p-4">
+                        <span class="absolute inset-y-0 left-0 w-1 bg-[var(--customer-brand)]" aria-hidden="true" />
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <div class="font-medium">{{ a.type_label ?? a.type ?? "-" }}</div>
                             <Badge variant="outline">Aset #{{ assetIndex + 1 }}</Badge>

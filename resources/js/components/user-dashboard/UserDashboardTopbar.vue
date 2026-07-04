@@ -70,12 +70,12 @@ defineProps({
 </script>
 
 <template>
-  <header class="h-16 bg-white border-b border-slate-200 flex items-center px-4 lg:px-6 gap-3">
+  <header class="flex h-16 items-center gap-3 border-b border-[var(--border,#e2e8f0)] bg-[var(--customer-surface,#ffffff)] px-4 lg:px-6">
     <Button variant="ghost" size="icon" class="lg:hidden" @click="toggleSidebar">
       <Menu class="h-5 w-5" />
     </Button>
 
-    <div class="flex-1 flex items-center gap-2 font-semibold text-slate-900 text-base">
+    <div class="customer-display flex flex-1 items-center gap-2 text-base font-semibold text-[var(--customer-ink,#0f172a)]">
       <Button
         variant="ghost"
         size="icon"
@@ -99,11 +99,11 @@ defineProps({
       <DropdownMenuTrigger as-child>
         <button
           type="button"
-          class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+          class="flex items-center gap-2 rounded-full border border-[var(--border,#e2e8f0)] bg-[var(--customer-surface,#ffffff)] px-2 py-1 transition-colors hover:bg-[var(--customer-surface-muted,#f8fafc)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 focus-visible:ring-offset-2"
         >
           <Avatar class="h-8 w-8">
             <AvatarImage :src="avatarUrl" />
-            <AvatarFallback class="bg-slate-900 text-white text-xs">
+            <AvatarFallback class="bg-[var(--customer-trust,#0f172a)] text-xs text-white">
               {{ userInitials }}
             </AvatarFallback>
           </Avatar>

@@ -5,7 +5,7 @@ const year = new Date().getFullYear();
 </script>
 
 <template>
-  <footer class="border-t border-slate-200 bg-white px-4 py-4 text-xs text-slate-500 lg:px-6">
+  <footer class="border-t border-[var(--border,#e2e8f0)] bg-[var(--customer-surface,#ffffff)] px-4 py-4 text-xs text-[var(--customer-muted,#64748b)] lg:px-6">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div>
         DIGIPRO BY KJPP HJAR (c) {{ year }}. All rights reserved.

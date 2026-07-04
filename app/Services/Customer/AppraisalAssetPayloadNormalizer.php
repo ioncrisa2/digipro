@@ -38,11 +38,13 @@ class AppraisalAssetPayloadNormalizer
             // 'land_position' => $asset['land_position'] ?? null,
             // 'land_condition' => $asset['land_condition'] ?? null,
             // 'topography' => $asset['topography'] ?? null,
-            'land_area' => $asset['land_area'] ?? null,
-            'building_area' => $hasBuilding ? ($asset['building_area'] ?? null) : null,
-            'building_floors' => $hasBuilding ? ($asset['floors'] ?? $asset['building_floors'] ?? null) : null,
-            'build_year' => $hasBuilding ? ($asset['build_year'] ?? null) : null,
-            'renovation_year' => $hasBuilding ? ($asset['renovation_year'] ?? null) : null,
+            'land_area' => $this->blankToNull($asset['land_area'] ?? null),
+            'building_area' => $hasBuilding ? $this->blankToNull($asset['building_area'] ?? null) : null,
+            'building_floors' => $hasBuilding
+                ? $this->blankToNull($asset['floors'] ?? $asset['building_floors'] ?? null)
+                : null,
+            'build_year' => $hasBuilding ? $this->blankToNull($asset['build_year'] ?? null) : null,
+            'renovation_year' => $hasBuilding ? $this->blankToNull($asset['renovation_year'] ?? null) : null,
             // 'frontage_width' => $asset['frontage_width'] ?? null,
             // 'access_road_width' => $asset['access_road_width'] ?? null,
             'province_id' => $this->normalizeLocationCode($asset['province_id'] ?? null, 2),
@@ -142,6 +144,15 @@ class AppraisalAssetPayloadNormalizer
         }
 
         return is_numeric($value) ? (float) $value : null;
+    }
+
+    private function blankToNull(mixed $value): mixed
+    {
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return null;
+        }
+
+        return $value;
     }
 
     private function normalizeLocationCode(mixed $value, int $length): ?string

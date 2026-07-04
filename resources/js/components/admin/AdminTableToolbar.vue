@@ -13,6 +13,10 @@ const props = defineProps({
   filterDescription: { type: String, default: '' },
   activeFilterCount: { type: Number, default: 0 },
   hasFilter: { type: Boolean, default: true },
+  searchFirst: { type: Boolean, default: false },
+  alignStart: { type: Boolean, default: false },
+  disabled: { type: Boolean, default: false },
+  largeControls: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['search', 'apply-filters', 'reset-filters']);
@@ -48,11 +52,11 @@ const resetFilters = () => {
 </script>
 
 <template>
-  <div class="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-end">
-    <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-      <Popover v-if="hasFilter" v-model:open="open">
+  <div class="flex w-full flex-col gap-3 md:flex-row md:items-center" :class="alignStart ? 'md:justify-start' : 'md:justify-end'">
+    <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-center" :class="alignStart ? 'sm:justify-start' : 'sm:justify-end'">
+      <Popover v-if="hasFilter" v-model:open="open" :class="searchFirst ? 'order-2' : 'order-1'">
         <PopoverTrigger as-child>
-          <Button type="button" variant="outline" class="shrink-0">
+          <Button type="button" variant="outline" :disabled="disabled" :class="['shrink-0', largeControls ? 'min-h-11' : '']">
             <Filter class="h-4 w-4" />
             <span>Filter</span>
             <Badge v-if="filterBadgeLabel" variant="secondary" class="ml-1 min-w-5 justify-center px-1.5">
@@ -83,12 +87,13 @@ const resetFilters = () => {
         </PopoverContent>
       </Popover>
 
-      <form class="relative w-full md:w-[22rem]" @submit.prevent="submitSearch">
+      <form class="relative w-full md:w-[22rem]" :class="searchFirst ? 'order-1' : 'order-2'" @submit.prevent="submitSearch">
         <Search class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <Input
           :model-value="search"
           :placeholder="searchPlaceholder"
-          class="pl-9"
+          :disabled="disabled"
+          :class="['pl-9', largeControls ? 'h-11' : '']"
           @input="search = $event.target.value"
         />
       </form>

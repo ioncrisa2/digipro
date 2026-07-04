@@ -75,9 +75,7 @@ onMounted(() => {
 
       <LandingWorkflowSection :process-steps="processSteps" />
 
-      <LandingTestimonialsSection
-        :testimonials="props.testimonials"
-      />
+      <LandingTestimonialsSection />
 
       <LandingFaqSection :faqs="props.faqs" />
 

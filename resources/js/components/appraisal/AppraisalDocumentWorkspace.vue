@@ -168,25 +168,25 @@ const emptyStateLabel = computed(() => {
 <template>
   <div class="space-y-6">
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <div class="rounded-2xl border bg-slate-50 px-4 py-4">
+      <div class="rounded-xl border border-[var(--border)] bg-[var(--customer-surface-muted)]/55 px-4 py-4">
         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Total Arsip</p>
         <p class="mt-3 text-3xl font-semibold text-slate-950">{{ summary.total_documents_count || 0 }}</p>
       </div>
-      <div class="rounded-2xl border bg-slate-50 px-4 py-4">
+      <div class="rounded-xl border border-[var(--border)] bg-[var(--customer-surface-muted)]/55 px-4 py-4">
         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Upload Customer</p>
         <p class="mt-3 text-3xl font-semibold text-slate-950">{{ summary.customer_documents_count || 0 }}</p>
       </div>
-      <div class="rounded-2xl border bg-slate-50 px-4 py-4">
+      <div class="rounded-xl border border-[var(--border)] bg-[var(--customer-surface-muted)]/55 px-4 py-4">
         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Foto Aset</p>
         <p class="mt-3 text-3xl font-semibold text-slate-950">{{ summary.customer_photos_count || 0 }}</p>
       </div>
-      <div class="rounded-2xl border bg-slate-50 px-4 py-4">
+      <div class="rounded-xl border border-[var(--border)] bg-[var(--customer-surface-muted)]/55 px-4 py-4">
         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Dokumen Sistem</p>
         <p class="mt-3 text-3xl font-semibold text-slate-950">{{ summary.system_documents_count || 0 }}</p>
       </div>
     </div>
 
-    <div class="flex flex-col gap-4 rounded-2xl border bg-white p-4">
+    <div class="flex flex-col gap-4 rounded-xl border border-[var(--border)] bg-[var(--customer-surface)] p-4">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div class="space-y-1">
           <p class="text-sm font-semibold text-slate-950">Pusat Dokumen</p>
@@ -241,7 +241,7 @@ const emptyStateLabel = computed(() => {
       <section
         v-for="section in filteredSections"
         :key="section.key"
-        class="rounded-3xl border bg-white p-5"
+        class="rounded-xl border border-[var(--border)] bg-[var(--customer-surface)] p-5"
       >
         <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -255,7 +255,7 @@ const emptyStateLabel = computed(() => {
           <article
             v-for="file in section.items"
             :key="`${section.key}-${file.id}-${file.type}`"
-            class="overflow-hidden rounded-2xl border bg-slate-50/70"
+            class="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--customer-surface-muted)]/45"
           >
             <div class="flex h-full gap-4 p-4">
               <div

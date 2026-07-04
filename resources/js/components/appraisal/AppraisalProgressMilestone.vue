@@ -15,7 +15,7 @@ const segmentClass = (milestone) => {
 
     if (state === "completed") return "bg-emerald-500";
     if (state === "current" && terminalState.value === "cancelled") return "bg-rose-500";
-    if (state === "current") return "bg-sky-600";
+    if (state === "current") return "bg-[var(--customer-brand)]";
 
     return "bg-slate-200";
 };
@@ -41,12 +41,12 @@ const substatusClass = computed(() => {
         <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div class="space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Progress Milestone</p>
+                    <p class="customer-kicker">Progress Permohonan</p>
                     <Badge variant="outline">Tahap {{ summary.current_step }} dari {{ summary.total_steps }}</Badge>
                     <Badge v-if="terminalState === 'cancelled'" variant="destructive">Terminal</Badge>
                 </div>
                 <div>
-                    <h2 class="text-2xl font-semibold tracking-tight text-slate-950">{{ summary.current_label }}</h2>
+                    <h2 class="customer-display text-2xl font-semibold text-slate-950">{{ summary.current_label }}</h2>
                     <p class="mt-1 text-sm text-slate-600">{{ summary.helper_text }}</p>
                 </div>
             </div>
@@ -73,15 +73,15 @@ const substatusClass = computed(() => {
                     v-for="milestone in milestones"
                     :key="`${milestone.key}-label`"
                     class="space-y-1 rounded-2xl border px-3 py-3"
-                    :class="milestone.state === 'current' ? 'border-slate-900 bg-slate-950 text-white' : 'border-slate-200 bg-white'"
+                    :class="milestone.state === 'current' ? 'border-[var(--customer-brand)] bg-[var(--customer-brand-soft)] text-[var(--customer-ink)]' : 'border-[var(--border)] bg-[var(--customer-surface)]'"
                 >
                     <p
                         class="text-[11px] font-semibold uppercase tracking-[0.22em]"
-                        :class="milestone.state === 'current' ? 'text-slate-300' : 'text-slate-500'"
+                        :class="milestone.state === 'current' ? 'text-[var(--customer-brand)]' : 'text-slate-500'"
                     >
                         {{ milestone.state === "completed" ? "Selesai" : milestone.state === "current" ? "Aktif" : "Berikutnya" }}
                     </p>
-                    <p class="text-sm font-medium" :class="milestone.state === 'current' ? 'text-white' : 'text-slate-900'">
+                    <p class="text-sm font-medium text-slate-900">
                         {{ milestone.label }}
                     </p>
                 </div>

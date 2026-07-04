@@ -5,15 +5,16 @@ namespace App\Services\Customer\Payloads;
 use App\Enums\AppraisalStatusEnum;
 use App\Enums\ReportTypeEnum;
 use App\Models\AppraisalAsset;
+use App\Models\AppraisalAssetFile;
 use App\Models\AppraisalRequest;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class CustomerAppraisalIndexBuilder
 {
     public function __construct(
         private readonly AppraisalPayloadFormatter $formatter,
-    ) {
-    }
+    ) {}
 
     public function build(int $userId, string $q, string $status, int $perPage = 10): array
     {
@@ -74,6 +75,17 @@ class CustomerAppraisalIndexBuilder
                     ->orderBy('id')
                     ->limit(1),
                 'first_asset_address'
+            )
+            ->selectSub(
+                AppraisalAssetFile::query()
+                    ->select('appraisal_asset_files.path')
+                    ->join('appraisal_assets', 'appraisal_assets.id', '=', 'appraisal_asset_files.appraisal_asset_id')
+                    ->whereColumn('appraisal_assets.appraisal_request_id', 'appraisal_requests.id')
+                    ->where('appraisal_asset_files.type', 'photo_front')
+                    ->orderBy('appraisal_assets.id')
+                    ->orderBy('appraisal_asset_files.id')
+                    ->limit(1),
+                'front_photo_path'
             );
 
         if ($q !== '') {
@@ -98,7 +110,7 @@ class CustomerAppraisalIndexBuilder
 
                 return [
                     'id' => $record->id,
-                    'request_number' => $record->request_number ?? ('REQ-' . $record->id),
+                    'request_number' => $record->request_number ?? ('REQ-'.$record->id),
                     'report_type' => $reportTypeValue,
                     'report_type_label' => $this->formatter->enumLabel(ReportTypeEnum::class, $record->report_type)
                         ?? $this->formatter->headlineOrDashValue($reportTypeValue),
@@ -108,6 +120,9 @@ class CustomerAppraisalIndexBuilder
                         ?? $this->formatter->headlineOrDashValue($statusValue),
                     'requested_at' => optional($record->requested_at)->toDateString(),
                     'location' => $record->first_asset_address ? Str::limit($record->first_asset_address, 48) : '-',
+                    'front_photo_url' => filled($record->front_photo_path)
+                        ? Storage::disk('public')->url((string) $record->front_photo_path)
+                        : null,
                     'report_format' => $record->report_format,
                     'physical_copies_count' => (int) ($record->physical_copies_count ?? 0),
                 ];

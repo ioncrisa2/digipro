@@ -145,22 +145,25 @@ const statusClass = (color) => {
     <template #title>Dashboard</template>
 
     <div class="mx-auto flex w-full max-w-7xl flex-col gap-5 px-0 lg:gap-6">
-      <header class="flex flex-col gap-4 rounded-[18px] border border-slate-200 bg-white px-5 py-5 shadow-xs sm:flex-row sm:items-center sm:justify-between lg:px-6">
+      <header class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--customer-surface)] px-5 py-6 sm:px-6 lg:py-7">
+        <div class="absolute inset-y-0 left-0 w-1.5 bg-[var(--customer-brand)]" aria-hidden="true" />
+        <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0">
-          <p class="text-sm font-medium text-slate-500">Halo, {{ firstName }}</p>
-          <h1 class="mt-1 text-3xl font-semibold text-balance text-slate-950">Dashboard</h1>
-          <p class="mt-1 text-sm text-pretty text-slate-600">
-            Pantau permohonan penilaian, dokumen, dan tindakan lanjutan.
+          <p class="customer-kicker">Portal Penilaian Properti</p>
+          <h1 class="customer-display mt-2 text-3xl font-semibold text-balance text-[var(--customer-ink)]">Selamat datang, {{ firstName }}</h1>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-pretty text-[var(--customer-muted)]">
+            Lihat posisi setiap permohonan dan selesaikan tindakan yang masih menunggu.
           </p>
         </div>
 
         <Link
           :href="newRequestHref"
-          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--customer-trust)] px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-[#1b4652] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--customer-trust)]/30 focus-visible:ring-offset-2"
         >
           <Plus class="size-4" />
           Ajukan Permohonan
         </Link>
+        </div>
       </header>
 
       <section
@@ -185,8 +188,9 @@ const statusClass = (color) => {
         <article
           v-for="card in statCards"
           :key="card.label"
-          class="min-h-[96px] rounded-[16px] border border-slate-200 bg-white px-4 py-4 shadow-xs"
+          class="relative min-h-[104px] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--customer-surface)] px-4 py-4"
         >
+          <span class="absolute inset-y-0 left-0 w-1 bg-[var(--customer-brand)]/70" aria-hidden="true" />
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <p class="text-xs font-semibold text-slate-500">{{ card.label }}</p>
@@ -199,10 +203,11 @@ const statusClass = (color) => {
       </section>
 
       <section class="grid gap-5 xl:grid-cols-12">
-        <section class="rounded-[18px] border border-slate-200 bg-white shadow-xs xl:col-span-8">
+        <section class="rounded-2xl border border-[var(--border)] bg-[var(--customer-surface)] xl:col-span-8">
           <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-6">
             <div>
-              <h2 class="text-lg font-semibold text-slate-950">Permohonan Terbaru</h2>
+              <p class="customer-kicker">Dossier Terbaru</p>
+              <h2 class="customer-display mt-1 text-xl font-semibold text-slate-950">Permohonan Terbaru</h2>
               <p class="mt-1 text-sm text-slate-500">Daftar ringkas permohonan penilaian terakhir.</p>
             </div>
             <Link
@@ -283,9 +288,10 @@ const statusClass = (color) => {
         </section>
 
         <aside class="space-y-5 xl:col-span-4">
-          <section class="rounded-[18px] border border-slate-200 bg-white shadow-xs">
+          <section class="rounded-2xl border border-[var(--border)] bg-[var(--customer-surface)]">
             <div class="border-b border-slate-200 px-5 py-4">
-              <h2 class="text-lg font-semibold text-slate-950">Tindakan Menunggu</h2>
+              <p class="customer-kicker">Perlu Respons</p>
+              <h2 class="customer-display mt-1 text-xl font-semibold text-slate-950">Tindakan Menunggu</h2>
               <p class="mt-1 text-sm text-slate-500">Item yang membutuhkan respons Anda.</p>
             </div>
 
@@ -317,7 +323,7 @@ const statusClass = (color) => {
             </div>
           </section>
 
-          <section class="rounded-[18px] border border-slate-200 bg-white shadow-xs">
+          <section class="rounded-2xl border border-[var(--border)] bg-[var(--customer-surface)]">
             <div class="border-b border-slate-200 px-5 py-4">
               <h2 class="text-lg font-semibold text-slate-950">Akses Cepat</h2>
             </div>
