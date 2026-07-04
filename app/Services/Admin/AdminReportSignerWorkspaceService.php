@@ -5,13 +5,13 @@ namespace App\Services\Admin;
 use App\Models\ReportSigner;
 use App\Models\User;
 use App\Services\Peruri\PeruriSignerReadinessService;
+use Illuminate\Support\Facades\Storage;
 
 class AdminReportSignerWorkspaceService
 {
     public function __construct(
         private readonly PeruriSignerReadinessService $readinessService,
-    ) {
-    }
+    ) {}
 
     public function indexPayload(array $filters, int $perPage): array
     {
@@ -21,9 +21,9 @@ class AdminReportSignerWorkspaceService
             ->when($filters['q'] !== '', function ($query) use ($filters): void {
                 $query->where(function ($innerQuery) use ($filters): void {
                     $innerQuery
-                        ->where('name', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('position_title', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('certification_number', 'like', '%' . $filters['q'] . '%');
+                        ->where('name', 'like', '%'.$filters['q'].'%')
+                        ->orWhere('position_title', 'like', '%'.$filters['q'].'%')
+                        ->orWhere('certification_number', 'like', '%'.$filters['q'].'%');
                 });
             })
             ->when($filters['role'] !== 'all', fn ($query) => $query->where('role', $filters['role']))
@@ -82,11 +82,14 @@ class AdminReportSignerWorkspaceService
             'indexUrl' => route('admin.master-data.report-signers.index'),
             'refreshReadinessUrl' => null,
             'peruriActions' => $this->peruriActionsPayload(null, $record),
+            'demoSignature' => $this->demoSignaturePayload(null),
         ];
     }
 
     public function editPayload(ReportSigner $reportSigner): array
     {
+        $reportSigner->loadMissing('demoSignatureUpdatedBy:id,name');
+
         $record = [
             'id' => $reportSigner->id,
             'user_id' => $reportSigner->user_id,
@@ -112,6 +115,7 @@ class AdminReportSignerWorkspaceService
             'indexUrl' => route('admin.master-data.report-signers.index'),
             'refreshReadinessUrl' => route('admin.master-data.report-signers.refresh-readiness', $reportSigner),
             'peruriActions' => $this->peruriActionsPayload($reportSigner, $record),
+            'demoSignature' => $this->demoSignaturePayload($reportSigner),
         ];
     }
 
@@ -233,6 +237,26 @@ class AdminReportSignerWorkspaceService
                 'kyc_payload' => '{}',
                 'specimen_payload' => '{}',
             ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function demoSignaturePayload(?ReportSigner $reportSigner): array
+    {
+        $disk = (string) config('signatures.canvas_demo.signature_disk', 'local');
+        $path = (string) ($reportSigner?->demo_signature_path ?? '');
+        $isConfigured = $path !== '' && Storage::disk($disk)->exists($path);
+
+        return [
+            'is_configured' => $isConfigured,
+            'preview_url' => $isConfigured
+                ? route('admin.master-data.report-signers.demo-signature.show', $reportSigner)
+                : null,
+            'store_url' => $reportSigner
+                ? route('admin.master-data.report-signers.demo-signature.store', $reportSigner)
+                : null,
+            'updated_at' => optional($reportSigner?->demo_signature_updated_at)->toDateTimeString(),
+            'updated_by' => $reportSigner?->demoSignatureUpdatedBy?->name,
         ];
     }
 }

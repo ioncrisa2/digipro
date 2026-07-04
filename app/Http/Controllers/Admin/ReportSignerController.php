@@ -6,21 +6,25 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\RegisterPeruriSignerUserRequest;
 use App\Http\Requests\Admin\ReportSignerIndexRequest;
 use App\Http\Requests\Admin\SetPeruriSignerSpecimenRequest;
+use App\Http\Requests\Admin\StoreDemoSignatureSpecimenRequest;
 use App\Http\Requests\Admin\StoreReportSignerRequest;
 use App\Http\Requests\Admin\SubmitPeruriSignerKycRequest;
 use App\Models\ReportSigner;
 use App\Services\Admin\AdminReportSignerWorkspaceService;
 use App\Services\Peruri\PeruriSignerOnboardingService;
+use App\Services\Signatures\DemoSignatureSpecimenService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportSignerController extends Controller
 {
     public function __construct(
         private readonly AdminReportSignerWorkspaceService $workspaceService,
         private readonly PeruriSignerOnboardingService $onboardingService,
-    ) {
-    }
+        private readonly DemoSignatureSpecimenService $demoSignatureSpecimens,
+    ) {}
 
     public function index(ReportSignerIndexRequest $request): Response
     {
@@ -71,7 +75,7 @@ class ReportSignerController extends Controller
 
         return redirect()
             ->route('admin.master-data.report-signers.edit', $reportSigner)
-            ->with('success', 'Kesiapan Peruri diperbarui: ' . data_get($readiness, 'overall.message', 'status terbaru tersimpan.'));
+            ->with('success', 'Kesiapan Peruri diperbarui: '.data_get($readiness, 'overall.message', 'status terbaru tersimpan.'));
     }
 
     public function registerPeruriUser(RegisterPeruriSignerUserRequest $request, ReportSigner $reportSigner): RedirectResponse
@@ -107,6 +111,38 @@ class ReportSignerController extends Controller
         return redirect()
             ->route('admin.master-data.report-signers.edit', $reportSigner)
             ->with('success', 'Specimen tanda tangan berhasil dikirim ke Peruri.');
+    }
+
+    public function storeDemoSignature(
+        StoreDemoSignatureSpecimenRequest $request,
+        ReportSigner $reportSigner,
+    ): RedirectResponse {
+        $this->demoSignatureSpecimens->store(
+            $reportSigner,
+            $request->file('signature_image'),
+            $request->user(),
+        );
+
+        return redirect()
+            ->route('admin.master-data.report-signers.edit', $reportSigner)
+            ->with('success', 'Tanda tangan demo penilai publik berhasil disimpan.');
+    }
+
+    public function showDemoSignature(ReportSigner $reportSigner): StreamedResponse
+    {
+        $path = (string) $reportSigner->demo_signature_path;
+        $disk = $this->demoSignatureSpecimens->disk();
+
+        abort_if($path === '' || ! Storage::disk($disk)->exists($path), 404);
+
+        return Storage::disk($disk)->response(
+            $path,
+            "tanda-tangan-demo-{$reportSigner->id}",
+            [
+                'Content-Type' => (string) ($reportSigner->demo_signature_mime ?: 'image/png'),
+                'Cache-Control' => 'private, no-store',
+            ],
+        );
     }
 
     public function registerPeruriKeyla(ReportSigner $reportSigner): RedirectResponse

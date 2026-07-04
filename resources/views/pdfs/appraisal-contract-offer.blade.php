@@ -197,6 +197,22 @@
             min-height: 76px;
             margin: 0 0 8px;
         }
+        .signature-image {
+            display: block;
+            width: 160px;
+            height: 70px;
+            object-fit: contain;
+            object-position: left center;
+        }
+        .signature-demo-notice {
+            margin-top: 18px;
+            padding: 8px 10px;
+            border: 1px solid #f59e0b;
+            background: #fffbeb;
+            color: #92400e;
+            font-size: 8.8px;
+            line-height: 1.35;
+        }
         .signature-name {
             margin: 0;
             font-weight: 700;
@@ -208,14 +224,15 @@
         .signature-line-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 82px;
+            table-layout: fixed;
+            margin-top: 8px;
         }
         .signature-line-table td {
             padding: 2px 0;
             vertical-align: bottom;
         }
         .signature-line-label {
-            width: 58px;
+            width: 64px;
         }
         .signature-line-colon {
             width: 12px;
@@ -224,19 +241,26 @@
         .signature-line {
             border-bottom: 1px solid #6b7280;
             height: 17px;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
         .signature-meta-table {
             margin-top: 8px;
             font-size: 8.6px;
             line-height: 1.28;
             color: #4b5563;
+            table-layout: fixed;
         }
         .signature-meta-table td {
             padding: 1px 0;
             vertical-align: top;
         }
         .signature-meta-label {
-            width: 58px;
+            width: 68px;
+        }
+        .signature-meta-table td:last-child {
+            overflow-wrap: anywhere;
+            word-break: break-all;
         }
         .footer-line {
             margin-top: 16px;
@@ -265,6 +289,7 @@
     $isCustomerSigned = ($customerSignature['status'] ?? null) === 'signed'
         || (bool) ($signature['is_signed'] ?? false);
     $isPublicAppraiserSigned = ($publicAppraiserSignature['status'] ?? null) === 'signed';
+    $isDemoSignature = data_get($doc, 'envelope.provider') === 'canvas_demo';
     $documentHash = (string) data_get($doc, 'envelope.document_hash', $signature['document_hash'] ?? '-');
     $requestReference = trim((string) ($doc['request_reference'] ?? ''));
     $subject = trim((string) ($doc['subject'] ?? 'Lingkup Penugasan Jasa Penilaian Properti'));
@@ -387,12 +412,22 @@
         </table>
     @endforeach
 
+    @if($isDemoSignature)
+        <div class="signature-demo-notice">
+            Dokumen ini menggunakan tanda tangan canvas untuk demonstrasi DigiPro dan tidak diproses melalui Peruri SIGN-IT.
+        </div>
+    @endif
+
     <table class="signature-table">
         <tr>
             <td class="signature-left">
                 <p class="signature-heading">Hormat kami,</p>
                 <p class="signature-organization">{{ $officeName }}</p>
-                <div class="signature-space"></div>
+                <div class="signature-space">
+                    @if($isPublicAppraiserSigned && filled($publicAppraiserSignature['image_data_uri'] ?? null))
+                        <img src="{{ $publicAppraiserSignature['image_data_uri'] }}" alt="" class="signature-image">
+                    @endif
+                </div>
                 <p class="signature-name">{{ $publicAppraiserSignature['name'] ?? ($sender['representative_name'] ?? '-') }}</p>
                 <p class="signature-title">{{ $sender['representative_title'] ?? 'Penilai Publik / Penandatangan Atasan' }}</p>
                 <p class="signature-title">{{ $officeDivision }}</p>
@@ -400,7 +435,7 @@
                 <table class="signature-meta-table">
                     <tr>
                         <td class="signature-meta-label">Status</td>
-                        <td>: {{ $isPublicAppraiserSigned ? 'Sudah ditandatangani digital' : 'Belum ditandatangani digital' }}</td>
+                        <td>: {{ $isPublicAppraiserSigned ? ($isDemoSignature ? 'Tertanda tangan untuk demonstrasi' : 'Sudah ditandatangani digital') : 'Belum ditandatangani' }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Waktu</td>
@@ -412,7 +447,7 @@
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Signature ID</td>
-                        <td>: {{ $publicAppraiserSignature['external_order_id'] ?? '-' }}</td>
+                        <td>: {{ $publicAppraiserSignature['external_order_id'] ?? ($publicAppraiserSignature['reference_id'] ?? '-') }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Hash</td>
@@ -422,6 +457,11 @@
             </td>
             <td class="signature-right">
                 <p class="signature-heading">Persetujuan Customer,</p>
+                <div class="signature-space">
+                    @if($isCustomerSigned && filled($customerSignature['image_data_uri'] ?? null))
+                        <img src="{{ $customerSignature['image_data_uri'] }}" alt="" class="signature-image">
+                    @endif
+                </div>
                 <table class="signature-line-table">
                     <tr>
                         <td class="signature-line-label">Nama</td>
@@ -443,7 +483,7 @@
                 <table class="signature-meta-table">
                     <tr>
                         <td class="signature-meta-label">Status</td>
-                        <td>: {{ $isCustomerSigned ? 'Sudah ditandatangani digital' : 'Menunggu persetujuan digital' }}</td>
+                        <td>: {{ $isCustomerSigned ? ($isDemoSignature ? 'Tertanda tangan untuk demonstrasi' : 'Sudah ditandatangani digital') : 'Menunggu persetujuan' }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Email</td>
@@ -451,7 +491,7 @@
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Signature ID</td>
-                        <td>: {{ $customerSignature['external_order_id'] ?? ($signature['signature_id'] ?? ($doc['consent_id'] ?? '-')) }}</td>
+                        <td>: {{ $customerSignature['external_order_id'] ?? ($customerSignature['reference_id'] ?? ($signature['signature_id'] ?? ($doc['consent_id'] ?? '-'))) }}</td>
                     </tr>
                     <tr>
                         <td class="signature-meta-label">Hash</td>

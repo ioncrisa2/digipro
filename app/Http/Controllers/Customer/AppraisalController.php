@@ -296,14 +296,48 @@ class AppraisalController extends Controller
         }
 
         $payload = $appraisalService->buildShowPayload($request->user()->id, $id);
-        $record->loadMissing(['user:id,name,email,phone_number,billing_nik,address', 'contractPublicAppraiserSigner:id,name,email,peruri_certificate_status,peruri_keyla_status,peruri_last_checked_at']);
-        $payload['signingReadiness'] = $this->readinessService->forContract(
-            $record,
-            $record->user?->email,
-            syncPublicSigner: true,
-            customer: $request->user(),
-        );
-        $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+        $signatureMode = (string) config('signatures.contract_mode', 'peruri');
+        $payload['signatureMode'] = $signatureMode;
+        $record->loadMissing([
+            'user:id,name,email,phone_number,billing_nik,address',
+            'contractPublicAppraiserSigner:id,name,email,is_active,peruri_certificate_status,peruri_keyla_status,peruri_last_checked_at,demo_signature_path',
+        ]);
+
+        if ($signatureMode === 'canvas_demo') {
+            $signer = $record->contractPublicAppraiserSigner;
+            $signaturePath = (string) ($signer?->demo_signature_path ?? '');
+            $hasDemoSignature = $signer?->is_active === true
+                && $signaturePath !== ''
+                && Storage::disk((string) config('signatures.canvas_demo.signature_disk', 'local'))->exists($signaturePath);
+
+            $payload['signingReadiness'] = [
+                'can_customer_sign' => $hasDemoSignature,
+                'customer' => [
+                    'overall' => [
+                        'is_ready' => true,
+                        'message' => 'Canvas tanda tangan siap digunakan.',
+                    ],
+                ],
+                'public_appraiser' => [
+                    'readiness' => [
+                        'overall' => [
+                            'is_ready' => $hasDemoSignature,
+                            'message' => $hasDemoSignature
+                                ? 'Specimen demo penilai publik siap digunakan otomatis.'
+                                : 'Tanda tangan demo penilai publik belum disetel oleh admin.',
+                        ],
+                    ],
+                ],
+            ];
+        } else {
+            $payload['signingReadiness'] = $this->readinessService->forContract(
+                $record,
+                $record->user?->email,
+                syncPublicSigner: true,
+                customer: $request->user(),
+            );
+            $this->customerOnboardingService->snapshotForRequest($record, $request->user());
+        }
 
         if (($record->status?->value ?? $record->status) !== AppraisalStatusEnum::WaitingSignature->value
             && data_get($payload, 'signingReadiness.customer.overall.is_ready') !== true) {
@@ -317,7 +351,8 @@ class AppraisalController extends Controller
             data_set($payload, 'signingReadiness.can_customer_sign', true);
         }
 
-        if (($record->status?->value ?? $record->status) === AppraisalStatusEnum::WaitingSignature->value
+        if ($signatureMode !== 'canvas_demo'
+            && ($record->status?->value ?? $record->status) === AppraisalStatusEnum::WaitingSignature->value
             && data_get($payload, 'signingReadiness.can_customer_sign') !== true) {
             return redirect()
                 ->route('appraisal.contract.onboarding.page', ['id' => $record->id])
@@ -518,7 +553,7 @@ class AppraisalController extends Controller
 
             return redirect()
                 ->route('appraisal.contract.page', ['id' => $record->id])
-                ->with('error', 'Gagal memproses tanda tangan digital. Silakan coba lagi.');
+                ->with('error', 'Gagal memproses tanda tangan kontrak. Silakan coba lagi.');
         }
 
         return redirect()

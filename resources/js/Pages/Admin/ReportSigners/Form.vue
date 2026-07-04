@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import SignatureCanvas from '@/components/signatures/SignatureCanvas.vue';
 
 const props = defineProps({
   mode: { type: String, required: true },
@@ -31,6 +32,16 @@ const props = defineProps({
         kyc_payload: '{}',
         specimen_payload: '{}',
       },
+    }),
+  },
+  demoSignature: {
+    type: Object,
+    default: () => ({
+      is_configured: false,
+      preview_url: null,
+      store_url: null,
+      updated_at: null,
+      updated_by: null,
     }),
   },
 });
@@ -76,6 +87,10 @@ const specimenForm = useForm({
   signature_image: null,
 });
 
+const demoSignatureForm = useForm({
+  signature_image: null,
+});
+
 const registerPeruriUser = () => {
   if (!props.peruriActions?.register_user_url) return;
 
@@ -95,6 +110,20 @@ const submitSpecimen = () => {
   if (!props.peruriActions?.set_specimen_url) return;
 
   specimenForm.post(props.peruriActions.set_specimen_url, {
+    preserveScroll: true,
+    forceFormData: true,
+  });
+};
+
+const setDemoSignatureFile = (file) => {
+  demoSignatureForm.signature_image = file;
+  demoSignatureForm.clearErrors('signature_image');
+};
+
+const submitDemoSignature = () => {
+  if (!props.demoSignature?.store_url || !demoSignatureForm.signature_image) return;
+
+  demoSignatureForm.post(props.demoSignature.store_url, {
     preserveScroll: true,
     forceFormData: true,
   });
@@ -233,6 +262,68 @@ const peruriStatusClass = (value) => {
             <div class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm text-slate-700">
               <Checkbox :model-value="form.is_active" @update:model-value="form.is_active = Boolean($event)" />
               <span>Profil aktif dan bisa dipilih pada report</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card v-if="isEditMode && form.role === 'public_appraiser'">
+          <CardHeader>
+            <CardTitle>Tanda Tangan Canvas Demo</CardTitle>
+            <CardDescription class="text-pretty">
+              Specimen ini ditempel otomatis pada kontrak mode demo setelah customer menandatangani. Perubahan hanya berlaku untuk kontrak berikutnya.
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-6">
+            <Alert class="border-amber-200 bg-amber-50 text-amber-950">
+              <AlertTitle>Hanya untuk demonstrasi</AlertTitle>
+              <AlertDescription>
+                Specimen ini bukan pengganti otorisasi Peruri dan tidak boleh digunakan sebagai bukti tanda tangan tersertifikasi.
+              </AlertDescription>
+            </Alert>
+
+            <div v-if="demoSignature.is_configured" class="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[220px_1fr] md:items-center">
+              <div class="rounded-lg border border-slate-200 bg-white p-3">
+                <img :src="demoSignature.preview_url" alt="Specimen tanda tangan demo saat ini" class="h-24 w-full object-contain" />
+              </div>
+              <div class="space-y-1 text-sm text-slate-600">
+                <p class="font-medium text-slate-900">Specimen demo sudah tersedia</p>
+                <p>Diperbarui: {{ demoSignature.updated_at || '-' }}</p>
+                <p>Oleh: {{ demoSignature.updated_by || '-' }}</p>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <Label>Gambar langsung pada canvas</Label>
+              <SignatureCanvas
+                :disabled="demoSignatureForm.processing"
+                label="Canvas tanda tangan demo penilai publik"
+                @change="setDemoSignatureFile"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <Label for="demo_signature_upload">Atau unggah PNG/JPG</Label>
+              <Input
+                id="demo_signature_upload"
+                type="file"
+                accept="image/png,image/jpeg"
+                class="text-base md:text-sm"
+                @input="setDemoSignatureFile($event.target.files?.[0] ?? null)"
+              />
+              <p class="text-xs text-slate-500">Maksimal 2 MB. Gunakan latar transparan atau putih agar hasil PDF bersih.</p>
+              <p v-if="demoSignatureForm.errors.signature_image" class="text-sm text-rose-700">
+                {{ demoSignatureForm.errors.signature_image }}
+              </p>
+            </div>
+
+            <div class="flex justify-end">
+              <Button
+                type="button"
+                :disabled="demoSignatureForm.processing || !demoSignatureForm.signature_image"
+                @click="submitDemoSignature"
+              >
+                {{ demoSignatureForm.processing ? 'Menyimpan…' : 'Simpan Specimen Demo' }}
+              </Button>
             </div>
           </CardContent>
         </Card>

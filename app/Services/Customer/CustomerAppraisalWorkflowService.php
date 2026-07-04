@@ -5,6 +5,7 @@ namespace App\Services\Customer;
 use App\Enums\AppraisalStatusEnum;
 use App\Enums\ContractStatusEnum;
 use App\Models\AppraisalRequest;
+use App\Services\Signatures\CanvasDemoContractSignatureService;
 use App\Services\Signatures\ContractSignatureService;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -15,6 +16,7 @@ class CustomerAppraisalWorkflowService
 
     public function __construct(
         private readonly ContractSignatureService $contractSignatureService,
+        private readonly CanvasDemoContractSignatureService $canvasDemoSignatureService,
     ) {}
 
     public function resolveUserAppraisalRequest(Request $request, int $id): AppraisalRequest
@@ -131,35 +133,58 @@ class CustomerAppraisalWorkflowService
             throw new RuntimeException('Status saat ini tidak dapat menandatangani kontrak.');
         }
 
-        $keylaToken = trim((string) $request->input('keyla_token'));
-        if ($keylaToken === '') {
-            throw new RuntimeException('Kode dari aplikasi KEYLA wajib diisi.');
-        }
+        $isCanvasDemo = config('signatures.contract_mode') === 'canvas_demo';
 
-        $envelope = $this->contractSignatureService->customerSignContract(
-            $request->user(),
-            $record,
-            $appraisalService,
-            $keylaToken,
-        );
+        if ($isCanvasDemo) {
+            $signatureImage = $request->file('signature_image');
+            if (! $signatureImage) {
+                throw new RuntimeException('Tanda tangan canvas wajib diisi.');
+            }
+
+            $envelope = $this->canvasDemoSignatureService->sign(
+                $request->user(),
+                $record,
+                $appraisalService,
+                $signatureImage,
+                [
+                    'ip' => $request->ip(),
+                    'user_agent' => mb_substr((string) $request->userAgent(), 0, 500),
+                ],
+            );
+        } else {
+            $keylaToken = trim((string) $request->input('keyla_token'));
+            if ($keylaToken === '') {
+                throw new RuntimeException('Kode dari aplikasi KEYLA wajib diisi.');
+            }
+
+            $envelope = $this->contractSignatureService->customerSignContract(
+                $request->user(),
+                $record,
+                $appraisalService,
+                $keylaToken,
+            );
+        }
 
         $customerParticipant = $envelope->participants
             ->firstWhere('role', 'customer');
 
         $record->offerNegotiations()->create([
             'user_id' => $request->user()->id,
-            'action' => 'contract_sign_peruri_customer',
+            'action' => $isCanvasDemo ? 'contract_sign_canvas_demo' : 'contract_sign_peruri_customer',
             'round' => $this->countNegotiationRounds($record),
             'offered_fee' => $record->fee_total,
             'selected_fee' => $record->fee_total,
-            'reason' => 'Peruri SIGN-IT contract signing (KEYLA).',
+            'reason' => $isCanvasDemo
+                ? 'Canvas demo contract signing with automatic public appraiser specimen.'
+                : 'Peruri SIGN-IT contract signing (KEYLA).',
             'meta' => [
-                'flow' => 'peruri_contract_signature',
-                'provider' => 'peruri_signit',
-                'model' => 'tier',
+                'flow' => $isCanvasDemo ? 'canvas_demo_contract_signature' : 'peruri_contract_signature',
+                'provider' => $isCanvasDemo ? 'canvas_demo' : 'peruri_signit',
+                'model' => $isCanvasDemo ? 'parallel' : 'tier',
                 'signature_envelope_id' => $envelope->id,
                 'external_envelope_id' => $envelope->external_envelope_id,
                 'external_order_id' => $customerParticipant?->external_order_id,
+                'automatic_public_appraiser_signature' => $isCanvasDemo,
             ],
         ]);
 

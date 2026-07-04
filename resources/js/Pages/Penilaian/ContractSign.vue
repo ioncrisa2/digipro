@@ -9,10 +9,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeft, CircleAlert, CircleCheck, Download, FilePenLine } from "lucide-vue-next";
+import SignatureCanvas from "@/components/signatures/SignatureCanvas.vue";
 
 const props = defineProps({
     request: { type: Object, default: null },
     signingReadiness: { type: Object, default: () => ({}) },
+    signatureMode: { type: String, default: "peruri" },
 });
 
 const page = usePage();
@@ -20,9 +22,11 @@ const req = computed(() => props.request ?? {});
 const signing = ref(false);
 const hasAgreedToSign = ref(false);
 const keylaToken = ref("");
+const signatureFile = ref(null);
 const flash = computed(() => page.props.flash ?? {});
 
 const canSign = computed(() => req.value?.status === "waiting_signature");
+const isCanvasDemo = computed(() => props.signatureMode === "canvas_demo");
 const contractDoc = computed(() => req.value?.contract_document ?? {});
 const envelope = computed(() => contractDoc.value?.envelope ?? {});
 const signatures = computed(() => contractDoc.value?.signatures ?? {});
@@ -42,6 +46,10 @@ const customerCanSign = computed(() => readiness.value?.can_customer_sign === tr
 const signBlockedMessage = computed(() => {
     if (!canSign.value) return "Kontrak belum berada pada tahap tanda tangan.";
     if (customerCanSign.value) return null;
+    if (isCanvasDemo.value) {
+        return publicAppraiserReadiness.value?.overall?.message
+            ?? "Tanda tangan demo penilai publik belum disetel oleh admin.";
+    }
     return "Aktifkan tanda tangan digital terlebih dahulu agar kontrak bisa ditandatangani.";
 });
 const customerVerificationMessage = computed(() => customerReadiness.value?.certificate?.is_ready === true
@@ -124,19 +132,35 @@ const formatIDR = (value) => {
 
 const submitSignature = () => {
     if (!canSign.value || !customerCanSign.value || signing.value || hasAgreedToSign.value !== true) return;
-    if (!keylaToken.value || String(keylaToken.value).trim().length < 6) return;
+    if (isCanvasDemo.value && !signatureFile.value) return;
+    if (!isCanvasDemo.value && (!keylaToken.value || String(keylaToken.value).trim().length < 6)) return;
 
     signing.value = true;
     router.post(signUrl.value, {
         agree_contract: hasAgreedToSign.value === true,
-        keyla_token: String(keylaToken.value).trim(),
+        ...(isCanvasDemo.value
+            ? { signature_image: signatureFile.value }
+            : { keyla_token: String(keylaToken.value).trim() }),
     }, {
         preserveScroll: true,
+        forceFormData: isCanvasDemo.value,
         onFinish: () => {
             signing.value = false;
         },
     });
 };
+
+const setSignatureFile = (file) => {
+    signatureFile.value = file;
+};
+
+const canSubmitSignature = computed(() => {
+    if (signing.value || !customerCanSign.value || hasAgreedToSign.value !== true) return false;
+
+    return isCanvasDemo.value
+        ? Boolean(signatureFile.value)
+        : String(keylaToken.value || "").trim().length >= 6;
+});
 
 const toneClasses = {
     success: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -156,6 +180,9 @@ const badgeClassFor = (tone) => toneClasses[tone] ?? toneClasses.muted;
                     <div class="flex items-center gap-2">
                         <h1 class="text-xl font-semibold">Tanda Tangan Kontrak</h1>
                         <Badge variant="secondary">{{ req.request_number ?? '-' }}</Badge>
+                        <Badge v-if="isCanvasDemo" variant="outline" class="border-amber-300 bg-amber-50 text-amber-800">
+                            Mode Demo
+                        </Badge>
                     </div>
                     <p class="text-sm text-muted-foreground">
                         Finalisasi persetujuan kontrak penugasan appraisal.
@@ -320,8 +347,8 @@ const badgeClassFor = (tone) => toneClasses[tone] ?? toneClasses.muted;
                             <div>Tanggal: <span class="font-medium text-slate-900">{{ contractDoc.accepted_at ?? "-" }}</span></div>
                             <div>Consent ID: <span class="font-medium text-slate-900">{{ contractDoc.consent_id ?? "-" }}</span></div>
                         </div>
-                        <div class="h-16 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                            Area tanda tangan digital (Peruri SIGN-IT).
+                        <div class="min-h-16 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                            {{ isCanvasDemo ? "Tanda tangan canvas akan ditempel pada PDF final setelah disimpan." : "Area tanda tangan digital (Peruri SIGN-IT)." }}
                         </div>
                     </section>
 
@@ -334,10 +361,20 @@ const badgeClassFor = (tone) => toneClasses[tone] ?? toneClasses.muted;
             <Card>
                 <CardHeader>
                     <CardTitle class="text-base">Tindakan</CardTitle>
-                    <CardDescription>Finalisasi persetujuan kontrak dan cek kesiapan tanda tangan digital.</CardDescription>
+                    <CardDescription>
+                        {{ isCanvasDemo ? "Tandatangani kontrak menggunakan canvas demonstrasi." : "Finalisasi persetujuan kontrak dan cek kesiapan tanda tangan digital." }}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-3">
-                    <div class="grid gap-3 md:grid-cols-2">
+                    <Alert v-if="isCanvasDemo" class="border-amber-200 bg-amber-50 text-amber-950">
+                        <CircleAlert />
+                        <AlertTitle>Tanda tangan demonstrasi</AlertTitle>
+                        <AlertDescription>
+                            Proses ini tidak menggunakan Peruri SIGN-IT. Specimen penilai publik akan ditempel otomatis pada PDF final untuk kebutuhan demo.
+                        </AlertDescription>
+                    </Alert>
+
+                    <div v-if="!isCanvasDemo" class="grid gap-3 md:grid-cols-2">
                         <div class="rounded-xl border p-4">
                             <div class="flex items-center justify-between gap-3">
                                 <div>
@@ -364,7 +401,7 @@ const badgeClassFor = (tone) => toneClasses[tone] ?? toneClasses.muted;
                         </div>
                     </div>
 
-                    <div v-if="publicAppraiserReadiness?.overall" class="rounded-xl border p-4">
+                    <div v-if="!isCanvasDemo && publicAppraiserReadiness?.overall" class="rounded-xl border p-4">
                         <div class="flex items-center justify-between gap-3">
                             <div>
                                 <div class="text-sm font-medium text-slate-900">Kesiapan Penilai Publik</div>
@@ -391,13 +428,24 @@ const badgeClassFor = (tone) => toneClasses[tone] ?? toneClasses.muted;
                         <AlertDescription>{{ signBlockedMessage }}</AlertDescription>
                     </Alert>
 
-                    <div v-if="canSign" class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
+                    <div v-if="canSign && customerCanSign" class="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                         <div class="text-sm font-medium">Kontrak siap ditandatangani</div>
-                        <p class="text-xs text-muted-foreground">
+                        <p v-if="!isCanvasDemo" class="text-xs text-muted-foreground">
                             Buka aplikasi KEYLA di HP, lalu masukkan kode yang sedang aktif untuk menandatangani kontrak.
                             Sistem akan memeriksa kode tersebut sebelum tanda tangan diproses.
                         </p>
-                        <div class="rounded-lg border border-emerald-200 bg-white/80 p-3 space-y-1.5">
+                        <p v-else class="text-pretty text-xs text-emerald-900">
+                            Gambar tanda tangan Anda. Setelah disimpan, sistem menempelkan tanda tangan customer dan specimen penilai publik ke PDF final.
+                        </p>
+
+                        <SignatureCanvas
+                            v-if="isCanvasDemo"
+                            :disabled="signing"
+                            label="Canvas tanda tangan kontrak customer"
+                            @change="setSignatureFile"
+                        />
+
+                        <div v-else class="space-y-1.5 rounded-lg border border-emerald-200 bg-white/80 p-3">
                             <div class="text-xs font-medium text-slate-700">Kode dari aplikasi KEYLA</div>
                             <Input v-model="keylaToken" placeholder="Masukkan kode dari aplikasi KEYLA" autocomplete="one-time-code" />
                             <p v-if="flash.error" class="text-[11px] text-rose-700">
@@ -410,16 +458,19 @@ const badgeClassFor = (tone) => toneClasses[tone] ?? toneClasses.muted;
                         <label class="flex items-start gap-2 rounded-lg border border-emerald-300 bg-white/80 p-3">
                             <Checkbox v-model="hasAgreedToSign" class="mt-0.5" />
                             <span class="text-xs text-slate-700">
-                                Saya telah membaca, memahami, dan menyetujui seluruh isi dokumen penawaran ini untuk diproses tanda tangan digital melalui Peruri SIGN-IT.
+                                {{ isCanvasDemo
+                                    ? "Saya telah membaca, memahami, dan menyetujui isi dokumen ini untuk diproses menggunakan tanda tangan canvas demonstrasi."
+                                    : "Saya telah membaca, memahami, dan menyetujui seluruh isi dokumen penawaran ini untuk diproses tanda tangan digital melalui Peruri SIGN-IT."
+                                }}
                             </span>
                         </label>
                         <Button
                             class="bg-emerald-600 hover:bg-emerald-700"
-                            :disabled="signing || !customerCanSign || hasAgreedToSign !== true || String(keylaToken || '').trim().length < 6"
+                            :disabled="!canSubmitSignature"
                             @click="submitSignature"
                         >
                             <FilePenLine class="mr-2 h-4 w-4" />
-                            {{ signing ? "Memproses..." : "Tanda Tangani Kontrak" }}
+                            {{ signing ? "Memproses…" : "Tanda Tangani Kontrak" }}
                         </Button>
                     </div>
                     <div v-else-if="isCustomerSigned && !isFullySigned" class="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2 text-sm">

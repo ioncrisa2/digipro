@@ -2,10 +2,10 @@
 
 use App\Http\Controllers\Admin\AccessControlController;
 use App\Http\Controllers\Admin\ActivityLogController;
-use App\Http\Controllers\Admin\BackupController;
-use App\Http\Controllers\Admin\AppraisalRequestController;
 use App\Http\Controllers\Admin\AppraisalRequestCancellationController;
+use App\Http\Controllers\Admin\AppraisalRequestController;
 use App\Http\Controllers\Admin\AppraisalRequestWorkflowController;
+use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\BuildingEconomicLifeController;
 use App\Http\Controllers\Admin\CommunicationController;
 use App\Http\Controllers\Admin\ContentController;
@@ -15,9 +15,9 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\IkkByProvinceController;
 use App\Http\Controllers\Admin\MasterDataController;
-use App\Http\Controllers\Admin\ReportSignerController;
 use App\Http\Controllers\Admin\ReferenceGuideDataController;
 use App\Http\Controllers\Admin\ReferenceGuideSettingsController;
+use App\Http\Controllers\Admin\ReportSignerController;
 use App\Support\SystemNavigation;
 use Illuminate\Support\Facades\Route;
 
@@ -27,7 +27,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
     ->group(function (): void {
         Route::get('/', [AdminDashboardController::class, 'entry'])->name('dashboard');
 
-        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_APPRAISAL_REQUESTS)
+        Route::middleware('system.section:'.SystemNavigation::MANAGE_ADMIN_APPRAISAL_REQUESTS)
             ->prefix('signatures')
             ->name('signatures.')
             ->group(function (): void {
@@ -35,7 +35,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::post('/contracts/{appraisalRequest}/sign', [ContractSignatureController::class, 'sign'])->name('contracts.sign');
             });
 
-        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_APPRAISAL_REQUESTS)
+        Route::middleware('system.section:'.SystemNavigation::MANAGE_ADMIN_APPRAISAL_REQUESTS)
             ->prefix('permohonan-penilaian')
             ->name('appraisal-requests.')
             ->group(function (): void {
@@ -66,7 +66,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::post('/{appraisalRequest}/report-final', [AppraisalRequestWorkflowController::class, 'uploadFinalReport'])->name('actions.report-final');
             });
 
-        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_FINANCE)
+        Route::middleware('system.section:'.SystemNavigation::MANAGE_ADMIN_FINANCE)
             ->prefix('keuangan')
             ->name('finance.')
             ->group(function (): void {
@@ -82,7 +82,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::get('/bukti-potong', [FinanceController::class, 'withholdingReceiptsIndex'])->name('withholding-receipts.index');
             });
 
-        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_CONTENT)
+        Route::middleware('system.section:'.SystemNavigation::MANAGE_ADMIN_CONTENT)
             ->prefix('konten')
             ->name('content.')
             ->group(function (): void {
@@ -164,14 +164,14 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                     });
             });
 
-        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_MASTER_DATA)
+        Route::middleware('system.section:'.SystemNavigation::MANAGE_ADMIN_MASTER_DATA)
             ->prefix('master-data')
             ->name('master-data.')
             ->group(function (): void {
                 Route::get('/location-id-preview', [MasterDataController::class, 'locationIdPreview'])->name('locations.id-preview');
                 Route::get('/location-options', [MasterDataController::class, 'locationOptions'])->name('locations.options');
 
-                Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_MASTER_DATA_USERS)
+                Route::middleware('system.section:'.SystemNavigation::MANAGE_ADMIN_MASTER_DATA_USERS)
                     ->group(function (): void {
                         Route::get('/users', [MasterDataController::class, 'usersIndex'])->name('users.index');
                         Route::get('/users/buat', [MasterDataController::class, 'usersCreate'])->name('users.create');
@@ -192,6 +192,8 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::post('/penandatangan-report/{reportSigner}/peruri/submit-kyc', [ReportSignerController::class, 'submitPeruriKyc'])->name('report-signers.peruri.submit-kyc');
                 Route::post('/penandatangan-report/{reportSigner}/peruri/set-specimen', [ReportSignerController::class, 'setPeruriSpecimen'])->name('report-signers.peruri.set-specimen');
                 Route::post('/penandatangan-report/{reportSigner}/peruri/register-keyla', [ReportSignerController::class, 'registerPeruriKeyla'])->name('report-signers.peruri.register-keyla');
+                Route::get('/penandatangan-report/{reportSigner}/demo-signature', [ReportSignerController::class, 'showDemoSignature'])->name('report-signers.demo-signature.show');
+                Route::post('/penandatangan-report/{reportSigner}/demo-signature', [ReportSignerController::class, 'storeDemoSignature'])->name('report-signers.demo-signature.store');
                 Route::delete('/penandatangan-report/{reportSigner}', [ReportSignerController::class, 'destroy'])->name('report-signers.destroy');
 
                 Route::get('/provinsi', [MasterDataController::class, 'provincesIndex'])->name('provinces.index');
@@ -223,7 +225,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::delete('/kelurahan-desa/{village}', [MasterDataController::class, 'villagesDestroy'])->name('villages.destroy');
             });
 
-        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_REF_GUIDELINES)
+        Route::middleware('system.section:'.SystemNavigation::MANAGE_ADMIN_REF_GUIDELINES)
             ->prefix('ref-guidelines')
             ->name('ref-guidelines.')
             ->group(function (): void {
@@ -291,7 +293,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::delete('/valuation-settings/{valuationSetting}', [ReferenceGuideSettingsController::class, 'valuationSettingsDestroy'])->name('valuation-settings.destroy');
             });
 
-        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_ACCESS_CONTROL)
+        Route::middleware('system.section:'.SystemNavigation::MANAGE_ADMIN_ACCESS_CONTROL)
             ->prefix('hak-akses')
             ->name('access-control.')
             ->group(function (): void {
@@ -307,7 +309,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::put('/menu-sistem/{role}', [AccessControlController::class, 'workspaceMenusUpdate'])->name('system-menus.update');
             });
 
-        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_COMMUNICATIONS)
+        Route::middleware('system.section:'.SystemNavigation::MANAGE_ADMIN_COMMUNICATIONS)
             ->prefix('komunikasi')
             ->name('communications.')
             ->group(function (): void {
@@ -321,7 +323,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
                 Route::delete('/contact-messages/{contactMessage}', [CommunicationController::class, 'contactMessagesDestroy'])->name('contact-messages.destroy');
             });
 
-        Route::middleware('system.section:' . SystemNavigation::MANAGE_ADMIN_BACKUPS)
+        Route::middleware('system.section:'.SystemNavigation::MANAGE_ADMIN_BACKUPS)
             ->prefix('backup')
             ->name('backups.')
             ->group(function (): void {
@@ -331,7 +333,7 @@ Route::middleware(['auth', 'verified', 'not.reviewer'])
             });
 
         Route::middleware([
-            'system.section:' . SystemNavigation::MANAGE_ADMIN_ACTIVITY_LOGS,
+            'system.section:'.SystemNavigation::MANAGE_ADMIN_ACTIVITY_LOGS,
             'super_admin.role',
         ])
             ->prefix('aktivitas-pengguna')

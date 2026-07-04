@@ -11,8 +11,7 @@ class AppraisalContractDocumentBuilder
 {
     public function __construct(
         private readonly AppraisalPayloadFormatter $formatter,
-    ) {
-    }
+    ) {}
 
     public function build(AppraisalRequest $record): array
     {
@@ -68,10 +67,18 @@ class AppraisalContractDocumentBuilder
             'availability_label' => (string) config('support.availability_label', '-'),
         ];
 
+        $activeProvider = $this->activeContractProvider();
         $envelope = $record->signatureEnvelopes()
             ->where('document_type', 'contract')
-            ->where('provider', 'peruri_signit')
+            ->where('provider', $activeProvider)
             ->with('participants')
+            ->first();
+
+        $envelope ??= $record->signatureEnvelopes()
+            ->where('document_type', 'contract')
+            ->where('status', 'completed')
+            ->with('participants')
+            ->latest('id')
             ->first();
 
         $customerParticipant = $envelope?->participants?->firstWhere('role', 'customer');
@@ -83,20 +90,21 @@ class AppraisalContractDocumentBuilder
 
         $originalPdfPath = $envelope?->original_pdf_path;
         $originalPdfUrl = null;
-        if ($originalPdfPath && Storage::disk('public')->exists($originalPdfPath)) {
-            $originalPdfUrl = Storage::disk('public')->url($originalPdfPath);
+        $documentDisk = $this->documentDisk($envelope);
+        if ($originalPdfPath && Storage::disk($documentDisk)->exists($originalPdfPath)) {
+            $originalPdfUrl = Storage::disk($documentDisk)->url($originalPdfPath);
         }
 
         $signedPdfPath = $envelope?->signed_pdf_path
             ?: ($signedContractFile?->path ?? null);
 
         $signedPdfUrl = null;
-        if ($signedPdfPath && Storage::disk('public')->exists($signedPdfPath)) {
-            $signedPdfUrl = Storage::disk('public')->url($signedPdfPath);
+        if ($signedPdfPath && Storage::disk($documentDisk)->exists($signedPdfPath)) {
+            $signedPdfUrl = Storage::disk($documentDisk)->url($signedPdfPath);
         }
 
         $legacySignatureLog = $record->offerNegotiations
-            ->whereIn('action', ['contract_sign_peruri_customer', 'contract_sign_mock'])
+            ->whereIn('action', ['contract_sign_peruri_customer', 'contract_sign_canvas_demo', 'contract_sign_mock'])
             ->sortByDesc('id')
             ->first();
 
@@ -133,6 +141,10 @@ class AppraisalContractDocumentBuilder
                 'email' => $customerParticipant?->email ?? ($record->user?->email ?: '-'),
                 'external_order_id' => $customerParticipant?->external_order_id,
                 'external_envelope_id' => $envelope?->external_envelope_id,
+                'reference_id' => data_get($customerParticipant?->meta, 'reference_id'),
+                'method' => data_get($customerParticipant?->meta, 'method'),
+                'automatic' => (bool) data_get($customerParticipant?->meta, 'automatic', false),
+                'image_data_uri' => $this->signatureImageDataUri($customerParticipant?->meta),
             ],
             'public_appraiser' => [
                 'role' => 'public_appraiser',
@@ -142,6 +154,10 @@ class AppraisalContractDocumentBuilder
                 'email' => $publicAppraiserParticipant?->email ?? ($record->contractPublicAppraiserSigner?->email ?: '-'),
                 'external_order_id' => $publicAppraiserParticipant?->external_order_id,
                 'external_envelope_id' => $envelope?->external_envelope_id,
+                'reference_id' => data_get($publicAppraiserParticipant?->meta, 'reference_id'),
+                'method' => data_get($publicAppraiserParticipant?->meta, 'method'),
+                'automatic' => (bool) data_get($publicAppraiserParticipant?->meta, 'automatic', false),
+                'image_data_uri' => $this->signatureImageDataUri($publicAppraiserParticipant?->meta),
             ],
         ];
 
@@ -152,13 +168,13 @@ class AppraisalContractDocumentBuilder
             'agr_no' => $record->contract_number ?: '-',
             'date' => optional($contractDate)->toDateString() ?: now()->toDateString(),
             'date_label' => $this->formatIndonesianDate($contractDate),
-            'city_date_line' => 'Jakarta, ' . $this->formatIndonesianDate($contractDate),
+            'city_date_line' => 'Jakarta, '.$this->formatIndonesianDate($contractDate),
             'user_name' => $record->user?->name ?: $requestorName,
-            'request_id' => $record->request_number ?: ('REQ-' . $record->id),
+            'request_id' => $record->request_number ?: ('REQ-'.$record->id),
             'user_identifier' => $record->user?->email ?: '-',
             'subject' => 'Penawaran dan Lingkup Penugasan Layanan Kajian Nilai Pasar Properti Digital',
             'request_reference' => filled($record->client_spk_number)
-                ? 'Menindaklanjuti referensi/permintaan dengan nomor ' . trim((string) $record->client_spk_number) . ', bersama ini kami sampaikan penawaran dan lingkup penugasan layanan DigiPro by KJPP HJAR.'
+                ? 'Menindaklanjuti referensi/permintaan dengan nomor '.trim((string) $record->client_spk_number).', bersama ini kami sampaikan penawaran dan lingkup penugasan layanan DigiPro by KJPP HJAR.'
                 : 'Bersama ini kami sampaikan penawaran dan lingkup penugasan layanan DigiPro by KJPP HJAR untuk kajian nilai pasar properti digital.',
             'recipient_lines' => array_values(array_filter([
                 $requestorName,
@@ -190,9 +206,9 @@ class AppraisalContractDocumentBuilder
             'output_text' => 'Hasil estimasi ditampilkan pada halaman DigiPro by KJPP HJAR dan tersedia untuk diunduh dalam format PDF.',
             'sla_text' => $slaText,
             'statement_text' => 'Dokumen penawaran dan hasil layanan DigiPro by KJPP HJAR bersifat informasi umum. DigiPro by KJPP HJAR tidak melakukan inspeksi lapangan. Hasil layanan berupa estimasi rentang, bukan nilai final, dan tidak dimaksudkan untuk digunakan sebagai dasar penjaminan/agunan, kredit, transaksi mengikat, perpajakan, pelaporan keuangan, maupun tujuan penilaian profesional.',
-            'official_contact' => config('app.name') . ' User Portal',
+            'official_contact' => config('app.name').' User Portal',
             'accepted_at' => $acceptedAt?->toDateTimeString() ?: '-',
-            'consent_id' => 'CONSENT-' . $record->id,
+            'consent_id' => 'CONSENT-'.$record->id,
             'disclaimer_footer' => 'Dokumen ini bersifat informasi umum dan non-reliance (tanpa inspeksi lapangan).',
             'support_contact' => $supportContact,
             'sender' => [
@@ -214,8 +230,8 @@ class AppraisalContractDocumentBuilder
                 'signed_by_email' => $customerParticipant?->email ?? (string) ($legacyMeta['signed_by_email'] ?? ($legacySignatureLog?->user?->email ?: '-')),
                 'signature_id' => $customerParticipant?->external_order_id
                     ?? (string) ($legacyMeta['signature_id'] ?? ($legacyMeta['external_order_id'] ?? '-')),
-                'method' => (string) ($legacyMeta['method'] ?? ($customerSigned ? 'keyla' : '-')),
-                'provider' => (string) ($legacyMeta['provider'] ?? ($customerSigned ? 'peruri_signit' : '-')),
+                'method' => (string) ($legacyMeta['method'] ?? data_get($customerParticipant?->meta, 'method', $customerSigned ? 'keyla' : '-')),
+                'provider' => (string) ($legacyMeta['provider'] ?? ($envelope?->provider ?: ($customerSigned ? 'peruri_signit' : '-'))),
                 'document_hash' => $envelope?->document_hash ?? (string) ($legacyMeta['document_hash'] ?? '-'),
                 'original_pdf_path' => $originalPdfPath,
                 'original_pdf_url' => $originalPdfUrl,
@@ -225,6 +241,41 @@ class AppraisalContractDocumentBuilder
             'envelope' => $envelopePayload,
             'signatures' => $signatures,
         ];
+    }
+
+    private function activeContractProvider(): string
+    {
+        if (config('signatures.contract_mode') === 'canvas_demo') {
+            return (string) config('signatures.canvas_demo.provider', 'canvas_demo');
+        }
+
+        return 'peruri_signit';
+    }
+
+    private function documentDisk(?SignatureEnvelope $envelope): string
+    {
+        if ($envelope?->provider === config('signatures.canvas_demo.provider', 'canvas_demo')) {
+            return (string) config('signatures.canvas_demo.document_disk', 'public');
+        }
+
+        return 'public';
+    }
+
+    private function signatureImageDataUri(mixed $meta): ?string
+    {
+        if (! is_array($meta)) {
+            return null;
+        }
+
+        $disk = (string) ($meta['signature_disk'] ?? '');
+        $path = (string) ($meta['signature_path'] ?? '');
+        $mime = (string) ($meta['signature_mime'] ?? 'image/png');
+
+        if ($disk === '' || $path === '' || ! Storage::disk($disk)->exists($path)) {
+            return null;
+        }
+
+        return 'data:'.$mime.';base64,'.base64_encode(Storage::disk($disk)->get($path));
     }
 
     private function assetAreaBasisForContract(AppraisalAsset $asset): string
@@ -275,7 +326,7 @@ class AppraisalContractDocumentBuilder
         $totalFee = $this->formatter->formatRupiah((int) ($record->fee_total ?? 0));
         $feePerAsset = $this->formatter->formatRupiah((int) (($record->fee_total ?? 0) > 0 && count($assetRows) > 0 ? round((int) $record->fee_total / count($assetRows)) : (int) ($record->fee_total ?? 0)));
         $validityText = $record->offer_validity_days
-            ? $record->offer_validity_days . ' hari kalender sejak tanggal surat ini.'
+            ? $record->offer_validity_days.' hari kalender sejak tanggal surat ini.'
             : 'mengikuti kebijakan aktif pada portal DigiPro by KJPP HJAR atau sampai ada pembaruan tertulis dari DigiPro by KJPP HJAR.';
         $analysisDate = $this->formatIndonesianDate($record->contract_date ?? now());
         $documentChecklist = $this->documentChecklistText($assetRows);
@@ -422,7 +473,7 @@ class AppraisalContractDocumentBuilder
                 'lines' => [
                     "Biaya layanan DigiPro by KJPP HJAR sebesar {$totalFee} untuk keseluruhan penugasan, dengan indikasi rata-rata {$feePerAsset} per aset.",
                     'Pajak mengikuti ketentuan perpajakan yang berlaku.',
-                    'Metode pembayaran dilakukan melalui Midtrans Snap (VA, QRIS, dan e-wallet yang tersedia), dengan masa berlaku penawaran ' . $validityText,
+                    'Metode pembayaran dilakukan melalui Midtrans Snap (VA, QRIS, dan e-wallet yang tersedia), dengan masa berlaku penawaran '.$validityText,
                 ],
             ],
             [
@@ -517,7 +568,7 @@ class AppraisalContractDocumentBuilder
             return 'Jenis dokumen rinci akan mengikuti kelengkapan yang diunggah pengguna pada masing-masing aset.';
         }
 
-        return 'Dokumen yang saat ini teridentifikasi pada aset meliputi: ' . $documents . '.';
+        return 'Dokumen yang saat ini teridentifikasi pada aset meliputi: '.$documents.'.';
     }
 
     private function multilineTextLines(?string $value): array
@@ -540,7 +591,7 @@ class AppraisalContractDocumentBuilder
     private function formatIndonesianDate(mixed $value): string
     {
         if ($value instanceof \DateTimeInterface) {
-            return $value->format('d') . ' ' . $this->indonesianMonth((int) $value->format('m')) . ' ' . $value->format('Y');
+            return $value->format('d').' '.$this->indonesianMonth((int) $value->format('m')).' '.$value->format('Y');
         }
 
         $timestamp = strtotime((string) $value);
@@ -549,7 +600,7 @@ class AppraisalContractDocumentBuilder
             return (string) $value;
         }
 
-        return date('d', $timestamp) . ' ' . $this->indonesianMonth((int) date('m', $timestamp)) . ' ' . date('Y', $timestamp);
+        return date('d', $timestamp).' '.$this->indonesianMonth((int) date('m', $timestamp)).' '.date('Y', $timestamp);
     }
 
     private function indonesianMonth(int $month): string
