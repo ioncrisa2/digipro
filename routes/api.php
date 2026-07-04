@@ -85,8 +85,24 @@ Route::prefix('v1')
                 Route::get('/appraisals/{appraisal}/tracking', [MobileAppraisalController::class, 'tracking'])
                     ->whereNumber('appraisal')
                     ->name('appraisals.tracking');
-                Route::get('/profile', MobileProfileController::class)->name('profile.show');
-                Route::get('/notifications', MobileNotificationController::class)->name('notifications.index');
+                Route::get('/profile', [MobileProfileController::class, 'show'])->name('profile.show');
+                Route::put('/profile', [MobileProfileController::class, 'update'])->name('profile.update');
+                Route::get('/profile/location-options', [MobileProfileController::class, 'locationOptions'])
+                    ->name('profile.location-options');
+                Route::put('/profile/password', [MobileProfileController::class, 'updatePassword'])
+                    ->name('profile.password.update');
+                Route::post('/profile/password/verify', [MobileProfileController::class, 'verifyPassword'])
+                    ->name('profile.password.verify');
+                Route::post('/profile/avatar', [MobileProfileController::class, 'updateAvatar'])
+                    ->name('profile.avatar.update');
+                Route::delete('/profile/avatar', [MobileProfileController::class, 'removeAvatar'])
+                    ->name('profile.avatar.destroy');
+                Route::get('/notifications', [MobileNotificationController::class, 'index'])
+                    ->name('notifications.index');
+                Route::post('/notifications/read-all', [MobileNotificationController::class, 'readAll'])
+                    ->name('notifications.read-all');
+                Route::post('/notifications/{notification}/read', [MobileNotificationController::class, 'read'])
+                    ->name('notifications.read');
             });
 
         Route::middleware(['auth:sanctum', 'abilities:mobile:customer', 'verified', 'customer.role'])
