@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Customer\MobileAppraisalConsentController;
 use App\Http\Controllers\Api\V1\Customer\MobileAppraisalController;
 use App\Http\Controllers\Api\V1\Customer\MobileAppraisalDraftController;
 use App\Http\Controllers\Api\V1\Customer\MobileDashboardController;
+use App\Http\Controllers\Api\V1\Customer\MobileDeviceTokenController;
 use App\Http\Controllers\Api\V1\Customer\MobileNotificationController;
 use App\Http\Controllers\Api\V1\Customer\MobileProfileController;
 use Illuminate\Support\Facades\Route;
@@ -103,6 +104,10 @@ Route::prefix('v1')
                     ->name('notifications.read-all');
                 Route::post('/notifications/{notification}/read', [MobileNotificationController::class, 'read'])
                     ->name('notifications.read');
+                Route::post('/notifications/device-token', [MobileDeviceTokenController::class, 'store'])
+                    ->name('notifications.device-token.store');
+                Route::delete('/notifications/device-token', [MobileDeviceTokenController::class, 'destroy'])
+                    ->name('notifications.device-token.destroy');
             });
 
         Route::middleware(['auth:sanctum', 'abilities:mobile:customer', 'verified', 'customer.role'])

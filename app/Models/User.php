@@ -142,6 +142,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(AppraisalRequestCancellation::class);
     }
 
+    public function mobileDeviceTokens(): HasMany
+    {
+        return $this->hasMany(MobileDeviceToken::class);
+    }
+
     public function signatureProfile(): HasOne
     {
         return $this->hasOne(UserSignatureProfile::class);
